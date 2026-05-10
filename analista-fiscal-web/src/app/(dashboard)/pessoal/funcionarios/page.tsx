@@ -1,0 +1,185 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { Plus, Search, Users } from "lucide-react";
+import { useQueryStates, parseAsString } from "nuqs";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { LoadingState } from "@/components/shared/loading-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Moeda } from "@/components/shared/moeda";
+import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
+import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
+import { StatusFuncionarioPill } from "@/components/pessoal/status-funcionario-pill";
+import { useFuncionarios } from "@/hooks/use-pessoal";
+import {
+  TIPO_CONTRATO_LABEL,
+  type Funcionario,
+} from "@/lib/schemas/pessoal";
+import { formatarDataBR } from "@/lib/format/data";
+
+export default function FuncionariosPage() {
+  const { data, isLoading, isError, refetch } = useFuncionarios();
+
+  const [filtros, setFiltros] = useQueryStates(
+    {
+      q: parseAsString.withDefault(""),
+      status: parseAsString.withDefault("todos"),
+      contrato: parseAsString.withDefault("todos"),
+    },
+    { history: "replace" }
+  );
+
+  const lista = React.useMemo(() => {
+    if (!data) return [];
+    const q = filtros.q.trim().toLowerCase();
+    return data.filter((f) => {
+      if (filtros.status !== "todos" && f.status !== filtros.status) return false;
+      if (filtros.contrato !== "todos" && f.tipoContrato !== filtros.contrato)
+        return false;
+      if (
+        q &&
+        !f.nome.toLowerCase().includes(q) &&
+        !f.cargo.toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [data, filtros]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+            Pessoal · Funcionários
+          </span>
+          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+            Funcionários
+          </h1>
+          <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
+            Quem está ativo, afastado ou desligado. Cadastre uma admissão e o
+            evento eSocial S-2200 é transmitido automaticamente.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/pessoal/funcionarios/novo">
+            <Plus className="size-4" /> Admitir funcionário
+          </Link>
+        </Button>
+      </header>
+
+      <PessoalSubnav />
+
+      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Input
+            value={filtros.q}
+            onChange={(e) => void setFiltros({ q: e.target.value })}
+            placeholder="Buscar por nome ou cargo"
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={filtros.status}
+          onValueChange={(v) => void setFiltros({ status: v })}
+        >
+          <SelectTrigger className="w-full md:w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            <SelectItem value="ativo">Ativos</SelectItem>
+            <SelectItem value="afastado">Afastados</SelectItem>
+            <SelectItem value="demitido">Demitidos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={filtros.contrato}
+          onValueChange={(v) => void setFiltros({ contrato: v })}
+        >
+          <SelectTrigger className="w-full md:w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os contratos</SelectItem>
+            <SelectItem value="CLT">CLT</SelectItem>
+            <SelectItem value="PJ">PJ</SelectItem>
+            <SelectItem value="ESTAGIO">Estágio</SelectItem>
+          </SelectContent>
+        </Select>
+      </Card>
+
+      {isLoading ? (
+        <LoadingState titulo="Carregando funcionários..." />
+      ) : isError ? (
+        <ErrorState onTentarNovamente={() => void refetch()} />
+      ) : lista.length === 0 ? (
+        <EmptyState
+          titulo="Nenhum funcionário"
+          descricao="Cadastre seu primeiro funcionário para começar."
+          icone={Users}
+          acao={
+            <Button asChild>
+              <Link href="/pessoal/funcionarios/novo">
+                <Plus className="size-4" /> Admitir
+              </Link>
+            </Button>
+          }
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <ul
+            className="divide-y"
+            style={{ borderColor: "var(--color-line)" }}
+          >
+            {lista.map((f) => (
+              <LinhaFuncionario key={f.id} funcionario={f} />
+            ))}
+          </ul>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function LinhaFuncionario({ funcionario }: { funcionario: Funcionario }) {
+  return (
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <AvatarFuncionario
+          nome={funcionario.nome}
+          seed={funcionario.avatarSeed}
+          size="lg"
+        />
+        <div className="min-w-0">
+          <span className="text-sm font-semibold text-[var(--color-txt)] truncate block">
+            {funcionario.nome}
+          </span>
+          <span className="text-[11px] text-[var(--color-txt-3)] truncate block">
+            {funcionario.cargo} · {TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}{" "}
+            · admitido {formatarDataBR(funcionario.dataAdmissao)}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <StatusFuncionarioPill status={funcionario.status} />
+        <span className="mono text-base font-bold text-[var(--color-txt)]">
+          <Moeda valor={funcionario.salario} />
+        </span>
+      </div>
+    </li>
+  );
+}

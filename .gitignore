@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build / cache
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing / coverage
+coverage/
+
+# Bundle analyzer outputs
+**/.next/analyze/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS / Claude local config
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vercel
+.vercel
+
+# Lighthouse / perf scratch
+lighthouse-*.json
+lh-*.json
+
+# Misc
+*.pem

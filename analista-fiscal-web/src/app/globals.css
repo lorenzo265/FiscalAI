@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  /* fontes */
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* paleta — copiada do fiscalai_v4.html */
+  --color-bg: #06080f;
+  --color-bg-2: #0c0f1a;
+  --color-card: #111624;
+  --color-card-2: #161c2e;
+  --color-card-3: #1c2338;
+
+  --color-line: rgba(255, 255, 255, 0.06);
+  --color-line-2: rgba(255, 255, 255, 0.11);
+
+  --color-lime: #a3ff6b;
+  --color-lime-d: rgba(163, 255, 107, 0.12);
+  --color-blue: #4d8eff;
+  --color-blue-d: rgba(77, 142, 255, 0.12);
+  --color-amber: #ffb84d;
+  --color-amber-d: rgba(255, 184, 77, 0.12);
+  --color-red: #ff5566;
+  --color-red-d: rgba(255, 85, 102, 0.12);
+
+  --color-txt: #dde3f0;
+  --color-txt-2: #8892a8;
+  --color-txt-3: #4a5268;
+
+  /* shape */
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  /* easing */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-txt);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    background-image:
+      linear-gradient(rgba(163, 255, 107, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(163, 255, 107, 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    min-height: 100vh;
+    color: var(--color-txt);
+  }
+
+  /* números fiscais SEMPRE em mono */
+  .num,
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Scrollbar discreta no tema dark */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-card-2);
+    border-radius: 6px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-card-3);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(163, 255, 107, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(163, 255, 107, 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
