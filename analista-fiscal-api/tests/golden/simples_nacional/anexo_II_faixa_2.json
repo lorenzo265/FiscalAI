@@ -1,0 +1,22 @@
+{
+  "descricao": "Anexo II (Indústria) — Faixa 2, RBT12 R$250k, receita R$20k → DAS R$1.084,80",
+  "fonte": "Resolução CGSN 140/2018 Tabela II — (250000×7,8%−5940)/250000 = 5,424%",
+  "input": {
+    "rbt12": "250000.00",
+    "receita_mes": "20000.00",
+    "anexo": "II",
+    "faixas": [
+      {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.0450", "parcela_deduzir": "0.00"},
+      {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.0780", "parcela_deduzir": "5940.00"},
+      {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.1000", "parcela_deduzir": "13860.00"},
+      {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.1120", "parcela_deduzir": "22500.00"},
+      {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.1470", "parcela_deduzir": "85500.00"},
+      {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.3000", "parcela_deduzir": "720000.00"}
+    ]
+  },
+  "expected": {
+    "faixa": 2,
+    "aliquota_efetiva": "0.0542",
+    "valor": "1084.80"
+  }
+}

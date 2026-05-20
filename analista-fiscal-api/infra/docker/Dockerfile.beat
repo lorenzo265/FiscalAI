@@ -1,0 +1,2 @@
+# Placeholder — Celery beat entra na Sprint 2.
+# Será derivado do Dockerfile.api com CMD apontando para celery beat.

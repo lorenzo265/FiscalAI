@@ -1,0 +1,22 @@
+{
+  "descricao": "Anexo V (Serviços) — Fator R = 20% (< 28%), RBT12 R$400k, receita R$33k → DAS R$5.618,25",
+  "fonte": "Resolução CGSN 140/2018 art. 26 §1º — Fator R < 0,28 → Anexo V Faixa 3: (400000×19,5%−9900)/400000 = 17,025%",
+  "input": {
+    "rbt12": "400000.00",
+    "receita_mes": "33000.00",
+    "anexo": "V",
+    "faixas": [
+      {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.1550", "parcela_deduzir": "0.00"},
+      {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.1800", "parcela_deduzir": "4500.00"},
+      {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.1950", "parcela_deduzir": "9900.00"},
+      {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.2050", "parcela_deduzir": "17100.00"},
+      {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.2300", "parcela_deduzir": "62100.00"},
+      {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.3050", "parcela_deduzir": "540000.00"}
+    ]
+  },
+  "expected": {
+    "faixa": 3,
+    "aliquota_efetiva": "0.1702",
+    "valor": "5618.25"
+  }
+}

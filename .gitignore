@@ -32,8 +32,21 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
-.claude/
 *.swp
+
+# Claude local config — ignora tudo em .claude/ EXCETO os slash commands versionados
+.claude/*
+!.claude/commands/
+!.claude/commands/**
+
+# Obsidian — config local do vault (workspace, painéis, hotkeys pessoais)
+# mantemos plugins/, snippets/, themes/ commitados se você quiser sincronizar entre máquinas
+docs/.obsidian/workspace*
+docs/.obsidian/app.json
+docs/.obsidian/appearance.json
+docs/.obsidian/core-plugins.json
+docs/.obsidian/hotkeys.json
+docs/.obsidian/graph.json
 
 # Logs
 *.log

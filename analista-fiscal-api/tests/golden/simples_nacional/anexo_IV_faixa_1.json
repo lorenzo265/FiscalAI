@@ -1,0 +1,22 @@
+{
+  "descricao": "Anexo IV (Serviços sem INSS) — Faixa 1, RBT12 R$150k, receita R$12k → DAS R$540,00",
+  "fonte": "Resolução CGSN 140/2018 Tabela IV — alíquota nominal 4,5%",
+  "input": {
+    "rbt12": "150000.00",
+    "receita_mes": "12000.00",
+    "anexo": "IV",
+    "faixas": [
+      {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.0450", "parcela_deduzir": "0.00"},
+      {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.0900", "parcela_deduzir": "8100.00"},
+      {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.1020", "parcela_deduzir": "12420.00"},
+      {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.1400", "parcela_deduzir": "39780.00"},
+      {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.2200", "parcela_deduzir": "183780.00"},
+      {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.3300", "parcela_deduzir": "828000.00"}
+    ]
+  },
+  "expected": {
+    "faixa": 1,
+    "aliquota_efetiva": "0.0450",
+    "valor": "540.00"
+  }
+}

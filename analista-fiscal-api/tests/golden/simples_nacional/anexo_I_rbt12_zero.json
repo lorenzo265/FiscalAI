@@ -1,0 +1,22 @@
+{
+  "descricao": "Anexo I — RBT12 zero (empresa nova, < 12 meses), receita R$5k → DAS R$200,00",
+  "fonte": "Resolução CGSN 140/2018 art. 18 §3º — sem RBT12 usa alíquota nominal da Faixa 1",
+  "input": {
+    "rbt12": "0.00",
+    "receita_mes": "5000.00",
+    "anexo": "I",
+    "faixas": [
+      {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.0400", "parcela_deduzir": "0.00"},
+      {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.0730", "parcela_deduzir": "5940.00"},
+      {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.0950", "parcela_deduzir": "13860.00"},
+      {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.1070", "parcela_deduzir": "22500.00"},
+      {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.1430", "parcela_deduzir": "87300.00"},
+      {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.1900", "parcela_deduzir": "378000.00"}
+    ]
+  },
+  "expected": {
+    "faixa": 1,
+    "aliquota_efetiva": "0.0400",
+    "valor": "200.00"
+  }
+}

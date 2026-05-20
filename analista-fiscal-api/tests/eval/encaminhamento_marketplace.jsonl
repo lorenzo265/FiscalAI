@@ -1,0 +1,50 @@
+{"id":"mkt-001","pergunta":"Como me defender de um auto de infração do CARF?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-002","pergunta":"Quanto vou pagar de DAS em maio?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-003","pergunta":"Quero abrir uma holding familiar para proteger meu patrimônio","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-004","pergunta":"Quando vence meu PGDAS-D?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-005","pergunta":"Preciso contestar uma autuação da Receita Federal","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-006","pergunta":"Como emitir uma nota fiscal de serviço?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-007","pergunta":"Quero reduzir meus impostos com planejamento tributário","esperado_out_of_scope":true,"esperada_categoria":"planejamento_tributario"}
+{"id":"mkt-008","pergunta":"Qual meu regime tributário atual?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-009","pergunta":"Tenho um processo de fiscalização aberto — o que fazer?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-010","pergunta":"Qual é a alíquota do DAS para minha empresa?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-011","pergunta":"Quero incorporar outra empresa na minha","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-012","pergunta":"Minha certidão CND ainda está válida?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-013","pergunta":"Como aproveitar incentivo fiscal estadual para minha atividade?","esperado_out_of_scope":true,"esperada_categoria":"planejamento_tributario"}
+{"id":"mkt-014","pergunta":"Como pago o DAS atrasado?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-015","pergunta":"Quero fazer importação de mercadorias da China — como funciona o drawback?","esperado_out_of_scope":true,"esperada_categoria":"operacoes_complexas"}
+{"id":"mkt-016","pergunta":"Meu funcionário tirou férias — o que preciso calcular?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-017","pergunta":"Recebi um mandado de segurança tributário — o que isso significa?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-018","pergunta":"Quando tenho que transmitir o eSocial?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-019","pergunta":"Como faço a cisão da minha empresa?","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-020","pergunta":"Qual o valor do meu DAS de abril?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-021","pergunta":"Quero entrar na Zona Franca de Manaus para pagar menos imposto","esperado_out_of_scope":true,"esperada_categoria":"operacoes_complexas"}
+{"id":"mkt-022","pergunta":"Como emitir NFS-e pelo sistema?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-023","pergunta":"Preciso de ajuda com um recurso administrativo na DRJ","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-024","pergunta":"Qual a situação fiscal da minha empresa hoje?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-025","pergunta":"Quero fazer um regime especial de ICMS com o estado","esperado_out_of_scope":true,"esperada_categoria":"planejamento_tributario"}
+{"id":"mkt-026","pergunta":"Quantos funcionários estão cadastrados no sistema?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-027","pergunta":"Tenho um sócio saindo da empresa — como faço o distrato?","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-028","pergunta":"Qual é o prazo do PGDAS-D de junho?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-029","pergunta":"Minha empresa exporta para o exterior — como funciona a exportação?","esperado_out_of_scope":true,"esperada_categoria":"operacoes_complexas"}
+{"id":"mkt-030","pergunta":"Quero ver o DRE do mês passado","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-031","pergunta":"Recebi uma intimação de fiscalização — o que faço?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-032","pergunta":"Como adicionar um funcionário novo no sistema?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-033","pergunta":"Quero fazer transferência de quotas para o meu filho","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-034","pergunta":"Qual é minha RBT12 atual?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-035","pergunta":"Quero elisão fiscal para pagar menos IRPJ — como planejar?","esperado_out_of_scope":true,"esperada_categoria":"planejamento_tributario"}
+{"id":"mkt-036","pergunta":"Tenho notas fiscais pendentes de envio ao SEFAZ?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-037","pergunta":"Preciso de substituição tributária para vender para outro estado","esperado_out_of_scope":true,"esperada_categoria":"operacoes_complexas"}
+{"id":"mkt-038","pergunta":"Qual é o faturamento do meu restaurante em abril?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-039","pergunta":"Meu advogado pediu defesa fiscal para a DRF — você pode ajudar?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-040","pergunta":"Quando vence a certidão de regularidade trabalhista?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-041","pergunta":"Quero fazer fusão com outra empresa do mesmo ramo","esperado_out_of_scope":true,"esperada_categoria":"societario"}
+{"id":"mkt-042","pergunta":"Como calculo o 13º salário do funcionário?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-043","pergunta":"Quero usar o entreposto aduaneiro para importar com vantagem fiscal","esperado_out_of_scope":true,"esperada_categoria":"operacoes_complexas"}
+{"id":"mkt-044","pergunta":"Qual o saldo do meu parcelamento com a Receita?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-045","pergunta":"Quero recorrer de um auto de infração de ISS","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-046","pergunta":"Como funciona o Fator R no Simples Nacional?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-047","pergunta":"Quero um benefício fiscal aproveitando incentivo de zona especial","esperado_out_of_scope":true,"esperada_categoria":"planejamento_tributario"}
+{"id":"mkt-048","pergunta":"Quantas notas fiscais emiti em maio?","esperado_out_of_scope":false,"esperada_categoria":null}
+{"id":"mkt-049","pergunta":"Meu escritório tem processo de defesa fiscal em andamento — quando termina?","esperado_out_of_scope":true,"esperada_categoria":"contencioso_fiscal"}
+{"id":"mkt-050","pergunta":"Qual é o valor do CBS informacional deste mês?","esperado_out_of_scope":false,"esperada_categoria":null}

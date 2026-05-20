@@ -1,0 +1,7 @@
+# Placeholder — overlay de produção entra na Sprint 11+.
+# Em produção real, infra é gerenciada por Helm/Terraform (ver infra/k8s e infra/terraform).
+services:
+  api:
+    build:
+      target: prod
+    restart: unless-stopped

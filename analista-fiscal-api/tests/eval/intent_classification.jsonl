@@ -1,0 +1,100 @@
+{"id":"int-001","pergunta":"Quanto vou pagar de DAS em maio?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-002","pergunta":"Qual o valor do meu DAS de abril?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-003","pergunta":"Vence quando o DAS?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-004","pergunta":"O guia do Simples Nacional ainda não pagamos — quando vence?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-005","pergunta":"DAS de março foi quanto?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-006","pergunta":"Quando preciso transmitir o PGDAS-D?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-007","pergunta":"Qual o prazo da declaração mensal do Simples?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-008","pergunta":"O PGDAS precisa ser enviado esse mês ainda?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-009","pergunta":"Como transmitir o PGDAS-D pelo SERPRO?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-010","pergunta":"Transmitiu o PGDAS deste mês?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-011","pergunta":"Quero emitir nota fiscal de serviço","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-012","pergunta":"Como emito uma NFS-e?","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-013","pergunta":"Preciso emitir uma nota para o cliente","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-014","pergunta":"Gerar nota fiscal eletrônica de serviço","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-015","pergunta":"Quero emitir NF-e de venda de mercadoria","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-016","pergunta":"Minha empresa está em dia com a Receita Federal?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-017","pergunta":"Qual a situação fiscal atual?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-018","pergunta":"Tenho algum débito em aberto?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-019","pergunta":"Minha certidão está válida?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-020","pergunta":"A empresa está regular no CNPJ?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-021","pergunta":"Quero ver o relatório do mês passado","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-022","pergunta":"Me mostra o DRE de abril","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-023","pergunta":"Qual o faturamento do trimestre?","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-024","pergunta":"Extrato de notas emitidas em maio","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-025","pergunta":"Ver balanço do período","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-026","pergunta":"Qual meu regime tributário?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-027","pergunta":"Estou no Simples Nacional ou Lucro Presumido?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-028","pergunta":"Em qual anexo do Simples estou enquadrado?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-029","pergunta":"O que é o Fator R e como afeta meu imposto?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-030","pergunta":"Meu regime muda em 2026?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-031","pergunta":"Quando vencem as obrigações de junho?","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-032","pergunta":"Quais obrigações tenho esse mês?","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-033","pergunta":"Calendário fiscal de julho","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-034","pergunta":"Tem algum prazo essa semana?","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-035","pergunta":"O eSocial precisa ser enviado agora?","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-036","pergunta":"Como funciona o DAS do Simples Nacional?","intento_esperado":"explicacao_fiscal","out_of_scope":false,"mock_resposta":"explicacao_fiscal"}
+{"id":"int-037","pergunta":"O que é o CBS da reforma tributária?","intento_esperado":"explicacao_fiscal","out_of_scope":false,"mock_resposta":"explicacao_fiscal"}
+{"id":"int-038","pergunta":"Explica o que é RBT12","intento_esperado":"explicacao_fiscal","out_of_scope":false,"mock_resposta":"explicacao_fiscal"}
+{"id":"int-039","pergunta":"O que é PGDAS-D?","intento_esperado":"explicacao_fiscal","out_of_scope":false,"mock_resposta":"explicacao_fiscal"}
+{"id":"int-040","pergunta":"Como funciona o Fator R?","intento_esperado":"explicacao_fiscal","out_of_scope":false,"mock_resposta":"explicacao_fiscal"}
+{"id":"int-041","pergunta":"Como me defender de um auto de infração no CARF?","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-042","pergunta":"Quero abrir uma holding para meu patrimônio","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-043","pergunta":"Preciso de planejamento tributário para pagar menos","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-044","pergunta":"Como fazer importação com drawback?","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-045","pergunta":"Tenho fiscalização da Receita — preciso de defesa fiscal","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-046","pergunta":"Qual a folha de pagamento de abril?","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-047","pergunta":"Quanto receberá o funcionário João nesse mês?","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-048","pergunta":"Calcular o 13º salário","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-049","pergunta":"O FGTS foi depositado?","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-050","pergunta":"Quanto é o INSS do funcionário?","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-051","pergunta":"Qual o saldo no banco hoje?","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-052","pergunta":"Tenho contas a pagar essa semana?","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-053","pergunta":"Quais clientes ainda não pagaram?","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-054","pergunta":"Fluxo de caixa do mês","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-055","pergunta":"Ver conciliação bancária","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-056","pergunta":"Como adicionar um funcionário?","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-057","pergunta":"Demitir funcionário — o que precisa fazer?","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-058","pergunta":"Registrar admissão no eSocial","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-059","pergunta":"Calcular rescisão do funcionário Maria","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-060","pergunta":"Funcionário tirou férias — como registrar?","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-061","pergunta":"Cancelar nota fiscal 42","intento_esperado":"acao_nota","out_of_scope":false,"mock_resposta":"acao_nota"}
+{"id":"int-062","pergunta":"Enviar notas pendentes para o SEFAZ","intento_esperado":"acao_nota","out_of_scope":false,"mock_resposta":"acao_nota"}
+{"id":"int-063","pergunta":"Ver notas rejeitadas","intento_esperado":"acao_nota","out_of_scope":false,"mock_resposta":"acao_nota"}
+{"id":"int-064","pergunta":"Consultar manifesto de destinatário","intento_esperado":"acao_nota","out_of_scope":false,"mock_resposta":"acao_nota"}
+{"id":"int-065","pergunta":"Download do XML da NF-e 99","intento_esperado":"acao_nota","out_of_scope":false,"mock_resposta":"acao_nota"}
+{"id":"int-066","pergunta":"Quanto pago de CBS e IBS informacional?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-067","pergunta":"O que muda na Reforma Tributária para mim em 2026?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-068","pergunta":"Como funciona o split payment em 2027?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-069","pergunta":"Qual meu CBS de maio?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-070","pergunta":"A reforma tributária afeta meu DAS?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-071","pergunta":"Ver notas fiscais de entrada de mercadoria","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-072","pergunta":"Quantas NF-e recebidas em maio?","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-073","pergunta":"O fornecedor mandou uma nota — está no sistema?","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-074","pergunta":"Conferir NF-e recebidas do mês","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-075","pergunta":"Importar XML de nota do fornecedor","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-076","pergunta":"Quero fazer cisão da empresa","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-077","pergunta":"Tenho um mandado de segurança tributário","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-078","pergunta":"Como funciona substituição tributária de ICMS?","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-079","pergunta":"Elisão fiscal para holding familiar","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-080","pergunta":"Recurso administrativo no CARF venceu — e agora?","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-081","pergunta":"Qual é a presunção de lucro da minha atividade?","intento_esperado":"consulta_regime","out_of_scope":false,"mock_resposta":"consulta_regime"}
+{"id":"int-082","pergunta":"Como calcular o IRPJ do trimestre?","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-083","pergunta":"Quero parcelar minha dívida com a Receita","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-084","pergunta":"Estou com CNPJ suspenso — o que faço?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-085","pergunta":"Como regularizar minha empresa no cadastro RFB?","intento_esperado":"consulta_situacao","out_of_scope":false,"mock_resposta":"consulta_situacao"}
+{"id":"int-086","pergunta":"Emitir DARF de IRPJ","intento_esperado":"consulta_das","out_of_scope":false,"mock_resposta":"consulta_das"}
+{"id":"int-087","pergunta":"Transmitir DCTFWeb","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-088","pergunta":"Obrigação do eSocial S-2200 está pendente?","intento_esperado":"acao_rh","out_of_scope":false,"mock_resposta":"acao_rh"}
+{"id":"int-089","pergunta":"Ver extrato do Open Finance do Bradesco","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-090","pergunta":"Conciliar notas com extratos bancários de maio","intento_esperado":"consulta_financeiro","out_of_scope":false,"mock_resposta":"consulta_financeiro"}
+{"id":"int-091","pergunta":"Como calcular pró-labore e INSS do sócio?","intento_esperado":"consulta_folha","out_of_scope":false,"mock_resposta":"consulta_folha"}
+{"id":"int-092","pergunta":"Qual é a carga tributária da minha empresa no ano?","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-093","pergunta":"Quero ver os documentos fiscais do mês","intento_esperado":"consulta_ingestao","out_of_scope":false,"mock_resposta":"consulta_ingestao"}
+{"id":"int-094","pergunta":"Emitir nota de serviço para cliente PJ","intento_esperado":"emissao_nota","out_of_scope":false,"mock_resposta":"emissao_nota"}
+{"id":"int-095","pergunta":"Preciso de um contador para defesa em CARF","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}
+{"id":"int-096","pergunta":"Quando preciso entregar o DEFIS?","intento_esperado":"consulta_agenda","out_of_scope":false,"mock_resposta":"consulta_agenda"}
+{"id":"int-097","pergunta":"Preciso da DASN-SIMEI — como fazer?","intento_esperado":"consulta_pgdas","out_of_scope":false,"mock_resposta":"consulta_pgdas"}
+{"id":"int-098","pergunta":"O CBS e IBS já vão aparecer na minha nota fiscal?","intento_esperado":"consulta_reforma","out_of_scope":false,"mock_resposta":"consulta_reforma"}
+{"id":"int-099","pergunta":"Quero ver o plano de contas da empresa","intento_esperado":"consulta_relatorio","out_of_scope":false,"mock_resposta":"consulta_relatorio"}
+{"id":"int-100","pergunta":"Tenho uma investigação da Receita — me ajuda?","intento_esperado":"out_of_scope","out_of_scope":true,"mock_resposta":"out_of_scope"}

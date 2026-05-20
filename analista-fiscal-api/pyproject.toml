@@ -1,0 +1,97 @@
+[tool.poetry]
+name = "analista-fiscal-api"
+version = "0.1.0"
+description = "Backend do Analista Fiscal — sistema fiscal-contábil multi-tenant para PMEs brasileiras."
+authors = ["FiscalAI Team"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115"
+uvicorn = { extras = ["standard"], version = "^0.32" }
+pydantic = { extras = ["email"], version = "^2.9" }
+pydantic-settings = "^2.5"
+sqlalchemy = { extras = ["asyncio"], version = "^2.0" }
+asyncpg = "^0.30"
+alembic = "^1.13"
+httpx = "^0.27"
+redis = "^5.1"
+structlog = "^24.4"
+pyjwt = { extras = ["crypto"], version = "^2.9" }
+bcrypt = "^4.2"
+tzdata = ">=2022.1"
+defusedxml = ">=0.7"
+python-multipart = ">=0.0.9"
+google-genai = ">=1.0"
+langfuse = ">=2.0"
+pgvector = ">=0.3"
+tenacity = ">=8.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+pytest-cov = "^5.0"
+ruff = "^0.7"
+mypy = "^1.13"
+types-redis = "^4.6"
+asgi-lifespan = "^2.1"
+pg8000 = "^1.31"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "UP",            # pyupgrade
+    "B",             # flake8-bugbear
+    "SIM",           # flake8-simplify
+    "C4",            # flake8-comprehensions
+    "RUF",           # ruff-specific
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_any_generics = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_reexport = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["defusedxml.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.*", "langfuse.*", "pgvector.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error"]
+markers = [
+    "eval_live: testes de eval que requerem LLM real (Ollama ou Gemini)",
+]

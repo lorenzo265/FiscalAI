@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "analista-fiscal-api/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "analista-fiscal-api/**"
+      - ".github/workflows/ci.yml"
+
+defaults:
+  run:
+    working-directory: analista-fiscal-api
+
+jobs:
+  quality:
+    name: Lint + Type-check + Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fiscal
+          POSTGRES_PASSWORD: fiscal
+          POSTGRES_DB: fiscal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fiscal -d fiscal"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ENVIRONMENT: local
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql+asyncpg://fiscal:fiscal@localhost:5432/fiscal
+      REDIS_URL: redis://localhost:6379/0
+      OLLAMA_URL: http://localhost:11434
+      JWT_SECRET: ci_test_secret_key_32_chars_minimum
+      JWT_EXPIRE_MINUTES: "60"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.4
+
+      - name: Cache Poetry venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('analista-fiscal-api/poetry.lock') }}
+          restore-keys: poetry-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
+
+      - name: Ruff lint
+        run: poetry run ruff check .
+
+      - name: Ruff format check
+        run: poetry run ruff format --check .
+
+      - name: Mypy
+        run: poetry run mypy app
+
+      - name: Run migrations
+        run: poetry run alembic upgrade head
+
+      - name: Pytest
+        run: poetry run pytest --cov=app --cov-report=term-missing
