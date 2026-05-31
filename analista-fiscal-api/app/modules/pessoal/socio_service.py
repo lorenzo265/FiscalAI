@@ -30,7 +30,7 @@ from app.modules.pessoal.esocial_payloads import (
     gerar_s1210_pagamento,
     gerar_s2200_admissao,
     gerar_s2299_desligamento,
-    gerar_s2400_beneficiario,
+    gerar_s2300_inicio_tsve,
 )
 from app.modules.pessoal.repo import (
     DistribuicaoRepo,
@@ -215,10 +215,26 @@ class DistribuicaoService:
                 f"Tabela IRRF incompleta em {payload.data_distribuicao.isoformat()}"
             )
 
+        # Sprint 19.7 PR1 (#15): limite_isento_apurado None = service
+        # calcula automaticamente. Caller pode override passando valor.
+        if payload.limite_isento_apurado is None:
+            limite_isento_apurado = (
+                await self._apurar_limite_isento_automatico(
+                    session,
+                    empresa_id=empresa_id,
+                    data_distribuicao=payload.data_distribuicao,
+                    base_calculo_referencia=BaseCalculoReferencia(
+                        payload.base_calculo_referencia.value
+                    ),
+                )
+            )
+        else:
+            limite_isento_apurado = payload.limite_isento_apurado
+
         try:
             resultado = calcular_distribuicao(
                 valor_distribuido=payload.valor,
-                limite_isento_apurado=payload.limite_isento_apurado,
+                limite_isento_apurado=limite_isento_apurado,
                 base_calculo_referencia=BaseCalculoReferencia(
                     payload.base_calculo_referencia.value
                 ),
@@ -255,6 +271,204 @@ class DistribuicaoService:
             irrf=str(resultado.irrf_retido),
         )
         return distribuicao
+
+    async def _apurar_limite_isento_automatico(
+        self,
+        session: AsyncSession,
+        *,
+        empresa_id: UUID,
+        data_distribuicao: date,
+        base_calculo_referencia: BaseCalculoReferencia,
+    ) -> Decimal:
+        """Sprint 19.7 PR1 (#15) — limite isento automático.
+
+        Calcula baseado no regime declarado em
+        ``base_calculo_referencia``:
+
+          * ``PRESUNCAO_LP``: receita do trimestre × presunção CNAE
+            (``presuncao_lucro_presumido`` SCD) - IRPJ+CSLL+PIS+COFINS
+            pagos no trimestre.
+          * ``SIMPLES_DENTRO_DAS``: receita do ano × presunção do anexo -
+            DAS recolhido no ano.
+          * ``MEI`` / ``LUCRO_CONTABIL``: sem dados estruturados pra
+            calcular — retorna 0 (admin precisa informar manualmente).
+
+        Defensivo: qualquer erro (sem dados, sem CNAE, sem apurações)
+        cai em 0 e loga warning — distribuição continua mas vira 100%
+        tributada (cliente revisa no painel).
+        """
+        from app.modules.lucro_presumido.repo import PresuncaoLpRepo
+        from app.modules.pessoal.calcula_limite_isento import (
+            _ZERO as _ZERO_LIMITE,
+            calcular_limite_isento_lucro_presumido,
+            calcular_limite_isento_simples_nacional,
+        )
+        from app.shared.db.models import ApuracaoFiscal, Empresa
+        from sqlalchemy import select
+
+        empresa = (
+            await session.execute(
+                select(Empresa).where(Empresa.id == empresa_id)
+            )
+        ).scalar_one_or_none()
+        if empresa is None:
+            return _ZERO_LIMITE
+
+        if base_calculo_referencia is BaseCalculoReferencia.PRESUNCAO_LP:
+            return await self._limite_isento_lp(
+                session, empresa, data_distribuicao
+            )
+        if base_calculo_referencia is BaseCalculoReferencia.SIMPLES_DENTRO_DAS:
+            return await self._limite_isento_sn(
+                session, empresa, data_distribuicao
+            )
+        # MEI / LUCRO_CONTABIL — sem rotina automática hoje.
+        log.info(
+            "pessoal.distribuicao.limite_isento_manual",
+            empresa_id=str(empresa.id),
+            base=base_calculo_referencia.value,
+        )
+        return _ZERO_LIMITE
+
+    async def _limite_isento_lp(
+        self,
+        session: AsyncSession,
+        empresa: "Empresa",
+        data: date,
+    ) -> Decimal:
+        from app.modules.lucro_presumido.repo import PresuncaoLpRepo
+        from app.modules.pessoal.calcula_limite_isento import (
+            _ZERO as _ZERO_LIMITE,
+            calcular_limite_isento_lucro_presumido,
+        )
+        from app.shared.db.models import ApuracaoFiscal
+        from sqlalchemy import select
+
+        # Período do trimestre — 1º dia do trimestre até último dia do trimestre.
+        trimestre = (data.month - 1) // 3 + 1
+        mes_inicio = (trimestre - 1) * 3 + 1
+        periodo_inicio = date(data.year, mes_inicio, 1)
+        mes_fim = mes_inicio + 2
+        # Último dia do trimestre — usa primeiro dia do trimestre seguinte
+        # menos 1.
+        if mes_fim == 12:
+            periodo_fim_excl = date(data.year + 1, 1, 1)
+        else:
+            periodo_fim_excl = date(data.year, mes_fim + 1, 1)
+
+        presuncao = await PresuncaoLpRepo(session).resolver_por_cnae(
+            data,
+            empresa.cnae_principal,
+            faturamento_12m=empresa.faturamento_12m,
+        )
+        if presuncao is None:
+            log.warning(
+                "pessoal.distribuicao.presuncao_lp_ausente",
+                empresa_id=str(empresa.id),
+                cnae=empresa.cnae_principal,
+            )
+            return _ZERO_LIMITE
+
+        # Apura receita e impostos pagos do trimestre.
+        stmt = (
+            select(ApuracaoFiscal)
+            .where(ApuracaoFiscal.empresa_id == empresa.id)
+            .where(ApuracaoFiscal.competencia >= periodo_inicio)
+            .where(ApuracaoFiscal.competencia < periodo_fim_excl)
+        )
+        apuracoes = list(
+            (await session.execute(stmt)).scalars().all()
+        )
+        receita_total = _ZERO_LIMITE
+        irpj = _ZERO_LIMITE
+        csll = _ZERO_LIMITE
+        pis = _ZERO_LIMITE
+        cofins = _ZERO_LIMITE
+        for ap in apuracoes:
+            out = ap.output_jsonb or {}
+            receita_total += Decimal(str(out.get("receita_periodo", "0")))
+            valor = Decimal(str(out.get("valor", "0")))
+            if ap.tipo == "irpj":
+                irpj += valor
+            elif ap.tipo == "csll":
+                csll += valor
+            elif ap.tipo == "pis":
+                pis += valor
+            elif ap.tipo == "cofins":
+                cofins += valor
+        if receita_total <= _ZERO_LIMITE:
+            return _ZERO_LIMITE
+        calc = calcular_limite_isento_lucro_presumido(
+            receita_periodo=receita_total,
+            presuncao_irpj=presuncao.percentual_irpj,
+            irpj_pago=irpj,
+            csll_pago=csll,
+            pis_pago=pis,
+            cofins_pago=cofins,
+        )
+        log.info(
+            "pessoal.distribuicao.limite_isento_lp",
+            empresa_id=str(empresa.id),
+            trimestre=f"{data.year}-T{trimestre}",
+            limite=str(calc.limite_isento),
+            receita=str(calc.receita_periodo),
+        )
+        return calc.limite_isento
+
+    async def _limite_isento_sn(
+        self,
+        session: AsyncSession,
+        empresa: "Empresa",
+        data: date,
+    ) -> Decimal:
+        from app.modules.pessoal.calcula_limite_isento import (
+            _ZERO as _ZERO_LIMITE,
+            calcular_limite_isento_simples_nacional,
+        )
+        from app.shared.db.models import ApuracaoFiscal
+        from sqlalchemy import select
+
+        # SN — apura sobre o ano-calendário corrente até o mês da
+        # distribuição.
+        periodo_inicio = date(data.year, 1, 1)
+        if data.month == 12:
+            periodo_fim_excl = date(data.year + 1, 1, 1)
+        else:
+            periodo_fim_excl = date(data.year, data.month + 1, 1)
+
+        stmt = (
+            select(ApuracaoFiscal)
+            .where(ApuracaoFiscal.empresa_id == empresa.id)
+            .where(ApuracaoFiscal.tipo == "das")
+            .where(ApuracaoFiscal.competencia >= periodo_inicio)
+            .where(ApuracaoFiscal.competencia < periodo_fim_excl)
+        )
+        apuracoes = list(
+            (await session.execute(stmt)).scalars().all()
+        )
+        receita_total = _ZERO_LIMITE
+        das_total = _ZERO_LIMITE
+        for ap in apuracoes:
+            out = ap.output_jsonb or {}
+            receita_total += Decimal(str(out.get("receita_mes", "0")))
+            das_total += Decimal(str(out.get("valor", "0")))
+        if receita_total <= _ZERO_LIMITE:
+            return _ZERO_LIMITE
+        anexo = empresa.anexo_simples or "III"
+        calc = calcular_limite_isento_simples_nacional(
+            receita_periodo=receita_total,
+            anexo=anexo,
+            das_pago_periodo=das_total,
+        )
+        log.info(
+            "pessoal.distribuicao.limite_isento_sn",
+            empresa_id=str(empresa.id),
+            ano=data.year,
+            anexo=anexo,
+            limite=str(calc.limite_isento),
+            receita=str(calc.receita_periodo),
+        )
+        return calc.limite_isento
 
 
 class EsocialService:
@@ -421,7 +635,9 @@ async def _gerar_payload(
             "esocial.skeleton.v1",
         )
 
-    if tipo is TipoEventoESocialIn.S_2400:
+    if tipo is TipoEventoESocialIn.S_2300:
+        # Sprint 19.6 PR1 (#14): substitui S-2400 (RPPS, uso adaptado) por
+        # S-2300 (TSVE — evento canônico pra sócio recebendo pró-labore).
         socio = await SocioRepo(session).por_id(payload.referencia_id)
         if socio is None or socio.empresa_id != empresa.id:
             raise SocioNaoEncontrado(
@@ -440,12 +656,12 @@ async def _gerar_payload(
         return (
             "socio",
             None,
-            gerar_s2400_beneficiario(
+            gerar_s2300_inicio_tsve(
                 emp_in, trab_in,
                 data_inicio=socio.data_entrada,
                 valor_referencia=valor_ref,
             ),
-            "esocial.skeleton.v1",
+            "esocial.skeleton.v2",
         )
 
     raise ParametrosFolhaInvalidos(f"Tipo de evento eSocial não suportado: {tipo}")

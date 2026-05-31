@@ -1,4 +1,4 @@
-"""Repositórios do Lucro Presumido (Sprint 11 PR1)."""
+"""Repositórios do Lucro Presumido (Sprint 11 PR1 + Sprint 20 PR1 + PR2)."""
 
 from __future__ import annotations
 
@@ -8,9 +8,11 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.db.models import ApuracaoFiscal, PresuncaoLucroPresumido
+from app.shared.db.models import ApuracaoFiscal, GuiaPagamento, PresuncaoLucroPresumido
+from app.shared.exceptions import DarfLpJaGerada, GuiaPagamentoNaoEncontrada
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,8 +131,116 @@ class ApuracaoLpRepo:
             stmt = stmt.where(ApuracaoFiscal.tipo == tipo)
         return list((await self._s.execute(stmt)).scalars().all())
 
+    async def listar_trimestre(
+        self, empresa_id: UUID, ano: int, trimestre: int
+    ) -> list[ApuracaoFiscal]:
+        """Retorna todas as apurações LP do trimestre (data_ini…data_fim)."""
+        meses = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}[trimestre]
+        data_ini = date(ano, meses[0], 1)
+        data_fim = date(ano, meses[1], 1)
+        stmt = (
+            select(ApuracaoFiscal)
+            .where(
+                ApuracaoFiscal.empresa_id == empresa_id,
+                ApuracaoFiscal.competencia >= data_ini,
+                ApuracaoFiscal.competencia <= data_fim,
+            )
+            .order_by(ApuracaoFiscal.competencia.asc())
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
     async def criar(self, apuracao: ApuracaoFiscal) -> ApuracaoFiscal:
         self._s.add(apuracao)
         await self._s.flush()
         await self._s.refresh(apuracao)
         return apuracao
+
+
+class GuiaPagamentoRepo:
+    """Persiste e consulta guias de pagamento (DARF/DARE/GPS/GRF).
+
+    Sprint 20 PR1. Idempotência §8.9 via UNIQUE (empresa_id, competencia,
+    codigo_receita) — DarfLpJaGerada para duplicatas.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def criar(self, guia: GuiaPagamento) -> GuiaPagamento:
+        try:
+            self._s.add(guia)
+            await self._s.flush()
+            await self._s.refresh(guia)
+            return guia
+        except IntegrityError as exc:
+            await self._s.rollback()
+            raise DarfLpJaGerada(
+                f"Guia já gerada para código {guia.codigo_receita} "
+                f"em {guia.competencia.isoformat()}"
+            ) from exc
+
+    async def buscar(
+        self,
+        empresa_id: UUID,
+        competencia: date,
+        codigo_receita: str,
+    ) -> GuiaPagamento | None:
+        stmt = select(GuiaPagamento).where(
+            GuiaPagamento.empresa_id == empresa_id,
+            GuiaPagamento.competencia == competencia,
+            GuiaPagamento.codigo_receita == codigo_receita,
+        )
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
+    async def por_id(self, guia_id: UUID) -> GuiaPagamento | None:
+        stmt = select(GuiaPagamento).where(GuiaPagamento.id == guia_id)
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
+    async def listar(
+        self,
+        empresa_id: UUID,
+        *,
+        status: str | None = None,
+        limite: int = 50,
+    ) -> list[GuiaPagamento]:
+        stmt = (
+            select(GuiaPagamento)
+            .where(GuiaPagamento.empresa_id == empresa_id)
+            .order_by(GuiaPagamento.data_vencimento.asc())
+            .limit(limite)
+        )
+        if status:
+            stmt = stmt.where(GuiaPagamento.status == status)
+        return list((await self._s.execute(stmt)).scalars().all())
+
+    async def listar_trimestre(
+        self, empresa_id: UUID, ano: int, trimestre: int
+    ) -> list[GuiaPagamento]:
+        """Retorna todas as guias do trimestre (competencia data_ini…data_fim)."""
+        meses = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}[trimestre]
+        data_ini = date(ano, meses[0], 1)
+        data_fim = date(ano, meses[1], 1)
+        stmt = (
+            select(GuiaPagamento)
+            .where(
+                GuiaPagamento.empresa_id == empresa_id,
+                GuiaPagamento.competencia >= data_ini,
+                GuiaPagamento.competencia <= data_fim,
+            )
+            .order_by(GuiaPagamento.competencia.asc())
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
+    async def marcar_pago(
+        self, guia_id: UUID, pago_em: date
+    ) -> GuiaPagamento:
+        guia = await self.por_id(guia_id)
+        if guia is None:
+            raise GuiaPagamentoNaoEncontrada(
+                f"Guia {guia_id} não encontrada"
+            )
+        guia.status = "pago"
+        guia.pago_em = pago_em
+        await self._s.flush()
+        await self._s.refresh(guia)
+        return guia

@@ -61,21 +61,19 @@ async def buscar_similares(
     """
     vec_str = "[" + ",".join(str(f) for f in embedding) + "]"
 
-    filtro_tipo = "AND tipo = :tipo" if tipo else ""
-    sql = text(f"""
+    _BASE = """
         SELECT id, tipo, rotulo, atributos, fonte_id, fonte_tipo, created_at,
                1 - (embedding <=> :emb::vector) AS similarity
         FROM memoria_node
         WHERE empresa_id = :empresa_id
           AND embedding IS NOT NULL
-          {filtro_tipo}
-        ORDER BY embedding <=> :emb::vector
-        LIMIT :k
-    """)
-
-    params: JsonObject = {"emb": vec_str, "empresa_id": str(empresa_id), "k": k}
+    """
     if tipo:
-        params["tipo"] = tipo
+        sql = text(_BASE + " AND tipo = :tipo ORDER BY embedding <=> :emb::vector LIMIT :k")
+        params: JsonObject = {"emb": vec_str, "empresa_id": str(empresa_id), "k": k, "tipo": tipo}
+    else:
+        sql = text(_BASE + " ORDER BY embedding <=> :emb::vector LIMIT :k")
+        params = {"emb": vec_str, "empresa_id": str(empresa_id), "k": k}
 
     result = await session.execute(sql, params)
     return [dict(row._mapping) for row in result]

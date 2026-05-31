@@ -13,6 +13,11 @@ from app.modules.certidoes.schemas import (
     CertidaoTipo,
     EmitirCertidaoOut,
 )
+from app.modules.certidoes.scrapers import (
+    CndtScraper,
+    CrfScraper,
+    NotImplementedScraper,
+)
 from app.modules.certidoes.service import CertidoesService
 from app.shared.db.deps import SessionDep, TenantDep
 
@@ -38,6 +43,7 @@ async def emitir(
     request: Request,
 ) -> EmitirCertidaoOut:
     serpro_client = getattr(request.app.state, "serpro_client", None)
+    crf_scraper, cndt_scraper = _resolver_scrapers(request)
     service = CertidoesService()
     return await service.emitir(
         session,
@@ -45,7 +51,37 @@ async def emitir(
         empresa_id,
         tipo,
         serpro_client=serpro_client,
+        crf_scraper=crf_scraper,
+        cndt_scraper=cndt_scraper,
     )
+
+
+def _resolver_scrapers(
+    request: Request,
+) -> tuple[CrfScraper | None, CndtScraper | None]:
+    """Sprint 19.6 PR1 (#3): factory dos scrapers baseado em settings.
+
+    Default ``not_implemented`` retorna ``NotImplementedScraper`` —
+    Service captura ``CertidaoEmissaoFalhou`` e cai no path legado
+    (status='processando' + mensagem manual). Quando provider real
+    estiver instalado, factory devolve instância real.
+    """
+    settings = getattr(request.app.state, "settings", None)
+    if settings is None:
+        return None, None
+    crf_provider = getattr(settings, "CRF_SCRAPER_PROVIDER", "not_implemented")
+    cndt_provider = getattr(settings, "CNDT_SCRAPER_PROVIDER", "not_implemented")
+    crf: CrfScraper | None = (
+        NotImplementedScraper(tipo="CRF")
+        if crf_provider == "not_implemented"
+        else None  # provider real entra aqui em PR futuro
+    )
+    cndt: CndtScraper | None = (
+        NotImplementedScraper(tipo="CNDT")
+        if cndt_provider == "not_implemented"
+        else None
+    )
+    return crf, cndt
 
 
 @router.get(

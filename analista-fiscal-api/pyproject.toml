@@ -37,6 +37,55 @@ mypy = "^1.13"
 types-redis = "^4.6"
 asgi-lifespan = "^2.1"
 pg8000 = "^1.31"
+bandit = { extras = ["toml"], version = "^1.8" }
+
+# Sprint 19.6 PR3 (#1, #41, #2) — grupos opcionais para deploy:
+#
+#   workers   — Celery real (broker Redis) + tasks reais.
+#               Ativar: poetry install --with workers
+#               Comandos: celery -A app.workers.celery_app worker/beat
+#
+#   dou-llm   — pdfplumber para extrair PDFs do DOU (Sprint 19.5 PR3).
+#               Ativar: poetry install --with dou-llm
+#
+#   storage   — boto3 para S3Storage (Sprint 19.6 PR3 #2).
+#               Ativar: poetry install --with storage
+#
+# Em dev local, defaults funcionam sem nenhum grupo (Celery stub
+# dual-mode, LocalDiskStorage, DOU worker stub).
+[tool.poetry.group.workers]
+optional = true
+
+[tool.poetry.group.workers.dependencies]
+celery = { extras = ["redis"], version = "^5.4" }
+
+[tool.poetry.group.dou-llm]
+optional = true
+
+[tool.poetry.group.dou-llm.dependencies]
+pdfplumber = "^0.11"
+
+[tool.poetry.group.storage]
+optional = true
+
+[tool.poetry.group.storage.dependencies]
+boto3 = "^1.35"
+
+# Sprint 19.7 PR2 (#13) — eSocial transmissão real:
+#   esocial — XMLDSig (lxml para C14N + cryptography para RSA+pkcs12) +
+#             signxml (orquestra ds:Signature padrão XMLDSig W3C).
+#             Ativar: poetry install --with esocial
+#             Defaults sem o grupo: assinador é NotImplementedXmldsig
+#             (gera evento status='preparado', sem assinar). Cliente
+#             eSocial fail-fast se ESOCIAL_TRANSMISSAO_ATIVA=true sem o
+#             grupo instalado.
+[tool.poetry.group.esocial]
+optional = true
+
+[tool.poetry.group.esocial.dependencies]
+lxml = "^5.3"
+signxml = "^4.0"
+cryptography = "^43.0"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]
@@ -86,6 +135,24 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["google.*", "langfuse.*", "pgvector.*"]
 ignore_missing_imports = true
+
+# Grupos opt-in da Sprint 19.6 PR3 (#1, #41, #2). Quando não instalados,
+# imports lazy nos módulos correspondentes ainda passam mypy.
+[[tool.mypy.overrides]]
+module = ["celery.*", "pdfplumber.*", "boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+# Sprint 19.7 PR2 (#13) — grupo opt-in esocial.
+[[tool.mypy.overrides]]
+module = ["lxml.*", "signxml.*", "cryptography.*"]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "alembic"]
+skips = ["B101"]  # assert usage legítimo em guards de invariantes
+
+[tool.bandit.assert_used]
+skips = ["tests/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

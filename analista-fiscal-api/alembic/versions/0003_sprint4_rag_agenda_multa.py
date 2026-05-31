@@ -214,7 +214,10 @@ def upgrade() -> None:
                 "INSERT INTO selic_mensal (id, competencia, taxa_mensal, fonte)"
                 " VALUES (gen_random_uuid(), :comp, :taxa, 'BACEN')"
                 " ON CONFLICT (competencia) DO NOTHING"
-            ).bindparams(comp=comp, taxa=taxa)
+            ).bindparams(
+                sa.bindparam("comp", comp, type_=sa.Date()),
+                sa.bindparam("taxa", taxa, type_=sa.Numeric(6, 4)),
+            )
         )
 
 

@@ -235,6 +235,25 @@ class PessoalService:
             total_liquido=str(total_liquido),
         )
 
+        # Sprint 19.7 PR1 (#10) — gera lançamento contábil automático.
+        # Fail-soft: se plano de contas incompleto (`PlanoContasIncompleto`),
+        # loga e segue — folha continua fechada, lançamento pode ser gerado
+        # depois via endpoint manual quando contas forem cloneadas.
+        try:
+            from app.modules.contabil.lancador_service import LancadorService
+
+            await LancadorService().lote_folha(
+                session, tenant_id, empresa_id, folha
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "pessoal.folha.lancamento_auto_falhou",
+                empresa_id=str(empresa_id),
+                folha_id=str(folha.id),
+                erro=exc.__class__.__name__,
+                mensagem=str(exc)[:200],
+            )
+
         return FecharFolhaOut(
             folha_id=folha.id,
             competencia=comp_dia1,

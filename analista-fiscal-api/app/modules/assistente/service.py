@@ -19,6 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.modules.assistente.schemas import CitacaoOut, PerguntaIn, RespostaOut
+from app.modules.empresa.repo import EmpresaRepo
+from app.modules.marketplace.categorias import (
+    categoria_do_assistente,
+    pricing_para,
+)
+from app.modules.marketplace.matching import ParceiroRanked, top_parceiros
+from app.modules.marketplace.repo import ContadorParceiroRepo
+from app.modules.marketplace.schemas import ParceiroSugeridoOut
 from app.modules.memoria.service import buscar_contexto_rag, contexto_para_fontes
 from app.shared.llm.citacao import (
     RESPOSTA_PADRAO_VERIFICAR,
@@ -51,6 +59,9 @@ async def responder_pergunta(
             empresa_id=str(empresa_id),
             categoria=categoria,
         )
+        parceiros, categoria_mkt = await _sugerir_parceiros(
+            session=session, empresa_id=empresa_id, bucket_assistente=categoria
+        )
         return RespostaOut(
             resposta=(
                 f"Essa pergunta está fora do escopo do Analista Fiscal. "
@@ -60,6 +71,8 @@ async def responder_pergunta(
             citacoes=[],
             encaminhar_marketplace=True,
             categoria_marketplace=categoria,
+            categoria_marketplace_sugerida=categoria_mkt,
+            parceiros_sugeridos=parceiros,
             provider_usado="deterministic",
             tokens_input=0,
             tokens_output=0,
@@ -182,3 +195,46 @@ def _categoria_pt(categoria: str | None) -> str:
         "operacoes_complexas": "operações fiscais complexas (despachante/contador especialista)",
     }
     return mapa.get(categoria or "", "questões especializadas")
+
+
+async def _sugerir_parceiros(
+    *,
+    session: AsyncSession,
+    empresa_id: UUID,
+    bucket_assistente: str | None,
+) -> tuple[list[ParceiroSugeridoOut], str | None]:
+    """Resolve top-3 parceiros para o bucket detectado pelo LLM.
+
+    Falhas silenciosas (parceiro indisponível, empresa sem UF) devolvem lista
+    vazia — assistente ainda devolve a mensagem de encaminhamento, só sem
+    opções concretas. Por construção, não bloqueia a resposta ao cliente.
+    """
+    if bucket_assistente is None:
+        return [], None
+    categoria_mkt = categoria_do_assistente(bucket_assistente)
+    if categoria_mkt is None:
+        return [], None
+    try:
+        empresa = await EmpresaRepo(session).por_id(empresa_id)
+        if empresa is None:
+            return [], categoria_mkt
+        parceiros = await ContadorParceiroRepo(session).listar_ativos(limite=500)
+        pricing = pricing_para(categoria_mkt)
+        ranked: list[ParceiroRanked] = top_parceiros(
+            parceiros,
+            categoria=categoria_mkt,
+            uf=empresa.uf,
+            k=3,
+            sla_aceitar_horas=int(pricing.sla_aceitar.total_seconds() // 3600),
+        )
+        return (
+            [ParceiroSugeridoOut.model_validate(p) for p in ranked],
+            categoria_mkt,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "assistente.parceiros_lookup_falhou",
+            empresa_id=str(empresa_id),
+            erro=str(exc),
+        )
+        return [], categoria_mkt

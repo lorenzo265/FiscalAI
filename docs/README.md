@@ -11,6 +11,7 @@ Ponto de entrada do vault. Use a barra lateral do Obsidian ou clique nos links a
 - [[roadmap]] — evolução do projeto: as 23 sprints, status e onde estamos.
 - [[dashboard]] — painéis vivos (Dataview): pendências, módulos, sprints, ADRs.
 - [[review-checklist]] — rubrica de auto-review de PR derivada dos 12 princípios.
+- [[deploy]] — mapeamento operacional pra subir o sistema (settings, integrações, gates `hard`/`soft`, pendências `[risco-deploy]`).
 
 ---
 
@@ -58,6 +59,8 @@ Cada módulo vive em `analista-fiscal-api/app/modules/<nome>/`.
 - [[modulos/conciliacao|conciliacao]] — Open Finance + Pluggy
 - [[modulos/lucro-presumido|lucro_presumido]] — IRPJ/CSLL trimestral
 - [[modulos/relatorios|relatorios]] — Sprint 12
+- [[modulos/reforma|reforma]] — CBS/IBS informacional (Sprint 14)
+- [[modulos/sped|sped]] — geração ECD/ECF/EFD-Contribuições/EFD ICMS-IPI (Sprint 16+)
 - (criar notas conforme for tocando cada módulo)
 
 ---

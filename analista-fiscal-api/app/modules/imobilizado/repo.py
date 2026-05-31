@@ -105,6 +105,39 @@ class BemImobilizadoRepo:
         )
         return list((await self._s.execute(stmt)).scalars().all())
 
+    async def listar_para_ciap(
+        self,
+        empresa_id: UUID,
+        *,
+        periodo_fim: date,
+    ) -> list[BemImobilizado]:
+        """Sprint 19.6 PR1 (#31) — bens que entram no CIAP do período.
+
+        Filtros:
+
+          * ``icms_aquisicao_destacado IS NOT NULL`` — bem foi adquirido
+            com ICMS conhecido (cadastro completo).
+          * ``data_aquisicao <= periodo_fim`` — bem já existe no período.
+          * (``data_baixa IS NULL`` OU ``data_baixa >= data_aquisicao``)
+            — bens baixados antes da aquisição (caso impossível mas
+            defensivo) ficam fora.
+
+        Bens baixados durante o CIAP entram — a lógica pura
+        ``calcular_apropriacao_ciap`` decide quando parar de apropriar.
+        Bens com 48+ meses de aquisição também entram — a lógica pura
+        descarta no cálculo (parcela_atual > 48).
+        """
+        stmt = (
+            select(BemImobilizado)
+            .where(
+                BemImobilizado.empresa_id == empresa_id,
+                BemImobilizado.icms_aquisicao_destacado.is_not(None),
+                BemImobilizado.data_aquisicao <= periodo_fim,
+            )
+            .order_by(asc(BemImobilizado.data_aquisicao))
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
     async def baixar(
         self, bem: BemImobilizado, *, data_baixa: date, motivo: str
     ) -> None:

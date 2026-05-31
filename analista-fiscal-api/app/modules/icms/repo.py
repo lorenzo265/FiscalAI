@@ -38,6 +38,29 @@ class AliquotaIcmsRepo:
             return None
         return row[0], row[1]
 
+    async def dia_vencimento_padrao_por_uf(
+        self, uf: str, em: date
+    ) -> int:
+        """Sprint 19.6 PR1 (#33) — dia do mês seguinte de vencimento ICMS.
+
+        Default 10 se a UF não tiver vigência cadastrada em ``em``
+        (Convênio ICMS 92/2006). Para empresas Simples Nacional o
+        vencimento é o DAS (dia 20) — esta tabela não cobre SN.
+        """
+        stmt = (
+            select(AliquotaIcmsUf.dia_vencimento_padrao)
+            .where(AliquotaIcmsUf.uf == uf)
+            .where(AliquotaIcmsUf.valid_from <= em)
+            .where(
+                (AliquotaIcmsUf.valid_to == None)  # noqa: E711
+                | (AliquotaIcmsUf.valid_to >= em)
+            )
+            .order_by(AliquotaIcmsUf.valid_from.desc())
+            .limit(1)
+        )
+        dia = (await self._s.execute(stmt)).scalar_one_or_none()
+        return dia if dia is not None else 10
+
 
 class ApuracaoIcmsRepo:
     """Persiste no ``apuracao_fiscal`` (tabela central da Sprint 2)."""

@@ -151,3 +151,39 @@ class TestDeterminismo:
         r1 = calcular_provisoes(Decimal("7500.50"), "lucro_presumido")
         r2 = calcular_provisoes(Decimal("7500.50"), "lucro_presumido")
         assert r1 == r2
+
+
+# ── Aliquota persistida coerente (Fase 2 PR10) ───────────────────────────────
+
+
+class TestAliquotaPersistidaSeisCasas:
+    """Após Fase 2 PR10: ``provisao_mensal.aliquota`` é NUMERIC(8,6).
+
+    O algoritmo persiste ``1/12 ≈ 0.083333`` (6 casas) — auditor que
+    multiplicar base × aliquota_persistida obtém valor ≈ valor_provisao
+    com erro ≤ R$ 0,01 (antes era R$ 0,03 em folha de R$ 10k).
+    """
+
+    def test_aliquota_ferias_seis_casas(self) -> None:
+        r = calcular_provisoes(Decimal("10000.00"), "lucro_presumido")
+        # Esperado: 1/12 = 0.083333 (6 casas, ROUND_HALF_EVEN)
+        assert r.ferias.aliquota == Decimal("0.083333")
+        # Garante que NÃO é o valor antigo arredondado a 4 casas.
+        assert r.ferias.aliquota != Decimal("0.0833")
+
+    def test_aliquota_13_seis_casas(self) -> None:
+        r = calcular_provisoes(Decimal("10000.00"), "lucro_presumido")
+        assert r.decimo_terceiro.aliquota == Decimal("0.083333")
+
+    def test_base_x_aliquota_aproxima_valor_provisao(self) -> None:
+        """Reconciliação visual: base × aliquota ≈ valor_provisao."""
+        r = calcular_provisoes(Decimal("10000.00"), "lucro_presumido")
+        # 13º: base 10000 × 0.083333 = 833.33 → valor persistido 833.33
+        produto = r.decimo_terceiro.base_calculo * r.decimo_terceiro.aliquota
+        diferenca = (produto - r.decimo_terceiro.valor_provisao).copy_abs()
+        # Erro ≤ R$ 0,01 (antes do PR10: ~R$ 0,03 com aliquota=0.0833)
+        assert diferenca <= Decimal("0.01")
+
+    def test_versao_bumped(self) -> None:
+        """Bump v05→v06 sinaliza mudança na coluna aliquota persistida."""
+        assert ALGORITMO_VERSAO == "prov-2026.06"

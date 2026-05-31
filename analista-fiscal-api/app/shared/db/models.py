@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
@@ -91,6 +91,10 @@ class Empresa(Base):
     anexo_simples: Mapped[str | None] = mapped_column(CHAR(1), nullable=True)
     cnae_principal: Mapped[str | None] = mapped_column(String(10), nullable=True)
     municipio: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Sprint 19.6 PR3 (#17): NOT NULL (era nullable=True desde Fase 2 PR6 — fase 1).
+    # Migration 0049 aplica ALTER COLUMN SET NOT NULL após pre-check garantir
+    # 0 linhas com NULL. Service não precisa mais checar `is None` em runtime.
+    codigo_municipio_ibge: Mapped[str] = mapped_column(String(7), nullable=False)
     uf: Mapped[str | None] = mapped_column(CHAR(2), nullable=True)
     ie: Mapped[str | None] = mapped_column(String(20), nullable=True)
     im: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -100,6 +104,9 @@ class Empresa(Base):
         Integer, nullable=False, server_default="1"
     )
     ativa: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+    aliquota_iss_validada: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -136,7 +143,7 @@ class Empresa(Base):
 
 
 class DocumentoFiscal(Base):
-    """NF-e / NFS-e / NFC-e ingerida. Imutável após criação (§8.2)."""
+    """NF-e / NFS-e / NFC-e ingerida. ImutÃ¡vel apÃ³s criaÃ§Ã£o (Â§8.2)."""
 
     __tablename__ = "documento_fiscal"
 
@@ -168,6 +175,7 @@ class DocumentoFiscal(Base):
     ncm: Mapped[str | None] = mapped_column(String(8), nullable=True)
     valor_cbs: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
     valor_ibs: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    cclasstrib: Mapped[str | None] = mapped_column(String(20), nullable=True)
     xml_storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     pdf_storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     focus_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -187,6 +195,13 @@ class DocumentoFiscal(Base):
     ingested_via: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     empresa: Mapped[Empresa] = relationship("Empresa", back_populates="documentos")
+    itens: Mapped[list[DocumentoFiscalItem]] = relationship(
+        "DocumentoFiscalItem",
+        back_populates="documento",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="DocumentoFiscalItem.n_item",
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -205,6 +220,10 @@ class DocumentoFiscal(Base):
         CheckConstraint(
             r"cst IS NULL OR cst ~ '^\d{2,3}$'",
             name="ck_doc_cst_formato",
+        ),
+        CheckConstraint(
+            r"cclasstrib IS NULL OR cclasstrib ~ '^[0-9]{6}$'",
+            name="ck_doc_cclasstrib_formato",
         ),
         Index("ix_doc_chave", "chave"),
         Index("ix_doc_empresa_tipo", "empresa_id", "tipo", "direcao"),
@@ -228,7 +247,7 @@ class DocumentoFiscal(Base):
 
 
 class TabelaSimplesFaixa(Base):
-    """Tabela tributária SN — SCD Type 2 (§8.3). Nunca atualiza linhas; adiciona nova versão."""
+    """Tabela tributÃ¡ria SN â€” SCD Type 2 (Â§8.3). Nunca atualiza linhas; adiciona nova versÃ£o."""
 
     __tablename__ = "tabela_simples_faixa"
 
@@ -253,7 +272,7 @@ class TabelaSimplesFaixa(Base):
 
 
 class ApuracaoFiscal(Base):
-    """Resultado imutável de uma apuração fiscal mensal (§8.2)."""
+    """Resultado imutÃ¡vel de uma apuraÃ§Ã£o fiscal mensal (Â§8.2)."""
 
     __tablename__ = "apuracao_fiscal"
 
@@ -270,7 +289,7 @@ class ApuracaoFiscal(Base):
     input_jsonb: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
     output_jsonb: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
     faixas_usadas: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="calculado")
     transmitido_em: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     pago_em: Mapped[date | None] = mapped_column(DATE, nullable=True)
@@ -291,8 +310,86 @@ class ApuracaoFiscal(Base):
     )
 
 
+class GuiaPagamento(Base):
+    """Guia de pagamento gerada a partir de uma apuração (§8.2 — fato imutável).
+
+    LP paga IRPJ/CSLL via DARF (código 2089/2372) e PIS/Cofins via DARF
+    (código 8109/2172). Sprint 20 PR1.
+    """
+
+    __tablename__ = "guia_pagamento"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    tenant_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    apuracao_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("apuracao_fiscal.id"),
+        nullable=True,
+    )
+    tipo: Mapped[str] = mapped_column(String(10), nullable=False)
+    codigo_receita: Mapped[str] = mapped_column(String(4), nullable=False)
+    denominacao: Mapped[str] = mapped_column(String(100), nullable=False)
+    competencia: Mapped[date] = mapped_column(DATE, nullable=False)
+    periodo_apuracao: Mapped[str] = mapped_column(String(20), nullable=False)
+    valor_principal: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    juros: Mapped[Decimal] = mapped_column(
+        NUMERIC(14, 2), nullable=False, server_default="0"
+    )
+    multa: Mapped[Decimal] = mapped_column(
+        NUMERIC(14, 2), nullable=False, server_default="0"
+    )
+    total: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    data_vencimento: Mapped[date] = mapped_column(DATE, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="a_pagar"
+    )
+    pago_em: Mapped[date | None] = mapped_column(DATE, nullable=True)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    fundamento_legal: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('darf','das','gps','grf','dare')",
+            name="ck_guia_tipo",
+        ),
+        CheckConstraint(
+            "status IN ('a_pagar','pago','cancelado')",
+            name="ck_guia_status",
+        ),
+        CheckConstraint(
+            "valor_principal >= 0",
+            name="ck_guia_principal_nao_negativo",
+        ),
+        CheckConstraint(
+            "total = valor_principal + juros + multa",
+            name="ck_guia_total_consistente",
+        ),
+        UniqueConstraint(
+            "empresa_id",
+            "competencia",
+            "codigo_receita",
+            name="uq_guia_empresa_comp_receita",
+        ),
+        Index("ix_guia_tenant", "tenant_id"),
+        Index("ix_guia_empresa_status", "empresa_id", "status"),
+        Index("ix_guia_empresa_venc", "empresa_id", "data_vencimento"),
+    )
+
+
 class SelicMensal(Base):
-    """Taxa SELIC acumulada por competência — usada para cálculo de mora e denúncia espontânea."""
+    """Taxa SELIC acumulada por competÃªncia â€” usada para cÃ¡lculo de mora e denÃºncia espontÃ¢nea."""
 
     __tablename__ = "selic_mensal"
 
@@ -306,7 +403,7 @@ class SelicMensal(Base):
 
 
 class AgendaItem(Base):
-    """Item do calendário fiscal por empresa — obrigações com data de vencimento."""
+    """Item do calendÃ¡rio fiscal por empresa â€” obrigaÃ§Ãµes com data de vencimento."""
 
     __tablename__ = "agenda_item"
 
@@ -339,7 +436,7 @@ class AgendaItem(Base):
 
 
 class MemoriaNode(Base):
-    """Nó do grafo de memória da empresa — fatos persistentes citáveis pelo LLM (§5.9)."""
+    """NÃ³ do grafo de memÃ³ria da empresa â€” fatos persistentes citÃ¡veis pelo LLM (Â§5.9)."""
 
     __tablename__ = "memoria_node"
 
@@ -371,7 +468,7 @@ class MemoriaNode(Base):
 
 
 class MemoriaEdge(Base):
-    """Aresta do grafo de memória — relações SCD Type 2 entre nós (§5.9)."""
+    """Aresta do grafo de memÃ³ria â€” relaÃ§Ãµes SCD Type 2 entre nÃ³s (Â§5.9)."""
 
     __tablename__ = "memoria_edge"
 
@@ -406,7 +503,7 @@ class MemoriaEdge(Base):
 
 
 class SessaoWhatsApp(Base):
-    """Estado de conversa WhatsApp por número de telefone e empresa (Sprint 5).
+    """Estado de conversa WhatsApp por nÃºmero de telefone e empresa (Sprint 5).
 
     Persiste o estado entre mensagens para suportar contexto multi-turno.
     """
@@ -437,12 +534,47 @@ class SessaoWhatsApp(Base):
     )
 
 
+class WhatsappMensagemProcessada(Base):
+    """Dedup de mensagens recebidas via webhook Meta WhatsApp (Fase 2 PR7).
+
+    Atende Â§8.9 (idempotÃªncia em integraÃ§Ãµes externas). O Meta Cloud API faz
+    retry sob falha de rede / timeout â€” sem esta tabela, o mesmo ``mensagem_id``
+    Ã© processado N vezes, inflando ``SessaoWhatsApp.mensagens_na_sessao`` e
+    enviando resposta duplicada.
+
+    Sem RLS â€” rota de sistema, mesmo padrÃ£o de ``pluggy_webhook_event``. O
+    isolamento por tenant vem dos campos ``tenant_id``/``empresa_id`` gravados
+    junto, mas a checagem ``ON CONFLICT DO NOTHING`` Ã© global por ``mensagem_id``.
+
+    Task Celery ``whatsapp.expurgar_processadas`` (cron diÃ¡rio 04:00) apaga
+    linhas > 7 dias. Tabela Ã© append-only por design (REVOKE UPDATE/DELETE).
+    """
+
+    __tablename__ = "whatsapp_mensagem_processada"
+
+    mensagem_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_whatsapp_msg_processed_at", "processed_at"),
+    )
+
+
 class SerproCredencial(Base):
     """Cert e-CNPJ (.p12) + senha do cliente, cifrados para uso pelo SERPRO (Sprint 6).
 
-    Sprint 6 § Plano §8.7 / §8.12: o cliente assina termo de delegação no
-    onboarding; cert é armazenado cifrado e usado pelo SERPRO Integra Contador
-    para transmissão de PGDAS-D/DCTFWeb/etc.
+    Sprint 6 Â§ Plano Â§8.7 / Â§8.12: o cliente assina termo de delegaÃ§Ã£o no
+    onboarding; cert Ã© armazenado cifrado e usado pelo SERPRO Integra Contador
+    para transmissÃ£o de PGDAS-D/DCTFWeb/etc.
     """
 
     __tablename__ = "serpro_credencial"
@@ -473,10 +605,10 @@ class SerproCredencial(Base):
 
 
 class Certidao(Base):
-    """Certidão CND / CRF / CNDT emitida (Sprint 6).
+    """CertidÃ£o CND / CRF / CNDT emitida (Sprint 6).
 
-    Append-only. Renovação anual gera nova linha. `valid_until` indica até
-    quando a certidão atual continua válida (CND: 180 dias; CRF: 30 dias;
+    Append-only. RenovaÃ§Ã£o anual gera nova linha. `valid_until` indica atÃ©
+    quando a certidÃ£o atual continua vÃ¡lida (CND: 180 dias; CRF: 30 dias;
     CNDT: 180 dias).
     """
 
@@ -513,7 +645,7 @@ class Certidao(Base):
 
 
 class SerproChamada(Base):
-    """Audit log de cada chamada SERPRO (Sprint 6). §8.10."""
+    """Audit log de cada chamada SERPRO (Sprint 6). Â§8.10."""
 
     __tablename__ = "serpro_chamada"
 
@@ -544,10 +676,10 @@ class SerproChamada(Base):
 
 
 class TransmissaoPgdas(Base):
-    """Transmissão de PGDAS-D ao SERPRO (Sprint 6 PR2). Append-only.
+    """TransmissÃ£o de PGDAS-D ao SERPRO (Sprint 6 PR2). Append-only.
 
-    Cada tentativa de transmitir um PGDAS-D para uma competência gera uma linha.
-    Retificações criam nova linha com `tentativa = N+1` e `eh_retificadora=True`.
+    Cada tentativa de transmitir um PGDAS-D para uma competÃªncia gera uma linha.
+    RetificaÃ§Ãµes criam nova linha com `tentativa = N+1` e `eh_retificadora=True`.
     """
 
     __tablename__ = "transmissao_pgdas"
@@ -600,11 +732,11 @@ class TransmissaoPgdas(Base):
 
 
 class PluggyItem(Base):
-    """Conexão Open Finance Pluggy autorizada pelo cliente (Sprint 7 PR1).
+    """ConexÃ£o Open Finance Pluggy autorizada pelo cliente (Sprint 7 PR1).
 
-    Uma empresa pode ter múltiplos itens (um por banco/conector). O
-    ``pluggy_item_id`` é o identificador externo da Pluggy — UNIQUE para
-    idempotência do callback do widget.
+    Uma empresa pode ter mÃºltiplos itens (um por banco/conector). O
+    ``pluggy_item_id`` Ã© o identificador externo da Pluggy â€” UNIQUE para
+    idempotÃªncia do callback do widget.
     """
 
     __tablename__ = "pluggy_item"
@@ -643,10 +775,10 @@ class PluggyItem(Base):
 
 
 class ContaBancaria(Base):
-    """Conta bancária extraída via Pluggy (Sprint 7 PR1).
+    """Conta bancÃ¡ria extraÃ­da via Pluggy (Sprint 7 PR1).
 
-    ``saldo_atual`` é snapshot do último sync — fonte de verdade fica no
-    próprio banco. Atualizado a cada chamada de sync de transações.
+    ``saldo_atual`` Ã© snapshot do Ãºltimo sync â€” fonte de verdade fica no
+    prÃ³prio banco. Atualizado a cada chamada de sync de transaÃ§Ãµes.
     """
 
     __tablename__ = "conta_bancaria"
@@ -694,12 +826,12 @@ class ContaBancaria(Base):
 
 
 class TransacaoBancaria(Base):
-    """Transação bancária extraída via Pluggy (Sprint 7 PR2).
+    """TransaÃ§Ã£o bancÃ¡ria extraÃ­da via Pluggy (Sprint 7 PR2).
 
-    UPSERT por ``pluggy_transaction_id``. ``valor`` é signed (positivo
-    entrada, negativo saída). ``raw_json`` mantém snapshot bruto Pluggy
-    para auditoria e re-processamento se o algoritmo de conciliação mudar
-    (§8.2).
+    UPSERT por ``pluggy_transaction_id``. ``valor`` Ã© signed (positivo
+    entrada, negativo saÃ­da). ``raw_json`` mantÃ©m snapshot bruto Pluggy
+    para auditoria e re-processamento se o algoritmo de conciliaÃ§Ã£o mudar
+    (Â§8.2).
     """
 
     __tablename__ = "transacao_bancaria"
@@ -747,10 +879,10 @@ class TransacaoBancaria(Base):
 
 
 class SaldoContaMes(Base):
-    """Saldo mensal materializado por (empresa, conta, competencia) — Sprint 9 PR3.
+    """Saldo mensal materializado por (empresa, conta, competencia) â€” Sprint 9 PR3.
 
-    Populado pelo serviço de encerramento mensal. ``status='fechado'`` é o
-    valor canônico após encerramento; ``aberto`` indica computação em curso.
+    Populado pelo serviÃ§o de encerramento mensal. ``status='fechado'`` Ã© o
+    valor canÃ´nico apÃ³s encerramento; ``aberto`` indica computaÃ§Ã£o em curso.
     """
 
     __tablename__ = "saldo_conta_mes"
@@ -791,11 +923,11 @@ class SaldoContaMes(Base):
 
 
 class ContaContabil(Base):
-    """Conta contábil hierárquica — SCD Type 2 (Sprint 9 PR1).
+    """Conta contÃ¡bil hierÃ¡rquica â€” SCD Type 2 (Sprint 9 PR1).
 
-    Apenas contas com ``aceita_lancamento=True`` (analíticas) podem aparecer
-    em ``partida_lancamento``. Sintéticas (contas-pai) servem para
-    consolidação no balancete.
+    Apenas contas com ``aceita_lancamento=True`` (analÃ­ticas) podem aparecer
+    em ``partida_lancamento``. SintÃ©ticas (contas-pai) servem para
+    consolidaÃ§Ã£o no balancete.
     """
 
     __tablename__ = "conta_contabil"
@@ -843,11 +975,11 @@ class ContaContabil(Base):
 
 
 class LancamentoContabil(Base):
-    """Cabeçalho de lançamento em partidas dobradas (Sprint 9 PR1).
+    """CabeÃ§alho de lanÃ§amento em partidas dobradas (Sprint 9 PR1).
 
     Invariante DB-level: ``total_debito = total_credito`` (CHECK). UNIQUE
-    parcial em (origem_tipo, origem_id) garante idempotência do motor
-    automático (PR2).
+    parcial em (origem_tipo, origem_id) garante idempotÃªncia do motor
+    automÃ¡tico (PR2).
     """
 
     __tablename__ = "lancamento_contabil"
@@ -877,7 +1009,7 @@ class LancamentoContabil(Base):
     __table_args__ = (
         CheckConstraint(
             "origem_tipo IN ('manual','nfe','transacao','depreciacao',"
-            "'provisao','encerramento','ajuste')",
+            "'provisao','encerramento','ajuste','importacao')",
             name="ck_lanc_origem_tipo",
         ),
         CheckConstraint(
@@ -897,7 +1029,7 @@ class LancamentoContabil(Base):
 
 
 class PartidaLancamento(Base):
-    """Linha de débito ou crédito de um lançamento (Sprint 9 PR1)."""
+    """Linha de dÃ©bito ou crÃ©dito de um lanÃ§amento (Sprint 9 PR1)."""
 
     __tablename__ = "partida_lancamento"
 
@@ -929,11 +1061,11 @@ class PartidaLancamento(Base):
 
 
 class ProvisaoMensal(Base):
-    """Provisão trabalhista mensal — férias, 13º, INSS, FGTS (Sprint 8 PR2).
+    """ProvisÃ£o trabalhista mensal â€” fÃ©rias, 13Âº, INSS, FGTS (Sprint 8 PR2).
 
-    ``funcionario_id`` é nullable; null indica provisão agregada por empresa
-    (modo atual — folha individual chega na Sprint 10). UNIQUE parcial
-    distinguindo agregada vs individual garante idempotência (§8.9).
+    ``funcionario_id`` Ã© nullable; null indica provisÃ£o agregada por empresa
+    (modo atual â€” folha individual chega na Sprint 10). UNIQUE parcial
+    distinguindo agregada vs individual garante idempotÃªncia (Â§8.9).
     """
 
     __tablename__ = "provisao_mensal"
@@ -947,9 +1079,9 @@ class ProvisaoMensal(Base):
     competencia: Mapped[date] = mapped_column(DATE, nullable=False)
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
     base_calculo: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
-    aliquota: Mapped[Decimal] = mapped_column(NUMERIC(6, 4), nullable=False)
+    aliquota: Mapped[Decimal] = mapped_column(NUMERIC(8, 6), nullable=False)
     valor_provisao: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     lancamento_contabil_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
@@ -975,7 +1107,7 @@ class ProvisaoMensal(Base):
 class TabelaDepreciacaoRfb(Base):
     """SCD Type 2 da IN SRF 162/1998 anexo I (Sprint 8 PR1).
 
-    Sem ``tenant_id`` — referência pública. Seed inicial cobre 6 categorias.
+    Sem ``tenant_id`` â€” referÃªncia pÃºblica. Seed inicial cobre 6 categorias.
     """
 
     __tablename__ = "tabela_depreciacao_rfb"
@@ -1002,7 +1134,7 @@ class TabelaDepreciacaoRfb(Base):
 
 
 class BemImobilizado(Base):
-    """Ativo imobilizado da empresa — IN SRF 162/1998 (Sprint 8 PR1)."""
+    """Ativo imobilizado da empresa â€” IN SRF 162/1998 (Sprint 8 PR1)."""
 
     __tablename__ = "bem_imobilizado"
 
@@ -1031,6 +1163,13 @@ class BemImobilizado(Base):
     valor_residual: Mapped[Decimal] = mapped_column(
         NUMERIC(14, 2), nullable=False, server_default="0"
     )
+    # Sprint 19.6 PR1 (#31) — ICMS destacado na NF-e de aquisição.
+    # NULL = bem não entra no CIAP (legado sem dado ou aquisição sem
+    # ICMS destacado). Quando preenchido, 1/48 do valor é apropriado
+    # por 48 meses (LC 87/1996 art. 20 §5º).
+    icms_aquisicao_destacado: Mapped[Decimal | None] = mapped_column(
+        NUMERIC(14, 2), nullable=True
+    )
     data_baixa: Mapped[date | None] = mapped_column(DATE, nullable=True)
     motivo_baixa: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
@@ -1057,15 +1196,21 @@ class BemImobilizado(Base):
             "valor_residual >= 0 AND valor_residual <= valor_aquisicao",
             name="ck_bem_residual_valido",
         ),
+        CheckConstraint(
+            "icms_aquisicao_destacado IS NULL OR "
+            "(icms_aquisicao_destacado > 0 "
+            " AND icms_aquisicao_destacado <= valor_aquisicao)",
+            name="ck_bem_icms_aquisicao_positivo",
+        ),
         Index("ix_bem_imob_tenant", "tenant_id"),
     )
 
 
 class DepreciacaoMensal(Base):
-    """Parcela mensal de depreciação calculada (Sprint 8 PR1).
+    """Parcela mensal de depreciaÃ§Ã£o calculada (Sprint 8 PR1).
 
-    UNIQUE (bem_id, competencia) garante idempotência do worker mensal (§8.9).
-    Append-only — recálculo histórico se a taxa mudar requer migration explícita.
+    UNIQUE (bem_id, competencia) garante idempotÃªncia do worker mensal (Â§8.9).
+    Append-only â€” recÃ¡lculo histÃ³rico se a taxa mudar requer migration explÃ­cita.
     """
 
     __tablename__ = "depreciacao_mensal"
@@ -1097,10 +1242,10 @@ class DepreciacaoMensal(Base):
 
 
 class ConciliacaoMatch(Base):
-    """Match banco × NF (Sprint 7 PR3). Trilha auditável em ``score_breakdown_json``.
+    """Match banco Ã— NF (Sprint 7 PR3). Trilha auditÃ¡vel em ``score_breakdown_json``.
 
-    UNIQUE (transacao_id, documento_fiscal_id) — não permite duplicar matches
-    para o mesmo par. Re-rodar o algoritmo é seguro (no-op em pares existentes).
+    UNIQUE (transacao_id, documento_fiscal_id) â€” nÃ£o permite duplicar matches
+    para o mesmo par. Re-rodar o algoritmo Ã© seguro (no-op em pares existentes).
     """
 
     __tablename__ = "conciliacao_match"
@@ -1122,7 +1267,7 @@ class ConciliacaoMatch(Base):
     )
     confianca: Mapped[int] = mapped_column(Integer, nullable=False)
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     score_breakdown_json: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
@@ -1159,8 +1304,8 @@ class ConciliacaoMatch(Base):
 class PluggyWebhookEvent(Base):
     """Dedup de eventos de webhook Pluggy (Sprint 7 PR2).
 
-    Cross-tenant — webhook chega antes do routing por item_id. Acesso direto
-    a esta tabela só pelo handler do webhook. Idempotência §8.9 garantida
+    Cross-tenant â€” webhook chega antes do routing por item_id. Acesso direto
+    a esta tabela sÃ³ pelo handler do webhook. IdempotÃªncia Â§8.9 garantida
     por UNIQUE em ``pluggy_event_id``.
     """
 
@@ -1185,10 +1330,10 @@ class PluggyWebhookEvent(Base):
 
 
 class DeclaracaoAnual(Base):
-    """Declaração anual SN/MEI — DEFIS ou DASN-SIMEI (Sprint 6 PR3).
+    """DeclaraÃ§Ã£o anual SN/MEI â€” DEFIS ou DASN-SIMEI (Sprint 6 PR3).
 
-    Append-only. Uma única linha por (empresa, tipo, ano_base) — retificações
-    seriam novas linhas em ano futuro (regra de negócio: para o MVP não
+    Append-only. Uma Ãºnica linha por (empresa, tipo, ano_base) â€” retificaÃ§Ãµes
+    seriam novas linhas em ano futuro (regra de negÃ³cio: para o MVP nÃ£o
     permitimos retificar a mesma anualidade; UNIQUE garante isso).
     """
 
@@ -1203,7 +1348,7 @@ class DeclaracaoAnual(Base):
     ano_base: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     payload_json: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     protocolo: Mapped[str | None] = mapped_column(String(60), nullable=True)
     transmitida_em: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
@@ -1247,8 +1392,8 @@ class DeclaracaoAnual(Base):
 class MensagemECac(Base):
     """Mensagem da caixa postal e-CAC (RFB). Sprint 6 PR2.
 
-    Sincronizada periodicamente via SERPRO Integra Contador. Classificação por
-    LLM (tipo, prioridade, prazo) ocorre após ingestão — campos nullable até
+    Sincronizada periodicamente via SERPRO Integra Contador. ClassificaÃ§Ã£o por
+    LLM (tipo, prioridade, prazo) ocorre apÃ³s ingestÃ£o â€” campos nullable atÃ©
     o classificador rodar.
     """
 
@@ -1296,14 +1441,14 @@ class MensagemECac(Base):
     )
 
 
-# ── Pessoal / Folha (Sprint 10 PR1) ─────────────────────────────────────────
+# â”€â”€ Pessoal / Folha (Sprint 10 PR1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class Funcionario(Base):
-    """Funcionário CLT da empresa (Sprint 10 PR1).
+    """FuncionÃ¡rio CLT da empresa (Sprint 10 PR1).
 
-    Sócio/pró-labore ficam fora deste cadastro — virão em modelo dedicado na
-    Sprint 10 PR3 conforme §5.7 do Plano.
+    SÃ³cio/prÃ³-labore ficam fora deste cadastro â€” virÃ£o em modelo dedicado na
+    Sprint 10 PR3 conforme Â§5.7 do Plano.
     """
 
     __tablename__ = "funcionario"
@@ -1345,11 +1490,11 @@ class Funcionario(Base):
 
 
 class FolhaMensal(Base):
-    """Cabeçalho da folha mensal (Sprint 10 PR1).
+    """CabeÃ§alho da folha mensal (Sprint 10 PR1).
 
-    ``status='fechada'`` torna a folha um fato imutável (§8.2): UPDATE em
-    holerite vinculado é bloqueado em service, e o algoritmo_versao usado
-    é congelado em ``algoritmo_versao``.
+    ``status='fechada'`` torna a folha um fato imutÃ¡vel (Â§8.2): UPDATE em
+    holerite vinculado Ã© bloqueado em service, e o algoritmo_versao usado
+    Ã© congelado em ``algoritmo_versao``.
     """
 
     __tablename__ = "folha_mensal"
@@ -1382,7 +1527,7 @@ class FolhaMensal(Base):
     qtd_funcionarios: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
     )
-    algoritmo_versao: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    algoritmo_versao: Mapped[str | None] = mapped_column(String(50), nullable=True)
     fechada_em: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
@@ -1401,10 +1546,10 @@ class FolhaMensal(Base):
 
 
 class Holerite(Base):
-    """Holerite de um funcionário em uma folha (Sprint 10 PR1).
+    """Holerite de um funcionÃ¡rio em uma folha (Sprint 10 PR1).
 
-    Snapshot do cálculo aplicado — preserva alíquotas e parcelas usadas mesmo
-    que a tabela tributária SCD mude depois (§8.3).
+    Snapshot do cÃ¡lculo aplicado â€” preserva alÃ­quotas e parcelas usadas mesmo
+    que a tabela tributÃ¡ria SCD mude depois (Â§8.3).
     """
 
     __tablename__ = "holerite"
@@ -1438,7 +1583,7 @@ class Holerite(Base):
     fgts_empregador: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
     fgts_aliquota: Mapped[Decimal] = mapped_column(NUMERIC(6, 4), nullable=False)
     valor_liquido: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
@@ -1454,11 +1599,11 @@ class Holerite(Base):
 
 
 class TabelaInssFaixa(Base):
-    """Tabela INSS SCD Type 2 (§8.3). Sprint 10 PR1.
+    """Tabela INSS SCD Type 2 (Â§8.3). Sprint 10 PR1.
 
-    ``tipo='empregado'`` → 4 faixas progressivas (cálculo escalonado).
-    ``tipo='contribuinte_individual'`` → 1 faixa, alíquota plana até o teto
-    (usado em pró-labore — Sprint 10 PR3).
+    ``tipo='empregado'`` â†’ 4 faixas progressivas (cÃ¡lculo escalonado).
+    ``tipo='contribuinte_individual'`` â†’ 1 faixa, alÃ­quota plana atÃ© o teto
+    (usado em prÃ³-labore â€” Sprint 10 PR3).
     """
 
     __tablename__ = "tabela_inss_faixa"
@@ -1486,10 +1631,10 @@ class TabelaInssFaixa(Base):
 
 
 class TabelaIrrfFaixa(Base):
-    """Tabela IRRF mensal SCD Type 2 (§8.3). Sprint 10 PR1.
+    """Tabela IRRF mensal SCD Type 2 (Â§8.3). Sprint 10 PR1.
 
-    5 faixas + dedução por dependente. ``base_ate`` da faixa 5 é simbólico
-    (teto altíssimo) — representa "acima da faixa 4".
+    5 faixas + deduÃ§Ã£o por dependente. ``base_ate`` da faixa 5 Ã© simbÃ³lico
+    (teto altÃ­ssimo) â€” representa "acima da faixa 4".
     """
 
     __tablename__ = "tabela_irrf_faixa"
@@ -1514,7 +1659,7 @@ class TabelaIrrfFaixa(Base):
 
 
 class TabelaFgtsAliquota(Base):
-    """Tabela FGTS SCD Type 2 (§8.3). Sprint 10 PR1."""
+    """Tabela FGTS SCD Type 2 (Â§8.3). Sprint 10 PR1."""
 
     __tablename__ = "tabela_fgts_aliquota"
 
@@ -1538,11 +1683,11 @@ class TabelaFgtsAliquota(Base):
 
 
 class RelatorioGerado(Base):
-    """Snapshot imutável de DRE/Balanço/DFC/Indicadores (§8.2). Sprint 12 PR1.
+    """Snapshot imutÃ¡vel de DRE/BalanÃ§o/DFC/Indicadores (Â§8.2). Sprint 12 PR1.
 
-    Re-cálculos geram nova linha; a anterior recebe ``superseded_by``
-    apontando para a nova — preservando histórico. UNIQUE parcial garante
-    apenas 1 versão ativa por (empresa, tipo, período).
+    Re-cÃ¡lculos geram nova linha; a anterior recebe ``superseded_by``
+    apontando para a nova â€” preservando histÃ³rico. UNIQUE parcial garante
+    apenas 1 versÃ£o ativa por (empresa, tipo, perÃ­odo).
     """
 
     __tablename__ = "relatorio_gerado"
@@ -1557,7 +1702,7 @@ class RelatorioGerado(Base):
     periodo_fim: Mapped[date] = mapped_column(DATE, nullable=False)
     payload: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
     saldos_base: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     superseded_by: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("relatorio_gerado.id", ondelete="SET NULL"),
@@ -1580,7 +1725,7 @@ class RelatorioGerado(Base):
 
 
 class MensagemDet(Base):
-    """Caixa postal Domicílio Eletrônico Trabalhista — Sprint 11 PR3.
+    """Caixa postal DomicÃ­lio EletrÃ´nico Trabalhista â€” Sprint 11 PR3.
 
     Espelha o pattern de ``MensagemECac`` (Sprint 6 PR2). Classificador LLM
     posterior preenche ``tipo``, ``prioridade`` e ``prazo_resposta``.
@@ -1623,11 +1768,11 @@ class MensagemDet(Base):
 
 
 class StatusCadastralRfb(Base):
-    """Snapshot da situação cadastral CNPJ na RFB — Sprint 11 PR3.
+    """Snapshot da situaÃ§Ã£o cadastral CNPJ na RFB â€” Sprint 11 PR3.
 
-    Append-only — cada sync gera nova linha (§8.2). O frontend lê apenas o
-    mais recente. Mudanças de situação ('ativa' → 'suspensa') ficam
-    rastreáveis no histórico.
+    Append-only â€” cada sync gera nova linha (Â§8.2). O frontend lÃª apenas o
+    mais recente. MudanÃ§as de situaÃ§Ã£o ('ativa' â†’ 'suspensa') ficam
+    rastreÃ¡veis no histÃ³rico.
     """
 
     __tablename__ = "status_cadastral_rfb"
@@ -1655,7 +1800,7 @@ class StatusCadastralRfb(Base):
 
 
 class StatusSintegra(Base):
-    """Snapshot da inscrição estadual (IE) por UF — Sprint 11 PR3. Append-only."""
+    """Snapshot da inscriÃ§Ã£o estadual (IE) por UF â€” Sprint 11 PR3. Append-only."""
 
     __tablename__ = "status_sintegra"
 
@@ -1685,7 +1830,7 @@ class StatusSintegra(Base):
 
 
 class ParcelamentoFiscal(Base):
-    """Parcelamento fiscal — Lei 10.522/2002, PERT, PERT2 etc. Sprint 11 PR3."""
+    """Parcelamento fiscal â€” Lei 10.522/2002, PERT, PERT2 etc. Sprint 11 PR3."""
 
     __tablename__ = "parcelamento_fiscal"
 
@@ -1705,7 +1850,7 @@ class ParcelamentoFiscal(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
     motivo_cancelamento: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1750,7 +1895,13 @@ class ParcelaFiscal(Base):
 
 
 class AliquotaIcmsUf(Base):
-    """Alíquota interna ICMS por UF — SCD Type 2 (§8.3). Sprint 11 PR2."""
+    """AlÃ­quota interna ICMS por UF â€” SCD Type 2 (Â§8.3). Sprint 11 PR2.
+
+    Sprint 19.6 PR1 adicionou ``dia_vencimento_padrao`` (#33) — dia do mês
+    seguinte quando vence o ICMS apurado (regime normal, não-Simples
+    Nacional). Default 10 cobre Convênio ICMS 92/2006; UFs com prazos
+    próprios têm valores específicos (ver migration 0046).
+    """
 
     __tablename__ = "aliquota_icms_uf"
 
@@ -1760,6 +1911,9 @@ class AliquotaIcmsUf(Base):
     aliquota_fecp: Mapped[Decimal] = mapped_column(
         NUMERIC(6, 4), nullable=False, server_default="0"
     )
+    dia_vencimento_padrao: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="10"
+    )
     valid_from: Mapped[date] = mapped_column(DATE, nullable=False)
     valid_to: Mapped[date | None] = mapped_column(DATE, nullable=True)
     fonte: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -1768,18 +1922,22 @@ class AliquotaIcmsUf(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "dia_vencimento_padrao BETWEEN 1 AND 28",
+            name="ck_icms_dia_vencimento_padrao",
+        ),
         Index("ix_icms_uf_vigente", "uf", "valid_from", "valid_to"),
     )
 
 
 class EfdReinfEvento(Base):
-    """Evento EFD-Reinf preparado para transmissão (Sprint 11 PR2 — skeleton).
+    """Evento EFD-Reinf preparado para transmissÃ£o (Sprint 11 PR2 â€” skeleton).
 
-    Tipos R-2010 (serviços tomados com retenção previdenciária), R-4020
-    (pagamentos diversos a PJ — IR + CSRF), R-9000 (exclusão), entre outros
+    Tipos R-2010 (serviÃ§os tomados com retenÃ§Ã£o previdenciÃ¡ria), R-4020
+    (pagamentos diversos a PJ â€” IR + CSRF), R-9000 (exclusÃ£o), entre outros
     do leiaute v2.1.2.
 
-    XML real e assinatura ICP-Brasil ficam para sprint futura — por ora
+    XML real e assinatura ICP-Brasil ficam para sprint futura â€” por ora
     o ``payload`` JSONB carrega os campos normalizados.
     """
 
@@ -1813,7 +1971,7 @@ class EfdReinfEvento(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="preparado")
     protocolo: Mapped[str | None] = mapped_column(String(80), nullable=True)
     resposta: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1832,12 +1990,12 @@ class EfdReinfEvento(Base):
 
 
 class PresuncaoLucroPresumido(Base):
-    """Percentuais de presunção LP por atividade — SCD Type 2 (§8.3).
+    """Percentuais de presunÃ§Ã£o LP por atividade â€” SCD Type 2 (Â§8.3).
 
     Sprint 11 PR1. Match por ``cnae_pattern`` (prefixo do CNAE 2.3, varia
     de 2 a 5 chars) com ``prioridade`` como desempate. ``limite_receita_anual``
-    quando não-NULL aplica a regra do art. 15 §4º (serviços gerais até R$120k
-    têm presunção reduzida de 32% → 16%).
+    quando nÃ£o-NULL aplica a regra do art. 15 Â§4Âº (serviÃ§os gerais atÃ© R$120k
+    tÃªm presunÃ§Ã£o reduzida de 32% â†’ 16%).
     """
 
     __tablename__ = "presuncao_lucro_presumido"
@@ -1867,11 +2025,66 @@ class PresuncaoLucroPresumido(Base):
     )
 
 
-class Socio(Base):
-    """Sócio da empresa (Sprint 10 PR3) — separado de Funcionario CLT.
+class AliquotaCbsIbs(Base):
+    """Alíquotas CBS/IBS por fase da Reforma Tributária — SCD Type 2 (§8.3).
 
-    Recebe pró-labore mensal (INSS 11% contribuinte individual + IRRF) e
-    distribuições de lucros (isentas até o limite contábil — Lei 9.249/1995).
+    Sprint 14. Pool global (sem ``tenant_id``); leitura aberta + REVOKE UPDATE/DELETE
+    do role público (apenas ``tax_table_admin`` insere novas vigências).
+
+    Fonte normativa: LC 214/2025 (lei base CBS/IBS) + PLP 68/2024 (em tramitação).
+    O cronograma de transição vive em ``app/modules/reforma/periodo_transicao.py``.
+
+    A fase ``teste_2026`` (CBS 0,9% + IBS 0,1%) é **informacional** — coexiste com
+    PIS/Cofins/ICMS/ISS sem recolhimento separado. As fases ``transicao_2027_2032``
+    e ``regime_pleno_2033`` têm alíquotas **preliminares** até regulamentação final
+    do Comitê Gestor IBS (princípio §8.12 — toda saída é labelada "estimativa").
+
+    A coluna ``classificacao_lc214`` reflete o art. 9º LC 214: ``geral``,
+    ``reducao_60`` (educação/saúde/transporte), ``reducao_30`` (serv. liberais
+    regulamentados), ``regime_diferenciado`` (combustíveis/financeiras/imóveis etc.).
+    NULL = aplica à classificação ``geral``.
+    """
+
+    __tablename__ = "aliquota_cbs_ibs"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    fase: Mapped[str] = mapped_column(String(30), nullable=False)
+    regime: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    cnae_pattern: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    classificacao_lc214: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    aliquota_cbs: Mapped[Decimal] = mapped_column(NUMERIC(7, 4), nullable=False)
+    aliquota_ibs: Mapped[Decimal] = mapped_column(NUMERIC(7, 4), nullable=False)
+    valid_from: Mapped[date] = mapped_column(DATE, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(DATE, nullable=True)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    fonte_norma: Mapped[str] = mapped_column(String(200), nullable=False)
+    observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "aliquota_cbs >= 0 AND aliquota_cbs <= 1",
+            name="ck_aliq_cbs_ibs_cbs",
+        ),
+        CheckConstraint(
+            "aliquota_ibs >= 0 AND aliquota_ibs <= 1",
+            name="ck_aliq_cbs_ibs_ibs",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_aliq_cbs_ibs_vigencia",
+        ),
+        Index("ix_aliq_cbs_ibs_lookup", "fase", "valid_from"),
+    )
+
+
+class Socio(Base):
+    """SÃ³cio da empresa (Sprint 10 PR3) â€” separado de Funcionario CLT.
+
+    Recebe prÃ³-labore mensal (INSS 11% contribuinte individual + IRRF) e
+    distribuiÃ§Ãµes de lucros (isentas atÃ© o limite contÃ¡bil â€” Lei 9.249/1995).
     """
 
     __tablename__ = "socio"
@@ -1905,11 +2118,11 @@ class Socio(Base):
 
 
 class ProlaboreMensal(Base):
-    """Pagamento mensal de pró-labore (Sprint 10 PR3).
+    """Pagamento mensal de prÃ³-labore (Sprint 10 PR3).
 
-    INSS 11% como contribuinte individual (Lei 8.212/1991 art. 21) até o
-    teto vigente. IRRF segue tabela mensal regular. Fato imutável após
-    persistir (§8.2).
+    INSS 11% como contribuinte individual (Lei 8.212/1991 art. 21) atÃ© o
+    teto vigente. IRRF segue tabela mensal regular. Fato imutÃ¡vel apÃ³s
+    persistir (Â§8.2).
     """
 
     __tablename__ = "prolabore_mensal"
@@ -1933,7 +2146,7 @@ class ProlaboreMensal(Base):
     irrf: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False, server_default="0")
     irrf_faixa: Mapped[int] = mapped_column(Integer, nullable=False)
     valor_liquido: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1948,12 +2161,12 @@ class ProlaboreMensal(Base):
 
 
 class DistribuicaoLucros(Base):
-    """Distribuição de lucros para um sócio (Sprint 10 PR3).
+    """DistribuiÃ§Ã£o de lucros para um sÃ³cio (Sprint 10 PR3).
 
-    Lei 9.249/1995 art. 10: lucros distribuídos são isentos de IRRF até o
-    limite contábil (presunção menos impostos, para LP sem escrituração;
-    lucro líquido contábil real, com escrituração). Acima do limite, o
-    excesso é tributado como rendimento (faixa progressiva IRRF mensal).
+    Lei 9.249/1995 art. 10: lucros distribuÃ­dos sÃ£o isentos de IRRF atÃ© o
+    limite contÃ¡bil (presunÃ§Ã£o menos impostos, para LP sem escrituraÃ§Ã£o;
+    lucro lÃ­quido contÃ¡bil real, com escrituraÃ§Ã£o). Acima do limite, o
+    excesso Ã© tributado como rendimento (faixa progressiva IRRF mensal).
     """
 
     __tablename__ = "distribuicao_lucros"
@@ -1977,7 +2190,7 @@ class DistribuicaoLucros(Base):
         NUMERIC(14, 2), nullable=False, server_default="0"
     )
     base_calculo_referencia: Mapped[str] = mapped_column(String(40), nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1997,9 +2210,14 @@ class EventoESocial(Base):
     """Evento eSocial preparado para transmissão (Sprint 10 PR3 — skeleton).
 
     Suporta S-1200 (remuneração trabalhador RGPS), S-1210 (pagamentos do
-    trabalho), S-2200 (admissão), S-2299 (desligamento), S-2400 (cadastro
-    beneficiário). XML real será gerado em sprint futura — por ora o
-    ``payload`` JSONB carrega os campos já normalizados.
+    trabalho), S-2200 (admissão), S-2299 (desligamento), S-2300 (TSVE —
+    início de prestação de serviços, usado pra sócio com pró-labore).
+    XML real é gerado em sprint futura — por ora o ``payload`` JSONB
+    carrega os campos já normalizados.
+
+    Sprint 19.6 PR1 (#14): S-2400 (Cadastro Beneficiário Ente Público
+    RPPS, uso adaptado) substituído por S-2300 (TSVE — evento canônico
+    do leiaute). Migration 0048 fez backfill + atualizou CHECK.
     """
 
     __tablename__ = "evento_esocial"
@@ -2017,7 +2235,7 @@ class EventoESocial(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="preparado")
     protocolo: Mapped[str | None] = mapped_column(String(80), nullable=True)
     resposta: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -2027,14 +2245,23 @@ class EventoESocial(Base):
     processado_em: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # Sprint 19.7 PR2 (#13) — transmissão real (XMLDSig + envio API + recibo).
+    xml_assinado: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )
+    lote_protocolo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    recibo_numero: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    hash_xml: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
-            "tipo_evento IN ('S-1200','S-1210','S-2200','S-2299','S-2400')",
+            "tipo_evento IN ('S-1200','S-1210','S-2200','S-2205','S-2206',"
+            "'S-2230','S-2298','S-2299','S-2300','S-3000')",
             name="ck_esocial_tipo",
         ),
         CheckConstraint(
-            "status IN ('preparado','transmitido','aceito','rejeitado','cancelado')",
+            "status IN ('preparado','assinado','em_lote','transmitido','aceito',"
+            "'rejeitado','rejeitado_xsd','cancelado')",
             name="ck_esocial_status",
         ),
         UniqueConstraint(
@@ -2043,15 +2270,20 @@ class EventoESocial(Base):
         ),
         Index("ix_esocial_tenant", "tenant_id"),
         Index("ix_esocial_empresa_periodo", "empresa_id", "periodo_apuracao"),
+        Index(
+            "ix_esocial_lote_protocolo",
+            "lote_protocolo",
+            postgresql_where="lote_protocolo IS NOT NULL",
+        ),
     )
 
 
 class EventoFolha(Base):
     """Pagamento pontual fora do holerite mensal (Sprint 10 PR2).
 
-    Cobre 13º (1ª/2ª parcela), férias e rescisão. Snapshot do cálculo em
-    ``detalhes`` JSONB (fato imutável — §8.2). Idempotência por UNIQUE
-    parcial em índice (ver migration 0017).
+    Cobre 13Âº (1Âª/2Âª parcela), fÃ©rias e rescisÃ£o. Snapshot do cÃ¡lculo em
+    ``detalhes`` JSONB (fato imutÃ¡vel â€” Â§8.2). IdempotÃªncia por UNIQUE
+    parcial em Ã­ndice (ver migration 0017).
     """
 
     __tablename__ = "evento_folha"
@@ -2086,7 +2318,7 @@ class EventoFolha(Base):
     )
     valor_liquido: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
     detalhes: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
-    algoritmo_versao: Mapped[str] = mapped_column(String(30), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
     )
@@ -2098,4 +2330,871 @@ class EventoFolha(Base):
         ),
         Index("ix_evento_tenant", "tenant_id"),
         Index("ix_evento_func_data", "funcionario_id", "data_evento"),
+    )
+
+
+# ── Marketplace de contadores parceiros (Sprint 13 PR1) ─────────────────────
+
+
+class ContadorParceiro(Base):
+    """Contador parceiro do marketplace (§5.8 + §10).
+
+    Pool global (SEM ``tenant_id``) — curado manualmente. Campos LGPD e de
+    curadoria (``ativo``, ``crc_status``, ``rating_medio``) governam quem
+    aparece nos resultados do matching. REVOKE UPDATE/DELETE FROM PUBLIC
+    (rating só recalculado por role admin via task Celery do PR3).
+    """
+
+    __tablename__ = "contador_parceiro"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    nome: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    telefone: Mapped[str] = mapped_column(String(20), nullable=False)
+    cpf: Mapped[str | None] = mapped_column(String(11), nullable=True)
+    cnpj: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    crc_numero: Mapped[str] = mapped_column(String(20), nullable=False)
+    crc_uf: Mapped[str] = mapped_column(CHAR(2), nullable=False)
+    crc_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="ativo"
+    )
+    crc_status_atualizado_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    especialidades: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    uf_atuacao: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    rating_medio: Mapped[Decimal | None] = mapped_column(NUMERIC(3, 2), nullable=True)
+    total_consultas: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    taxa_resposta_horas: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sla_resposta_horas: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="24"
+    )
+    oab_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    oab_uf: Mapped[str | None] = mapped_column(CHAR(2), nullable=True)
+    senha_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    aceitou_nda_lgpd_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "crc_status IN ('ativo','suspenso','baixado')",
+            name="ck_contador_crc_status",
+        ),
+        CheckConstraint(
+            "rating_medio IS NULL OR (rating_medio >= 0 AND rating_medio <= 5)",
+            name="ck_contador_rating",
+        ),
+        UniqueConstraint("email", name="uq_contador_email"),
+        UniqueConstraint("crc_numero", "crc_uf", name="uq_contador_crc"),
+        Index("ix_contador_ativo_rating", "ativo", "rating_medio"),
+    )
+
+
+class ConsultaMarketplace(Base):
+    """Consulta criada por cliente PME e atribuída a contador parceiro (§5.8).
+
+    RLS dual aplicada via migration 0032 — cliente vê por ``app.tenant_id``,
+    parceiro vê por ``app.contador_id`` (role ``marketplace_partner``). Status
+    segue máquina determinística (aberta → atribuida → aceita → concluida).
+    ``idempotency_key`` UNIQUE garante que mesma pergunta no mesmo dia retorna
+    a consulta existente (§8.9).
+    """
+
+    __tablename__ = "consulta_marketplace"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    contador_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("contador_parceiro.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    categoria: Mapped[str] = mapped_column(String(50), nullable=False)
+    pergunta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pergunta_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    contexto_empresa_jsonb: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
+    snapshot_versao: Mapped[str] = mapped_column(String(20), nullable=False)
+    consentimento_compartilhamento: Mapped[bool] = mapped_column(
+        Boolean, nullable=False
+    )
+    consentimento_revogado_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    pii_apagado_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    valor_consulta: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    comissao_plataforma: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    resposta_resumo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    arquivos_anexos: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
+    rating_cliente: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    comentario_cliente: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    sla_aceitar_ate: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    sla_responder_ate: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    aberta_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    aceita_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    respondida_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    paga_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "categoria IN ("
+            "'consulta_rapida','analise_intimacao_simples','analise_intimacao_complexa',"
+            "'parecer_tecnico','peticao_administrativa','defesa_auto',"
+            "'planejamento_tributario','holding','sucessao'"
+            ")",
+            name="ck_consulta_mkt_categoria",
+        ),
+        CheckConstraint(
+            "status IN ("
+            "'aberta','atribuida','aceita','em_andamento',"
+            "'concluida','cancelada','expirada'"
+            ")",
+            name="ck_consulta_mkt_status",
+        ),
+        CheckConstraint(
+            "comissao_plataforma >= 0 AND comissao_plataforma <= valor_consulta",
+            name="ck_consulta_mkt_comissao",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_consulta_mkt_idempotency"),
+        Index("ix_consulta_mkt_tenant", "tenant_id"),
+        Index("ix_consulta_mkt_empresa_status", "empresa_id", "status"),
+        Index("ix_consulta_mkt_contador_status", "contador_id", "status"),
+    )
+
+
+class CobrancaConsulta(Base):
+    """Cobrança gerada para uma consulta concluída (Sprint 13 PR3).
+
+    1:1 com ``ConsultaMarketplace`` (UNIQUE em ``consulta_id``). Provider real
+    (Stripe/Pagar.me) entra em sprint futura — ADR 0015. ``idempotency_key``
+    UNIQUE evita double-spend em retry de webhook (§8.9).
+    """
+
+    __tablename__ = "cobranca_consulta"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    consulta_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("consulta_marketplace.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(
+        String(40), nullable=False, server_default="fake"
+    )
+    provider_externo_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    valor: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pendente")
+    checkout_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    paga_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    cancelada_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pendente','paga','falhou','cancelada')",
+            name="ck_cobranca_status",
+        ),
+        CheckConstraint("valor >= 0", name="ck_cobranca_valor"),
+        UniqueConstraint("consulta_id", name="uq_cobranca_consulta"),
+        UniqueConstraint("idempotency_key", name="uq_cobranca_idempotency"),
+        Index("ix_cobranca_tenant", "tenant_id"),
+        Index("ix_cobranca_status", "status"),
+    )
+
+
+class AnomaliaFiscal(Base):
+    """Alerta proativo de salto atípico em apuração fiscal (Sprint 15 PR1).
+
+    Append-only (§8.2). Re-detecção da mesma chave ``(empresa, tipo,
+    competencia)`` produz nova linha; a anterior recebe ``superseded_by``
+    apontando para a nova. UNIQUE parcial garante uma única versão ativa.
+
+    Dispensa é UPDATE in-place: ``dispensada_em`` + ``dispensada_por`` +
+    ``motivo_dispensa``. A linha continua "ativa" do ponto de vista de
+    versionamento (``superseded_by IS NULL``); endpoints "abertas" filtram
+    onde ``dispensada_em IS NULL``.
+    """
+
+    __tablename__ = "anomalia_fiscal"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    competencia: Mapped[date] = mapped_column(DATE, nullable=False)
+    severidade: Mapped[str] = mapped_column(String(10), nullable=False)
+    valor_observado: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    valor_esperado: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    z_score: Mapped[Decimal] = mapped_column(NUMERIC(6, 3), nullable=False)
+    delta_percentual: Mapped[Decimal] = mapped_column(NUMERIC(7, 4), nullable=False)
+    metodo: Mapped[str] = mapped_column(String(20), nullable=False)
+    amostra_n: Mapped[int] = mapped_column(Integer, nullable=False)
+    mensagem: Mapped[str] = mapped_column(Text, nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    detectado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    dispensada_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    dispensada_por: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    motivo_dispensa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    superseded_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("anomalia_fiscal.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('das','irpj','csll','pis','cofins','iss','icms')",
+            name="ck_anomalia_tipo",
+        ),
+        CheckConstraint(
+            "severidade IN ('baixa','media','alta')",
+            name="ck_anomalia_severidade",
+        ),
+        CheckConstraint(
+            "metodo IN ('zscore','iqr')",
+            name="ck_anomalia_metodo",
+        ),
+        CheckConstraint(
+            "valor_observado >= 0 AND valor_esperado >= 0",
+            name="ck_anomalia_valores_positivos",
+        ),
+        CheckConstraint("amostra_n >= 3", name="ck_anomalia_amostra_minima"),
+        CheckConstraint(
+            "(dispensada_em IS NULL AND dispensada_por IS NULL)"
+            " OR (dispensada_em IS NOT NULL AND dispensada_por IS NOT NULL)",
+            name="ck_anomalia_dispensa_coerente",
+        ),
+        Index("ix_anomalia_tenant", "tenant_id"),
+    )
+
+
+class DigestSemanal(Base):
+    """Weekly digest WhatsApp do AI Advisor (Sprint 15 PR3).
+
+    Snapshot semanal proativo gerado segunda 06:00 BR pelo worker. Texto
+    pronto para envio via WhatsApp utility template; envio real fica como
+    pendência consciente (depende de template aprovado Meta).
+
+    Append-only (§8.2): re-gerações geram nova linha com ``superseded_by``;
+    UNIQUE parcial garante 1 versão ativa por (empresa, semana_iso) (§8.9).
+    """
+
+    __tablename__ = "digest_semanal"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    semana_iso: Mapped[str] = mapped_column(String(10), nullable=False)
+    periodo_inicio: Mapped[date] = mapped_column(DATE, nullable=False)
+    periodo_fim: Mapped[date] = mapped_column(DATE, nullable=False)
+    conteudo_estruturado: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
+    texto_redigido: Mapped[str] = mapped_column(Text, nullable=False)
+    fonte_redacao: Mapped[str] = mapped_column(String(30), nullable=False)
+    citacoes: Mapped[JsonObject] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="preparado")
+    llm_provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    custo_usd: Mapped[Decimal | None] = mapped_column(NUMERIC(10, 6), nullable=True)
+    tokens_input: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_output: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_cached: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    enviado_via_whatsapp_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    # Sprint 15.5 — auditoria do envio Meta WhatsApp
+    tentativas_envio: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    ultimo_erro_envio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enviado_template_name: Mapped[str | None] = mapped_column(
+        String(60), nullable=True
+    )
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    superseded_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("digest_semanal.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('preparado','enviado','cancelado','falhou')",
+            name="ck_digest_status",
+        ),
+        CheckConstraint(
+            "fonte_redacao IN ('template','llm_gemini_flash','llm_fallback')",
+            name="ck_digest_fonte_redacao",
+        ),
+        CheckConstraint(
+            "periodo_fim >= periodo_inicio",
+            name="ck_digest_periodo_coerente",
+        ),
+        CheckConstraint(
+            "tentativas_envio >= 0",
+            name="ck_digest_tentativas_positivas",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_digest_idempotency"),
+        Index("ix_digest_tenant", "tenant_id"),
+        Index("ix_digest_empresa_semana", "empresa_id", "semana_iso"),
+    )
+
+
+# ── SPED files (Sprint 16 PR1) ──────────────────────────────────────────────
+
+
+class ArquivoSped(Base):
+    """Arquivo SPED gerado — ECD/ECF/EFD-Contribuições/EFD ICMS-IPI (Sprint 16).
+
+    Snapshot imutável (§8.2): re-geração para mesma chave de domínio cria
+    nova linha com ``supersedes``; anterior recebe ``superseded_by``.
+    UNIQUE parcial (DB-level) garante 1 arquivo ativo por
+    ``(empresa, tipo, periodo_inicio, periodo_fim)`` — idempotência §8.9.
+
+    Conteúdo do ``.txt`` em ``conteudo_bytea`` (BYTEA — limite prático
+    ~1GB; SPED de PME fica em 5-50MB, OK por enquanto). ``storage_key``
+    fica nullable para migração futura para S3/GCS.
+
+    ``status`` começa em ``gerado`` (PR1). PR3 introduz ``validado``.
+    Transições para ``transmitido``/``aceito``/``rejeitado`` exigem
+    recibo ReceitaNet entregue pelo cliente — §8.12 (transmissão é ato
+    consciente).
+    """
+
+    __tablename__ = "arquivo_sped"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    periodo_inicio: Mapped[date] = mapped_column(DATE, nullable=False)
+    periodo_fim: Mapped[date] = mapped_column(DATE, nullable=False)
+    conteudo_bytea: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    tamanho_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    hash_arquivo: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    recibo_transmissao: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="gerado"
+    )
+    validacao_jsonb: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    gerado_por_usuario_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    supersedes: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("arquivo_sped.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    superseded_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("arquivo_sped.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    gerado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    transmitido_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('ecd','ecf','efd_contribuicoes','efd_icms_ipi')",
+            name="ck_sped_tipo",
+        ),
+        CheckConstraint(
+            "status IN ('gerado','validado','transmitido','aceito','rejeitado')",
+            name="ck_sped_status",
+        ),
+        CheckConstraint(
+            "periodo_fim >= periodo_inicio",
+            name="ck_sped_periodo_coerente",
+        ),
+        CheckConstraint(
+            "tamanho_bytes > 0",
+            name="ck_sped_tamanho_positivo",
+        ),
+        CheckConstraint(
+            "hash_arquivo ~ '^[0-9a-f]{64}$'",
+            name="ck_sped_hash_formato",
+        ),
+        Index("ix_sped_tenant", "tenant_id"),
+        Index(
+            "ix_sped_empresa_tipo_periodo", "empresa_id", "tipo", "periodo_inicio"
+        ),
+    )
+
+
+# ── Sprint 18 PR1 — Fundação da migração de escritório antigo ──────────────
+
+
+class DocumentoFiscalItem(Base):
+    """Item granular da NF-e — resolve pendência #26 (Sprint 18 PR1).
+
+    Hoje ``documento_fiscal`` carrega só cabeçalho. Esta tabela traz a
+    granularidade por linha (``<det>`` do XML, C170 do SPED EFD-Contribuições)
+    que é necessária para:
+
+    1. Escriturar PIS/Cofins por item no SPED EFD-Contribuições sem
+       colapsar 50 linhas em "MERC-GENERICO" (era o workaround da Sprint 17).
+    2. Cálculo CBS/IBS por NCM (Reforma Tributária — Sprint 14 deixou no
+       cabeçalho; aqui ganha resolução real).
+    3. Importador SPED histórico (PR2/PR3) preservar fidelidade dos C170
+       do escritório anterior.
+
+    Imutabilidade (§8.2) é herdada do pai: ``ON DELETE CASCADE`` quando o
+    ``documento_fiscal`` cabeçalho é destruído (caso raro — só via admin).
+    Re-emissão da NF gera novo cabeçalho com ``supersedes`` apontando para
+    o anterior; novos itens nascem ligados ao novo cabeçalho.
+    """
+
+    __tablename__ = "documento_fiscal_item"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    documento_fiscal_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("documento_fiscal.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    n_item: Mapped[int] = mapped_column(Integer, nullable=False)
+    codigo_produto: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    descricao: Mapped[str] = mapped_column(String(255), nullable=False)
+    ncm: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    cfop: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    cst_icms: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    cst_pis: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    cst_cofins: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    unidade: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    quantidade: Mapped[Decimal] = mapped_column(NUMERIC(15, 4), nullable=False)
+    valor_unitario: Mapped[Decimal] = mapped_column(NUMERIC(15, 4), nullable=False)
+    valor_total: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    valor_icms: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    valor_ipi: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    valor_pis: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    valor_cofins: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    valor_cbs: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    valor_ibs: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    documento: Mapped[DocumentoFiscal] = relationship(
+        "DocumentoFiscal", back_populates="itens"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "documento_fiscal_id", "n_item", name="uq_doc_item_documento_n"
+        ),
+        CheckConstraint("n_item >= 1", name="ck_doc_item_n_positivo"),
+        CheckConstraint("quantidade > 0", name="ck_doc_item_qtd_positiva"),
+        CheckConstraint(
+            "valor_unitario >= 0", name="ck_doc_item_unit_nao_negativo"
+        ),
+        CheckConstraint(
+            "valor_total >= 0", name="ck_doc_item_total_nao_negativo"
+        ),
+        CheckConstraint(
+            r"cfop IS NULL OR cfop ~ '^\d{4}$'",
+            name="ck_doc_item_cfop_formato",
+        ),
+        CheckConstraint(
+            r"ncm IS NULL OR ncm ~ '^\d{8}$'",
+            name="ck_doc_item_ncm_formato",
+        ),
+        CheckConstraint(
+            r"cst_icms IS NULL OR cst_icms ~ '^\d{2,3}$'",
+            name="ck_doc_item_cst_icms_formato",
+        ),
+        CheckConstraint(
+            r"cst_pis IS NULL OR cst_pis ~ '^\d{2}$'",
+            name="ck_doc_item_cst_pis_formato",
+        ),
+        CheckConstraint(
+            r"cst_cofins IS NULL OR cst_cofins ~ '^\d{2}$'",
+            name="ck_doc_item_cst_cofins_formato",
+        ),
+        Index("ix_doc_item_tenant", "tenant_id"),
+        Index("ix_doc_item_documento", "documento_fiscal_id", "n_item"),
+        Index(
+            "ix_doc_item_ncm",
+            "ncm",
+            postgresql_where="ncm IS NOT NULL",
+        ),
+    )
+
+
+class LoteImportacao(Base):
+    """Lote de importação de SPED/CSV — auditoria da migração (Sprint 18 PR1).
+
+    Cada upload de arquivo de migração de escritório antigo cria um lote;
+    parsers/services do módulo ``migracao`` (PR2+) registram aqui o
+    progresso, o resumo (contagens) e os erros estruturados (warnings,
+    rejeições por SCD ausente, conflitos cross-fonte etc.).
+
+    Idempotência forte por hash: 1 lote ``concluido`` por
+    ``(empresa_id, hash_arquivo)`` — re-upload do mesmo arquivo retorna o
+    lote anterior em vez de reprocessar.
+    """
+
+    __tablename__ = "lote_importacao"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fonte: Mapped[str] = mapped_column(String(40), nullable=False)
+    arquivo_sped_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("arquivo_sped.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    nome_arquivo: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    hash_arquivo: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    iniciado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    concluido_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="processando"
+    )
+    resumo_jsonb: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
+    erros_jsonb: Mapped[JsonObject | None] = mapped_column(JSONB, nullable=True)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "fonte IN ('sped_ecd','sped_ecf','sped_efd_contribuicoes',"
+            "'sped_efd_icms_ipi','csv_balancete','csv_razao')",
+            name="ck_lote_fonte",
+        ),
+        CheckConstraint(
+            "status IN ('processando','concluido','falhou')",
+            name="ck_lote_status",
+        ),
+        CheckConstraint(
+            "hash_arquivo IS NULL OR hash_arquivo ~ '^[0-9a-f]{64}$'",
+            name="ck_lote_hash_formato",
+        ),
+        CheckConstraint(
+            "(status = 'processando' AND concluido_em IS NULL) "
+            "OR (status IN ('concluido','falhou') AND concluido_em IS NOT NULL)",
+            name="ck_lote_status_concluido_coerente",
+        ),
+        Index("ix_lote_tenant", "tenant_id"),
+        Index(
+            "ix_lote_empresa_fonte",
+            "empresa_id",
+            "fonte",
+            "iniciado_em",
+        ),
+    )
+
+
+class VigenciaTabelaLog(Base):
+    """Audit append-only do painel admin de tabelas tributárias (Sprint 19.5 PR1).
+
+    Cada linha = 1 POST aceito em ``/v1/admin/tabelas/<tipo>/vigencia``. O serviço
+    aplica o INSERT na tabela SCD correspondente (``tabela_inss_faixa``,
+    ``tabela_irrf_faixa``, ``tabela_fgts_aliquota``, ``tabela_simples_faixa``,
+    ``presuncao_lucro_presumido``, ``aliquota_icms_uf``, ``aliquota_cbs_ibs``)
+    — o trigger ``scd_close_previous_valid_to`` da migration 0025 fecha o
+    ``valid_to`` da vigência anterior automaticamente.
+
+    Cross-tenant (sem RLS): operação de sistema controlada pelo role
+    ``tax_table_admin`` + token estático. Append-only via REVOKE UPDATE/DELETE
+    de PUBLIC na migration 0042 (princípio §8.2 estendido ao audit).
+
+    Idempotência §8.9: ``idempotency_key = uuid5(NS_TABELA_ADMIN, ...)`` UNIQUE
+    — re-POST com mesma chave + mesmo payload devolve o log anterior (200);
+    payload divergente devolve 409 ``VigenciaTributariaJaPostada``.
+
+    Citação §8.5: ``fonte_norma TEXT`` com CHECK ``char_length >= 10`` no DB +
+    validação Pydantic ``min_length=10`` na borda.
+    """
+
+    __tablename__ = "vigencia_tabela_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+        default=uuid4,
+    )
+    tipo_tabela: Mapped[str] = mapped_column(String(40), nullable=False)
+    valid_from: Mapped[date] = mapped_column(DATE, nullable=False)
+    fonte_norma: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_jsonb: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
+    usuario_admin_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    idempotency_key: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    registros_criados: Mapped[int] = mapped_column(Integer, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_tabela IN "
+            "('inss','irrf','fgts','simples_nacional','presuncao_lp',"
+            "'icms_uf','cbs_ibs')",
+            name="ck_vig_tab_log_tipo",
+        ),
+        CheckConstraint(
+            "char_length(fonte_norma) >= 10",
+            name="ck_vig_tab_log_fonte_minima",
+        ),
+        CheckConstraint(
+            "registros_criados >= 0",
+            name="ck_vig_tab_log_registros_nao_negativo",
+        ),
+        UniqueConstraint(
+            "idempotency_key", name="uq_vig_tab_log_idempotency"
+        ),
+        Index(
+            "ix_vig_tab_log_tipo_data",
+            "tipo_tabela",
+            "valid_from",
+        ),
+        Index("ix_vig_tab_log_criado_em", "criado_em"),
+    )
+
+
+class AlertaAdmin(Base):
+    """Alerta proativo do painel admin (Sprint 19.5 PR2).
+
+    Worker diário ``tabelas.verificar_vigencias`` insere uma linha por
+    chave ``(tipo, tipo_tabela, ano_corrente)`` quando detecta vigência
+    SCD desatualizada. Endpoints ``GET /v1/admin/alertas`` filtram por
+    ``severidade`` e ``resolvido`` (= ``resolvido_em IS NULL`` ou ≤ now).
+
+    Diferente de ``vigencia_tabela_log`` (audit puramente append-only),
+    aqui o UPDATE é parte do contrato — resolver e snooze atualizam
+    ``resolvido_em`` in-place. Não é fato fiscal, é estado operacional.
+
+    Idempotência §8.9: ``idempotency_key = uuid5(NS_TABELA_ADMIN,
+    "alerta|{tipo}|{tipo_tabela}|{ano_corrente}")``. 2 runs do worker no
+    mesmo mês caem em ``UNIQUE`` violation e ficam no-op.
+
+    ``contexto_jsonb`` carrega metadados úteis para o UI / digest WhatsApp:
+    ``tipo_tabela``, ``ano_corrente``, ``ano_vigencia_ativa``,
+    ``dias_desde_ultima_atualizacao``, link sugerido etc.
+    """
+
+    __tablename__ = "alerta_admin"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+        default=uuid4,
+    )
+    tipo: Mapped[str] = mapped_column(String(60), nullable=False)
+    severidade: Mapped[str] = mapped_column(String(10), nullable=False)
+    titulo: Mapped[str] = mapped_column(String(255), nullable=False)
+    descricao: Mapped[str] = mapped_column(Text, nullable=False)
+    contexto_jsonb: Mapped[JsonObject] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    idempotency_key: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    resolvido_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    resolvido_por_usuario_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "severidade IN ('info','aviso','critico')",
+            name="ck_alerta_admin_severidade",
+        ),
+        UniqueConstraint(
+            "idempotency_key", name="uq_alerta_admin_idempotency"
+        ),
+        Index("ix_alerta_admin_tipo", "tipo"),
+        # Index parcial ix_alerta_admin_abertos é criado via SQL puro na
+        # migration 0043 (Alembic não tem alias de Index parcial direto
+        # para WHERE; criar aqui só vazaria definição). Não precisamos
+        # do índice em testes unitários.
+    )
+
+
+class SugestaoVigenciaTabela(Base):
+    """Sugestão de vigência tributária gerada por LLM (Sprint 19.5 PR3).
+
+    Camada 3 do painel admin. Worker mensal varre o DOU, extrai PDFs via
+    ``pdfplumber``, passa para LLM Gemini Flash com prompt versionado que
+    devolve JSON estruturado matching ``VigenciaInssIn`` (e similares),
+    aplica re-check determinístico §8.6 e cria **uma sugestão pendente**.
+
+    **NUNCA cria vigência tributária diretamente** — princípio inviolável
+    §8.8. Admin humano revisa via ``GET /v1/admin/sugestoes-vigencia`` e
+    aprova/rejeita com 1 clique.
+
+    Aprovação chama ``TabelaAdminService.criar_vigencia_<tipo>`` da Camada 1
+    com ``payload_jsonb`` como body — link bidirecional via
+    ``vigencia_tabela_log_id`` FK.
+
+    Re-check §8.6 NÃO bloqueia a criação da sugestão — registra
+    ``recheck_passou=false`` + detalhes em ``recheck_observacoes`` para a
+    UI destacar em vermelho. Admin decide se quer aprovar mesmo assim
+    (cenário: LLM acertou a estrutura mas errou um valor que humano
+    consegue corrigir mentalmente).
+    """
+
+    __tablename__ = "sugestao_vigencia_tabela"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+        default=uuid4,
+    )
+    tipo_tabela: Mapped[str] = mapped_column(String(40), nullable=False)
+    valid_from: Mapped[date] = mapped_column(DATE, nullable=False)
+    payload_jsonb: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
+    fonte_norma: Mapped[str] = mapped_column(Text, nullable=False)
+    fonte_dou_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fonte_dou_pagina: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_modelo: Mapped[str] = mapped_column(String(50), nullable=False)
+    llm_versao_prompt: Mapped[str] = mapped_column(String(50), nullable=False)
+    llm_confianca: Mapped[Decimal] = mapped_column(
+        NUMERIC(3, 2), nullable=False
+    )
+    recheck_passou: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    recheck_observacoes: Mapped[JsonObject] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="pendente"
+    )
+    aprovada_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    aprovada_por_usuario_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    rejeitada_motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vigencia_tabela_log_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("vigencia_tabela_log.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    idempotency_key: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_tabela IN "
+            "('inss','irrf','fgts','simples_nacional','presuncao_lp',"
+            "'icms_uf','cbs_ibs')",
+            name="ck_sugestao_tipo",
+        ),
+        CheckConstraint(
+            "status IN ('pendente','aprovada','rejeitada','expirada')",
+            name="ck_sugestao_status",
+        ),
+        CheckConstraint(
+            "char_length(fonte_norma) >= 10",
+            name="ck_sugestao_fonte_minima",
+        ),
+        CheckConstraint(
+            "llm_confianca >= 0 AND llm_confianca <= 1",
+            name="ck_sugestao_confianca_intervalo",
+        ),
+        CheckConstraint(
+            "(status = 'aprovada') = (aprovada_em IS NOT NULL)",
+            name="ck_sugestao_aprovada_coerente",
+        ),
+        UniqueConstraint(
+            "idempotency_key", name="uq_sugestao_idempotency"
+        ),
+        Index(
+            "ix_sugestao_status", "status", "criado_em"
+        ),
     )

@@ -53,12 +53,30 @@ async def test_pergunta_out_of_scope_encaminha_marketplace(
     llm_client = AsyncMock()
     settings = _mock_settings()
 
-    resposta = await responder_pergunta(empresa_id, payload, session, llm_client, settings)
+    # Sprint 13 PR2: o assistente também resolve parceiros sugeridos para
+    # out-of-scope. Aqui o lookup retorna lista vazia (sem parceiros
+    # cadastrados); o teste cobre apenas o roteamento, não a lista.
+    empresa_repo = AsyncMock()
+    empresa_repo.por_id = AsyncMock(return_value=None)
+    parceiro_repo = AsyncMock()
+    parceiro_repo.listar_ativos = AsyncMock(return_value=[])
+
+    with (
+        patch(
+            "app.modules.assistente.service.EmpresaRepo", return_value=empresa_repo
+        ),
+        patch(
+            "app.modules.assistente.service.ContadorParceiroRepo",
+            return_value=parceiro_repo,
+        ),
+    ):
+        resposta = await responder_pergunta(empresa_id, payload, session, llm_client, settings)
 
     assert resposta.encaminhar_marketplace is True
     assert resposta.categoria_marketplace == categoria
     assert resposta.provider_usado == "deterministic"
     assert resposta.tokens_input == 0
+    assert resposta.parceiros_sugeridos == []
     llm_client.chamar.assert_not_called()
 
 

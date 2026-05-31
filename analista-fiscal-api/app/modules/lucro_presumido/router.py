@@ -1,4 +1,4 @@
-"""Endpoints REST — Lucro Presumido (Sprint 11 PR1)."""
+"""Endpoints REST — Lucro Presumido (Sprint 11 PR1 + Sprint 20 PR1 + PR2)."""
 
 from __future__ import annotations
 
@@ -6,16 +6,20 @@ import re
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.modules.lucro_presumido.repo import ApuracaoLpRepo
 from app.modules.lucro_presumido.schemas import (
     ApuracaoLpOut,
     ApurarIrpjCsllTrimestralIn,
     ApurarPisCofinsMensalIn,
+    ChecklistTrimestreOut,
+    GuiaPagamentoOut,
+    MarcarPagoIn,
     PresuncaoResolvidaOut,
+    SaudeLpOut,
 )
-from app.modules.lucro_presumido.service import LucroPresumidoService
+from app.modules.lucro_presumido.service import LpChecklistService, LucroPresumidoService
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["lucro_presumido"])
@@ -152,3 +156,198 @@ async def resolver_presuncao(
         prioridade=resolvida.prioridade,
         fonte=resolvida.fonte,
     )
+
+
+# ── DARF — Sprint 20 PR1 ──────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{empresa_id}/lp/irpj/{ano}/{trimestre}/darf",
+    response_model=GuiaPagamentoOut,
+    status_code=201,
+    summary="Gera DARF IRPJ trimestral (código 2089)",
+    description=(
+        "Requer apuração IRPJ do trimestre já realizada. "
+        "Idempotente: segundo POST retorna 409 DarfLpJaGerada."
+    ),
+)
+async def gerar_darf_irpj(
+    empresa_id: UUID,
+    ano: int,
+    trimestre: int,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> GuiaPagamentoOut:
+    guia = await LucroPresumidoService().gerar_darf_irpj(
+        session, ctx.tenant_id, empresa_id, ano, trimestre
+    )
+    await session.commit()
+    return GuiaPagamentoOut.from_guia(guia)
+
+
+@router.post(
+    "/{empresa_id}/lp/csll/{ano}/{trimestre}/darf",
+    response_model=GuiaPagamentoOut,
+    status_code=201,
+    summary="Gera DARF CSLL trimestral (código 2372)",
+)
+async def gerar_darf_csll(
+    empresa_id: UUID,
+    ano: int,
+    trimestre: int,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> GuiaPagamentoOut:
+    guia = await LucroPresumidoService().gerar_darf_csll(
+        session, ctx.tenant_id, empresa_id, ano, trimestre
+    )
+    await session.commit()
+    return GuiaPagamentoOut.from_guia(guia)
+
+
+@router.post(
+    "/{empresa_id}/lp/pis/{competencia}/darf",
+    response_model=GuiaPagamentoOut,
+    status_code=201,
+    summary="Gera DARF PIS cumulativo mensal (código 8109)",
+)
+async def gerar_darf_pis(
+    empresa_id: UUID,
+    competencia: str,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> GuiaPagamentoOut:
+    comp_date = _parse_competencia(competencia)
+    guia = await LucroPresumidoService().gerar_darf_pis(
+        session, ctx.tenant_id, empresa_id, comp_date
+    )
+    await session.commit()
+    return GuiaPagamentoOut.from_guia(guia)
+
+
+@router.post(
+    "/{empresa_id}/lp/cofins/{competencia}/darf",
+    response_model=GuiaPagamentoOut,
+    status_code=201,
+    summary="Gera DARF Cofins cumulativo mensal (código 2172)",
+)
+async def gerar_darf_cofins(
+    empresa_id: UUID,
+    competencia: str,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> GuiaPagamentoOut:
+    comp_date = _parse_competencia(competencia)
+    guia = await LucroPresumidoService().gerar_darf_cofins(
+        session, ctx.tenant_id, empresa_id, comp_date
+    )
+    await session.commit()
+    return GuiaPagamentoOut.from_guia(guia)
+
+
+@router.get(
+    "/{empresa_id}/lp/guias",
+    response_model=list[GuiaPagamentoOut],
+    summary="Lista guias de pagamento LP da empresa",
+)
+async def listar_guias(
+    empresa_id: UUID,
+    ctx: TenantDep,
+    session: SessionDep,
+    status: str | None = Query(default=None, description="Filtrar por status: a_pagar, pago, cancelado"),
+    limite: int = Query(default=50, ge=1, le=200),
+) -> list[GuiaPagamentoOut]:
+    guias = await LucroPresumidoService().listar_guias(
+        session, empresa_id, status=status, limite=limite
+    )
+    return [GuiaPagamentoOut.from_guia(g) for g in guias]
+
+
+@router.post(
+    "/{empresa_id}/lp/guias/{guia_id}/marcar-pago",
+    response_model=GuiaPagamentoOut,
+    summary="Marca guia de pagamento como paga",
+)
+async def marcar_guia_pago(
+    empresa_id: UUID,
+    guia_id: UUID,
+    payload: MarcarPagoIn,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> GuiaPagamentoOut:
+    guia = await LucroPresumidoService().marcar_pago(
+        session, empresa_id, guia_id, payload.pago_em
+    )
+    await session.commit()
+    return GuiaPagamentoOut.from_guia(guia)
+
+
+# ── Checklist LP — Sprint 20 PR2 ──────────────────────────────────────────────
+
+
+@router.get(
+    "/{empresa_id}/lp/trimestre/{ano}/{trimestre}/checklist",
+    response_model=ChecklistTrimestreOut,
+    summary="Checklist de obrigações LP do trimestre",
+    description=(
+        "Retorna o status de cada obrigação LP do trimestre: apurações IRPJ/CSLL "
+        "trimestrais, PIS/Cofins mensais (×3), e as respectivas DARFs. "
+        "Itens sem data de vencimento passada ficam como 'pendente'; "
+        "após o vencimento sem pagamento → 'atrasado'."
+    ),
+)
+async def checklist_trimestre(
+    empresa_id: UUID,
+    ano: int,
+    trimestre: int,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> ChecklistTrimestreOut:
+    c = await LpChecklistService().checklist_trimestre(
+        session, empresa_id, ano, trimestre
+    )
+    return ChecklistTrimestreOut.from_checklist(c)
+
+
+@router.post(
+    "/{empresa_id}/lp/trimestre/{ano}/{trimestre}/fechar",
+    response_model=ChecklistTrimestreOut,
+    summary="Fecha trimestre LP (valida que tudo está concluído)",
+    description=(
+        "Verifica que todos os itens do checklist estão 'ok'. "
+        "Retorna 409 ChecklistLpNaoConcluido se há pendentes ou atrasados."
+    ),
+)
+async def fechar_trimestre(
+    empresa_id: UUID,
+    ano: int,
+    trimestre: int,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> ChecklistTrimestreOut:
+    c = await LpChecklistService().fechar_trimestre(
+        session, empresa_id, ano, trimestre
+    )
+    return ChecklistTrimestreOut.from_checklist(c)
+
+
+@router.get(
+    "/{empresa_id}/lp/saude",
+    response_model=SaudeLpOut,
+    summary="Health score LP — últimos 4 trimestres encerrados",
+    description=(
+        "Agrega checklist dos últimos 4 trimestres encerrados em um score 0-100. "
+        "score ≥ 90 → saudavel; ≥ 60 → atencao; < 60 → critico."
+    ),
+)
+async def saude_lp(
+    empresa_id: UUID,
+    ctx: TenantDep,
+    session: SessionDep,
+    trimestres: int = Query(default=4, ge=1, le=8),
+) -> SaudeLpOut:
+    checklists_raw = await LpChecklistService().saude_lp(
+        session, empresa_id, trimestres=trimestres
+    )
+    checklists_out = [ChecklistTrimestreOut.from_checklist(c) for c in checklists_raw]
+    return SaudeLpOut.from_checklists(empresa_id, checklists_out)

@@ -24,6 +24,19 @@ async def set_tenant_id(session: AsyncSession, tenant_id: UUID) -> None:
     )
 
 
+async def set_contador_id(session: AsyncSession, contador_id: UUID) -> None:
+    """Aplica a GUC do parceiro marketplace via ``set_config(..., true)``.
+
+    Espelha :func:`set_tenant_id` mas para a policy ``consulta_mkt_parceiro``
+    (Sprint 13 / migration 0032). Junto com ``SET LOCAL ROLE marketplace_partner``
+    libera o contador a enxergar suas consultas no fluxo de aceitar/responder.
+    """
+    await session.execute(
+        text("SELECT set_config('app.contador_id', :cid, true)"),
+        {"cid": str(contador_id)},
+    )
+
+
 @asynccontextmanager
 async def session_with_tenant(
     factory: async_sessionmaker[AsyncSession],

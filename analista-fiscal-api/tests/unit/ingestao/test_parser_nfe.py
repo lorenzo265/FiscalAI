@@ -125,3 +125,11 @@ def test_chave_de_infnfe_id_quando_sem_protnfe() -> None:
     nfe = parse_xml_nfe(xml_sem_prot)
     assert len(nfe.chave) == 44
     assert nfe.chave.isdigit()
+
+
+def test_nfe_4_0_sem_extensao_ibscbs_preserva_none() -> None:
+    """Princípio §8.2 — NF-e 4.0 sem IBSCBSTot/cClassTrib não é alterada."""
+    nfe = parse_xml_nfe(_XML_NFE_VALIDO)
+    assert nfe.valor_cbs is None
+    assert nfe.valor_ibs is None
+    assert nfe.cclasstrib is None

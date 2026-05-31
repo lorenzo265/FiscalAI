@@ -47,6 +47,9 @@ from app.modules.pessoal.socio_service import (
     ProlaboreService,
     SocioService,
 )
+from app.modules.pessoal.transmissao_esocial_service import (
+    TransmissaoEsocialService,
+)
 from app.shared.db.deps import SessionDep, TenantDep
 from app.shared.exceptions import FolhaNaoEncontrada
 
@@ -386,7 +389,7 @@ async def listar_distribuicoes(
     description=(
         "Cria o payload JSON do evento conforme leiaute S-1.3. Eventos "
         "suportados: S-1200 (remuneração), S-1210 (pagamento), S-2200 "
-        "(admissão), S-2299 (desligamento), S-2400 (beneficiário/sócio). "
+        "(admissão), S-2299 (desligamento), S-2300 (TSVE — sócio). "
         "Transmissão real (com cert A1) será implementada em sprint futura."
     ),
 )
@@ -419,3 +422,106 @@ async def listar_eventos_esocial(
         empresa_id, tipo_evento=tipo_str, limite=limite
     )
     return [EventoESocialOut.model_validate(r) for r in rows]
+
+
+# ── eSocial transmissão real (Sprint 19.7 PR2 #13) ──────────────────────────
+
+
+def _construir_servico_transmissao(
+    empresa_id: UUID,
+) -> TransmissaoEsocialService:
+    """Factory simples — instancia o pipeline com defaults do ambiente.
+
+    Cert A1 não é resolvido aqui ainda: por padrão a flag está OFF e o
+    assinador cai em ``NotImplementedXmldsigSigner``. Pre-piloto pago,
+    `_cert_p12_da_empresa` virá do storage criptografado (pendência
+    #20 do log).
+    """
+    from app.config import get_settings
+    from app.shared.crypto.xmldsig import construir_assinador
+    from app.shared.integrations.esocial.client import EsocialClient
+
+    s = get_settings()
+    assinador = construir_assinador(
+        cert_p12_bytes=None,  # Pre-piloto: cert ainda não vai do banco.
+        senha=None,
+        transmissao_ativa=s.ESOCIAL_TRANSMISSAO_ATIVA,
+    )
+    cliente = EsocialClient(s)
+    return TransmissaoEsocialService(
+        settings=s, assinador=assinador, cliente=cliente
+    )
+
+
+@router.post(
+    "/{empresa_id}/esocial/eventos/{evento_id}/assinar",
+    response_model=EventoESocialOut,
+    summary="Aplica XMLDSig (cert A1) ao evento — passa pra status='assinado'",
+    description=(
+        "§8.12 — fail-soft: sem grupo opt-in 'esocial' instalado ou sem "
+        "cert A1 configurado, devolve 412 e mantém evento em 'preparado'. "
+        "Quando assinado, evento fica pronto pra transmissão em lote."
+    ),
+)
+async def assinar_evento_esocial(
+    empresa_id: UUID,
+    evento_id: UUID,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> EventoESocialOut:
+    servico = _construir_servico_transmissao(empresa_id)
+    evento = await servico.assinar_evento(session, evento_id)
+    return EventoESocialOut.model_validate(evento)
+
+
+@router.post(
+    "/{empresa_id}/esocial/transmissao/lotes",
+    summary="Envia eventos eSocial assinados pendentes (até ESOCIAL_LOTE_MAX)",
+    description=(
+        "Agrupa eventos com status='assinado' em lote, envia ao webservice "
+        "do eSocial e atualiza status='em_lote'. Idempotente via UUID5 sobre "
+        "o conjunto de IDs do lote. 412 se ESOCIAL_TRANSMISSAO_ATIVA=false."
+    ),
+    status_code=202,
+)
+async def transmitir_lote_esocial(
+    empresa_id: UUID,
+    ctx: TenantDep,
+    session: SessionDep,
+    cnpj_empregador: str,
+) -> dict[str, str | int | None]:
+    servico = _construir_servico_transmissao(empresa_id)
+    recibo = await servico.transmitir_lote(
+        session, empresa_id, cnpj_empregador=cnpj_empregador
+    )
+    if recibo is None:
+        return {"protocolo": None, "estado": None, "eventos": 0}
+    return {
+        "protocolo": recibo.protocolo,
+        "estado": int(recibo.estado),
+        "eventos": len(recibo.eventos),
+    }
+
+
+@router.post(
+    "/{empresa_id}/esocial/transmissao/lotes/{protocolo}/consultar",
+    summary="Consulta recibo eSocial e aplica status final aos eventos do lote",
+    description=(
+        "Polling explícito do recibo. Quando estado≥3, marca cada evento "
+        "como 'aceito' (cdResposta=201) ou 'rejeitado'."
+    ),
+)
+async def consultar_recibo_esocial(
+    empresa_id: UUID,
+    protocolo: str,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> dict[str, str | int]:
+    servico = _construir_servico_transmissao(empresa_id)
+    recibo = await servico._cliente.consultar_recibo(protocolo)
+    atualizados = await servico.aplicar_recibo(session, recibo)
+    return {
+        "protocolo": recibo.protocolo,
+        "estado": int(recibo.estado),
+        "atualizados": atualizados,
+    }

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Protocol
 
 from app.shared.db.models import ApuracaoFiscal, Empresa
@@ -37,7 +38,9 @@ from app.modules.pgdas.schemas import (
 from app.shared.exceptions import (
     ApuracaoNaoEncontrada,
     EmpresaNaoEncontrada,
+    MunicipioIbgeAusente,
     RegimeIncompativel,
+    RetificacaoSemOriginal,
     SerproErro,
     SerproTimeout,
 )
@@ -78,6 +81,11 @@ class PgdasService:
                 "PGDAS-D é exclusivo do Simples Nacional; empresa tem regime "
                 f"'{empresa.regime_tributario}'"
             )
+        if not empresa.codigo_municipio_ibge:
+            raise MunicipioIbgeAusente(
+                "Cadastre o código IBGE 7-dígitos do município da empresa antes "
+                "de transmitir PGDAS-D. Use PATCH /v1/empresas/{eid}/municipio-ibge."
+            )
 
         apuracao = await ApuracaoFiscalRepo(session).buscar(
             empresa_id, competencia, "das"
@@ -92,7 +100,7 @@ class PgdasService:
         if eh_retificadora:
             ultima = await repo.ultima_transmissao(empresa_id, competencia)
             if ultima is None or ultima.status != "transmitida":
-                raise RegimeIncompativel(
+                raise RetificacaoSemOriginal(
                     "Retificação requer transmissão original bem-sucedida."
                 )
 
@@ -225,34 +233,55 @@ def _gerar_idempotency_key(
 def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> JsonObject:
     """Constrói o subobjeto `dados` enviado ao SERPRO (PGDAS-D).
 
-    Para o MVP cobrimos o ramo unicidade: 1 estabelecimento (a própria empresa),
-    receita do mês = `output_jsonb.receita_mes`. Receitas por estabelecimento /
-    deduções / regimes especiais (substituição tributária, retenção ISS,
-    imunidade) são extensões futuras (PR3).
+    v3 (Fase 2 PR8 — MAJOR M2 da auditoria Sprints 4-6): itera
+    ``output_jsonb.receitas_por_anexo`` para discriminar atividades — exigência
+    real do PGDAS-D quando empresa tem receitas em múltiplos anexos (Anexo I + III,
+    ou Fator R alternando III↔V).
+
+    Compatibilidade: apurações pré-v3 (sem ``receitas_por_anexo`` no jsonb)
+    caem no fallback ``{anexo_efetivo: receita_mes}`` — comportamento idêntico ao
+    PGDAS PR2 original (1 atividade, idAtividade do anexo_efetivo).
+
+    Out-of-scope (pendência consciente):
+      * 1 estabelecimento por empresa (a própria) — múltiplas filiais não cobertas.
+      * Deduções / substituição tributária / retenção ISS / imunidades — vazias.
     """
     output = apuracao.output_jsonb or {}
-    receita_mes = output.get("receita_mes", "0")
-    anexo_efetivo = output.get("anexo_efetivo") or output.get("anexo") or "I"
+    receita_total = Decimal(str(output.get("receita_mes", "0")))
+    anexo_efetivo_default = output.get("anexo_efetivo") or output.get("anexo") or "I"
+
+    receitas_raw = output.get("receitas_por_anexo") or {}
+    receitas_por_anexo: dict[str, Decimal] = {
+        anexo: Decimal(str(valor))
+        for anexo, valor in receitas_raw.items()
+        if Decimal(str(valor)) > Decimal("0")
+    }
+    if not receitas_por_anexo:
+        # Apuração pré-v3 (sn.das.v2 e anteriores) — fallback compat.
+        receitas_por_anexo = {anexo_efetivo_default: receita_total}
+
+    atividades: list[JsonObject] = [
+        {
+            "idAtividade": _id_atividade_por_anexo(anexo),
+            "valorAtividade": _decstr(valor),
+            "receitasAtividade": [
+                {
+                    "valor": _decstr(valor),
+                    "municipio": (empresa.codigo_municipio_ibge or ""),
+                    "uf": (empresa.uf or ""),
+                    "isencoes": [],
+                    "reducoes": [],
+                    "qualificacoesTributarias": [],
+                    "exigibilidadesSuspensas": [],
+                }
+            ],
+        }
+        for anexo, valor in sorted(receitas_por_anexo.items())
+    ]
 
     estabelecimento = {
         "cnpjCompleto": empresa.cnpj,
-        "atividades": [
-            {
-                "idAtividade": _id_atividade_por_anexo(anexo_efetivo),
-                "valorAtividade": str(receita_mes),
-                "receitasAtividade": [
-                    {
-                        "valor": str(receita_mes),
-                        "municipio": (empresa.municipio or ""),
-                        "uf": (empresa.uf or ""),
-                        "isencoes": [],
-                        "reducoes": [],
-                        "qualificacoesTributarias": [],
-                        "exigibilidadesSuspensas": [],
-                    }
-                ],
-            }
-        ],
+        "atividades": atividades,
         "folhasSalario": [],
         "naoOptante": False,
     }
@@ -260,8 +289,8 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
     return {
         "declaracao": {
             "tipoDeclaracao": 1,  # 1=Original; service detecta retificadora antes
-            "receitaPaCompetencia": str(receita_mes),
-            "receitaPaCaixa": str(receita_mes),
+            "receitaPaCompetencia": _decstr(receita_total),
+            "receitaPaCaixa": _decstr(receita_total),
             "valorFixoIcms": "0",
             "valorFixoIss": "0",
             "estabelecimentos": [estabelecimento],
@@ -272,17 +301,63 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
     }
 
 
-# Mapa anexo → idAtividade do PGDAS-D (Manual SERPRO v1.0).
+def _decstr(v: Decimal) -> str:
+    """Serializa Decimal preservando 2 casas — formato esperado pelo SERPRO."""
+    return f"{v.quantize(Decimal('0.01')):.2f}"
+
+
+# Mapa anexo → idAtividade do PGDAS-D — Manual SERPRO v1.4+ (2022+).
+#
+# Sprint 19.6 PR2 (#16): corrige mapa anterior que seguia Manual v1.0
+# (I→1, II→2, III→3, IV→4, V→5). SERPRO rejeitaria o payload em prod
+# real (ID 3 hoje é "locação de bens móveis", não serviços ISS Anexo
+# III; ID 5 hoje é Anexo IV; ID 6 é Anexo V — IDs deslocados).
+#
+# Códigos do Manual v1.4+:
+#   1 — Revenda de mercadorias                     (Anexo I)
+#   2 — Venda de mercadorias industrializadas      (Anexo II)
+#   3 — Locação de bens móveis                     (subtipo do Anexo III)
+#   4 — Prestação de serviços (art. 18 §1º LC 123) (Anexo III ISS — caso comum)
+#   5 — Prestação de serviços do §5º-C art. 18     (Anexo IV — construção civil)
+#   6 — Prestação de serviços do §5º-D/Anexo V     (Anexo V — serviços técnicos)
+#   7 — Atividades com tributação concentrada/ST   (raro — out-of-scope MVP)
+#   8 — Exportação de mercadorias ou serviços      (raro — out-of-scope MVP)
+#
+# Mapa padrão cobre o caso comum por anexo. Subdistinção locação×serviços
+# dentro do Anexo III + tributação concentrada exigem override via
+# parâmetro `subtipo_atividade` (out-of-scope desta sprint — quando
+# primeiro cliente precisar, expandir `apuracao_fiscal.output_jsonb`
+# com subtipo por linha de receita).
 _ID_ATIVIDADE_POR_ANEXO: dict[str, int] = {
-    "I": 1,  # Comércio
-    "II": 2,  # Indústria
-    "III": 3,  # Serviços Anexo III
-    "IV": 4,  # Serviços Anexo IV
-    "V": 5,  # Serviços Anexo V
+    "I": 1,
+    "II": 2,
+    "III": 4,
+    "IV": 5,
+    "V": 6,
 }
 
 
-def _id_atividade_por_anexo(anexo: str) -> int:
+# Subtipos override do Anexo III — quando passados pelo caller (futuro),
+# substituem o ID padrão 4 pelo código específico do Manual SERPRO v1.4+.
+_ID_ATIVIDADE_POR_SUBTIPO: dict[str, int] = {
+    "locacao_bens_moveis": 3,
+    "exportacao": 8,
+    "tributacao_concentrada": 7,
+}
+
+
+def _id_atividade_por_anexo(anexo: str, subtipo: str | None = None) -> int:
+    """Resolve ``idAtividade`` do PGDAS-D (Manual SERPRO v1.4+).
+
+    Sprint 19.6 PR2 (#16). ``subtipo`` opcional permite distinguir
+    casos específicos dentro do mesmo anexo (locação de bens móveis,
+    exportação, tributação concentrada/ST). Sem subtipo, retorna o
+    código do caso comum por anexo.
+    """
+    if subtipo is not None:
+        codigo = _ID_ATIVIDADE_POR_SUBTIPO.get(subtipo)
+        if codigo is not None:
+            return codigo
     return _ID_ATIVIDADE_POR_ANEXO.get(anexo, 1)
 
 

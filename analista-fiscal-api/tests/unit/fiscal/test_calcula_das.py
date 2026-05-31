@@ -18,7 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.fiscal.calcula_das import FaixaDAS, calcular_das, resolver_anexo_fator_r
+from app.modules.fiscal.calcula_das import (
+    FaixaDAS,
+    calcular_das,
+    calcular_das_multi_anexo,
+    resolver_anexo_fator_r,
+    validar_soma_receitas,
+)
 from app.shared.exceptions import EmpresaForaSimplesNacional
 
 _GOLDEN_DIR = Path(__file__).parent.parent.parent / "golden" / "simples_nacional"
@@ -198,3 +204,157 @@ def test_resolver_anexo_fator_r(fator_r: Decimal, esperado: str) -> None:
 def test_resolver_fator_r_anexo_invalido_levanta_erro() -> None:
     with pytest.raises(ValueError, match="Fator R"):
         resolver_anexo_fator_r("I", Decimal("0.30"))
+
+
+# ── v3: receitas_por_anexo (Fase 2 PR8 — MAJOR M2) ───────────────────────────
+
+
+_FAIXAS_III = _faixas_from_json([
+    {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.0600", "parcela_deduzir": "0.00"},
+    {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.1120", "parcela_deduzir": "9360.00"},
+    {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.1350", "parcela_deduzir": "17640.00"},
+    {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.1600", "parcela_deduzir": "35640.00"},
+    {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.2100", "parcela_deduzir": "125640.00"},
+    {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.3300", "parcela_deduzir": "648000.00"},
+])
+
+_FAIXAS_V = _faixas_from_json([
+    {"faixa": 1, "rbt12_ate": "180000.00", "aliquota_nominal": "0.1550", "parcela_deduzir": "0.00"},
+    {"faixa": 2, "rbt12_ate": "360000.00", "aliquota_nominal": "0.1800", "parcela_deduzir": "4500.00"},
+    {"faixa": 3, "rbt12_ate": "720000.00", "aliquota_nominal": "0.1950", "parcela_deduzir": "9900.00"},
+    {"faixa": 4, "rbt12_ate": "1800000.00", "aliquota_nominal": "0.2050", "parcela_deduzir": "17100.00"},
+    {"faixa": 5, "rbt12_ate": "3600000.00", "aliquota_nominal": "0.2300", "parcela_deduzir": "62100.00"},
+    {"faixa": 6, "rbt12_ate": "4800000.00", "aliquota_nominal": "0.3050", "parcela_deduzir": "540000.00"},
+])
+
+
+def test_single_anexo_preserva_receitas_por_anexo() -> None:
+    """Single-anexo passa: receitas_por_anexo = {anexo_efetivo: receita_mes}."""
+    resultado = calcular_das(
+        rbt12=Decimal("500000.00"),
+        receita_mes=Decimal("40000.00"),
+        faixas=_FAIXAS_I,
+        anexo="I",
+    )
+    assert resultado.receitas_por_anexo == {"I": Decimal("40000.00")}
+    assert resultado.algoritmo_versao == "sn.das.v3"
+
+
+def test_multi_anexo_soma_dois_anexos() -> None:
+    """Anexo I (R$10k) + Anexo III (R$5k) — DAS é a soma das duas alíquotas."""
+    rbt12 = Decimal("500000.00")  # faixa 3 em ambos os anexos
+
+    # Esperado parcial por anexo (calculado individualmente):
+    parcial_i = calcular_das(rbt12, Decimal("10000"), _FAIXAS_I, anexo="I")
+    parcial_iii = calcular_das(rbt12, Decimal("5000"), _FAIXAS_III, anexo="III")
+    esperado_total = parcial_i.valor + parcial_iii.valor
+
+    resultado = calcular_das_multi_anexo(
+        rbt12=rbt12,
+        receitas_por_anexo={"I": Decimal("10000"), "III": Decimal("5000")},
+        faixas_por_anexo={"I": _FAIXAS_I, "III": _FAIXAS_III},
+        anexo_declarado="I",
+    )
+
+    assert resultado.valor == esperado_total
+    assert resultado.receita_mes == Decimal("15000")
+    assert resultado.receitas_por_anexo == {
+        "I": Decimal("10000"),
+        "III": Decimal("5000"),
+    }
+    assert resultado.algoritmo_versao == "sn.das.v3"
+
+
+def test_multi_anexo_fator_r_alterna_iii_para_v() -> None:
+    """Fator R < 28% transforma Anexo III declarado em V efetivo (sem afetar I).
+
+    Empresa com 60% serviço (Anexo III ou V via Fator R) + 40% comércio (Anexo I).
+    Folha baixa → Fator R abaixo de 28% → serviço cai no Anexo V.
+    """
+    rbt12 = Decimal("500000.00")
+    fator_r_baixo = Decimal("0.15")  # < 28%
+
+    resultado = calcular_das_multi_anexo(
+        rbt12=rbt12,
+        receitas_por_anexo={"I": Decimal("4000"), "III": Decimal("6000")},
+        faixas_por_anexo={
+            "I": _FAIXAS_I,
+            "III": _FAIXAS_III,
+            "V": _FAIXAS_V,
+        },
+        anexo_declarado="III",
+        fator_r=fator_r_baixo,
+    )
+
+    # Anexo III virou V; Anexo I permanece intocado
+    assert resultado.anexo_efetivo == "V"
+    assert "V" in resultado.receitas_por_anexo
+    assert "I" in resultado.receitas_por_anexo
+    assert resultado.receitas_por_anexo["V"] == Decimal("6000")
+    assert resultado.receitas_por_anexo["I"] == Decimal("4000")
+
+    # DAS final é I (sem Fator R) + V (com receita realocada do III)
+    parcial_i = calcular_das(rbt12, Decimal("4000"), _FAIXAS_I, anexo="I")
+    parcial_v = calcular_das(rbt12, Decimal("6000"), _FAIXAS_V, anexo="V")
+    assert resultado.valor == parcial_i.valor + parcial_v.valor
+
+
+def test_multi_anexo_descarta_receita_zero() -> None:
+    """Anexos com receita 0 são silenciosamente ignorados."""
+    resultado = calcular_das_multi_anexo(
+        rbt12=Decimal("200000"),
+        receitas_por_anexo={
+            "I": Decimal("8000"),
+            "II": Decimal("0"),
+            "III": Decimal("2000"),
+        },
+        faixas_por_anexo={"I": _FAIXAS_I, "III": _FAIXAS_III},
+        anexo_declarado="I",
+    )
+    assert set(resultado.receitas_por_anexo) == {"I", "III"}
+
+
+def test_multi_anexo_vazio_levanta() -> None:
+    with pytest.raises(ValueError, match="vazio"):
+        calcular_das_multi_anexo(
+            rbt12=Decimal("100000"),
+            receitas_por_anexo={},
+            faixas_por_anexo={"I": _FAIXAS_I},
+            anexo_declarado="I",
+        )
+
+
+def test_multi_anexo_somente_receitas_zero_levanta() -> None:
+    with pytest.raises(ValueError, match="ao menos um anexo"):
+        calcular_das_multi_anexo(
+            rbt12=Decimal("100000"),
+            receitas_por_anexo={"I": Decimal("0")},
+            faixas_por_anexo={"I": _FAIXAS_I},
+            anexo_declarado="I",
+        )
+
+
+def test_multi_anexo_faixas_faltando_levanta() -> None:
+    with pytest.raises(ValueError, match="faixas_por_anexo"):
+        calcular_das_multi_anexo(
+            rbt12=Decimal("100000"),
+            receitas_por_anexo={"I": Decimal("5000"), "III": Decimal("3000")},
+            faixas_por_anexo={"I": _FAIXAS_I},  # falta "III"
+            anexo_declarado="I",
+        )
+
+
+def test_validar_soma_receitas_dentro_tolerancia() -> None:
+    # Diferença de 0.005 → dentro da tolerância default 0.01
+    validar_soma_receitas(
+        receita_mes=Decimal("10000.00"),
+        receitas_por_anexo={"I": Decimal("6000.005"), "III": Decimal("3999.99")},
+    )
+
+
+def test_validar_soma_receitas_fora_tolerancia_levanta() -> None:
+    with pytest.raises(ValueError, match="soma"):
+        validar_soma_receitas(
+            receita_mes=Decimal("10000.00"),
+            receitas_por_anexo={"I": Decimal("6000"), "III": Decimal("3000")},
+        )

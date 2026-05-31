@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.empresa.repo import EmpresaRepo
 from app.modules.whatsapp.handlers import classificar_intent, resposta_para_intent
-from app.modules.whatsapp.repo import SessaoWhatsAppRepo
+from app.modules.whatsapp.repo import MensagemProcessadaRepo, SessaoWhatsAppRepo
 from app.modules.whatsapp.schemas import MensagemRecebidaIn, RespostaWhatsApp
 
 log = structlog.get_logger(__name__)
@@ -44,6 +44,24 @@ class WhatsAppService:
         if empresa is None:
             log.warning("whatsapp.empresa_nao_encontrada", empresa_id=str(empresa_id))
             return None
+
+        # §8.9 — dedup atômico ANTES de qualquer side-effect. Meta retry sob 5xx/timeout.
+        if msg.mensagem_id:
+            dedup_repo = MensagemProcessadaRepo(session)
+            registrou = await dedup_repo.marcar_processada(
+                mensagem_id=msg.mensagem_id,
+                tenant_id=tenant_id,
+                empresa_id=empresa_id,
+                phone=msg.phone,
+            )
+            if not registrou:
+                log.info(
+                    "whatsapp.msg.duplicada",
+                    mensagem_id=msg.mensagem_id,
+                    phone_sufixo=msg.phone[-4:],
+                )
+                await session.commit()
+                return None
 
         repo = SessaoWhatsAppRepo(session)
         sessao = await repo.obter_ou_criar(

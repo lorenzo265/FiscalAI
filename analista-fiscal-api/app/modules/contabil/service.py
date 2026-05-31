@@ -18,6 +18,7 @@ from app.modules.contabil.repo import (
     ContaContabilRepo,
     LancamentoRepo,
     PartidaRepo,
+    SaldoContaMesRepo,
 )
 from app.modules.contabil.schemas import (
     ClonarPlanoOut,
@@ -36,6 +37,7 @@ from app.shared.db.models import ContaContabil, LancamentoContabil, PartidaLanca
 from app.shared.exceptions import (
     ContaJaExiste,
     EmpresaNaoEncontrada,
+    LancamentoEmMesEncerrado,
     LancamentoInvalido,
     LancamentoJaConfirmado,
     LancamentoNaoEncontrado,
@@ -169,6 +171,18 @@ class ContabilService:
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
 
+        # §8.2 — fatos contábeis imutáveis após encerramento. Defesa em
+        # profundidade: o CHECK em ``status`` bloqueia mutação de lançamentos
+        # já encerrados, mas não impede criação retroativa em mês fechado.
+        comp_mes1 = date(payload.competencia.year, payload.competencia.month, 1)
+        if await SaldoContaMesRepo(session).competencia_encerrada(
+            empresa_id, comp_mes1
+        ):
+            raise LancamentoEmMesEncerrado(
+                f"Competência {comp_mes1:%Y-%m} encerrada — use lançamento "
+                f"de ajuste retroativo em competência aberta."
+            )
+
         # Valida partidas via algoritmo puro.
         conta_repo = ContaContabilRepo(session)
         ids = [p.conta_id for p in payload.partidas]
@@ -245,6 +259,15 @@ class ContabilService:
         if lanc.status == StatusLancamento.ENCERRADO.value:
             raise LancamentoJaConfirmado(
                 f"Lançamento {lancamento_id} já está encerrado"
+            )
+        # §8.2 — rascunho criado antes do encerramento não pode ser promovido
+        # a confirmado depois (burlaria o gate de competência fechada).
+        if await SaldoContaMesRepo(session).competencia_encerrada(
+            empresa_id, lanc.competencia
+        ):
+            raise LancamentoEmMesEncerrado(
+                f"Competência {lanc.competencia:%Y-%m} encerrada — rascunho não "
+                f"pode ser confirmado em mês fechado."
             )
         if lanc.status == StatusLancamento.CONFIRMADO.value:
             # Idempotente

@@ -1,0 +1,99 @@
+# docker-compose isolado para load testing (Sprint 19 PR3).
+#
+# Diferenças vs ../docker-compose.yml (dev):
+#   * Postgres com tuning de perf (shared_buffers, work_mem, etc).
+#   * pg_stat_statements pré-carregado.
+#   * Porta diferente (5435) — evita conflito com Postgres dev (5434).
+#   * API com pool maior (DB_POOL_SIZE=50).
+#   * Container k6 com mount do diretório de scenarios.
+#   * SEM Ollama (load test não exercita LLM).
+#
+# Uso:
+#   docker compose -f tests/load/docker-compose.load.yml up -d postgres redis api
+#   poetry run alembic upgrade head
+#   poetry run python -m scripts.seed.seed_1k_tenants --scale smoke
+#   docker compose -f tests/load/docker-compose.load.yml run --rm k6 run /load/scenarios/das_mensal.js
+
+name: fiscal-loadtest
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fiscal_loadtest_postgres
+    environment:
+      POSTGRES_USER: fiscal
+      POSTGRES_PASSWORD: fiscal
+      POSTGRES_DB: fiscal
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=512MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
+      -c effective_cache_size=1GB
+      -c log_min_duration_statement=500
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_loadtest_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fiscal -d fiscal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: fiscal_loadtest_redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+      target: dev
+    container_name: fiscal_loadtest_api
+    environment:
+      ENVIRONMENT: local
+      LOG_LEVEL: WARNING                      # menos ruído em high-throughput
+      DATABASE_URL: postgresql+asyncpg://fiscal:fiscal@postgres:5432/fiscal
+      REDIS_URL: redis://redis:6379/0
+      DB_POOL_SIZE: "50"
+      DB_MAX_OVERFLOW: "100"
+      DB_POOL_TIMEOUT: "30"
+      SLOW_QUERY_THRESHOLD_MS: "500"
+      JWT_SECRET: "loadtest-secret-do-not-use-in-prod"
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+
+  k6:
+    image: grafana/k6:0.55.0
+    container_name: fiscal_loadtest_k6
+    profiles: ["runner"]                      # não sobe com `up`; só com `run`
+    environment:
+      API_URL: http://api:8000
+      FIXTURES_PATH: /load/.seed/empresas.json
+    volumes:
+      - ./:/load:ro
+    depends_on:
+      - api
+    # Default command: smoke test. Override via `docker compose run k6 run /load/scenarios/X.js`.
+    command: ["run", "/load/scenarios/healthcheck.js"]
+
+volumes:
+  postgres_loadtest_data:

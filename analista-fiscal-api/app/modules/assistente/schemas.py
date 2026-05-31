@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.modules.marketplace.schemas import ParceiroSugeridoOut
+
 
 class PerguntaIn(BaseModel):
     pergunta: str = Field(min_length=3, max_length=2000)
@@ -22,6 +24,11 @@ class RespostaOut(BaseModel):
     citacoes: list[CitacaoOut]
     encaminhar_marketplace: bool
     categoria_marketplace: str | None
+    # Sprint 13 PR2 — quando ``encaminhar_marketplace=True``, o assistente
+    # popula até 3 parceiros sugeridos para o cliente escolher. Lista vazia
+    # quando não há parceiros aptos (cliente vê mensagem mas sem opções).
+    categoria_marketplace_sugerida: str | None = None
+    parceiros_sugeridos: list[ParceiroSugeridoOut] = Field(default_factory=list)
     provider_usado: str
     tokens_input: int
     tokens_output: int

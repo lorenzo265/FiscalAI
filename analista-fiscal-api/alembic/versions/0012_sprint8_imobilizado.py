@@ -82,11 +82,11 @@ def upgrade() -> None:
                 "(id, categoria, taxa_anual, vida_util_anos, fonte, valid_from) "
                 "VALUES (gen_random_uuid(), :cat, :taxa, :vida, :fonte, :vf)"
             ).bindparams(
-                cat=categoria,
-                taxa=taxa,
-                vida=vida,
-                fonte="IN SRF 162/1998 anexo I",
-                vf="1999-01-01",
+                sa.bindparam("cat", categoria, type_=sa.String(50)),
+                sa.bindparam("taxa", taxa, type_=sa.Numeric(6, 4)),
+                sa.bindparam("vida", vida, type_=sa.Integer()),
+                sa.bindparam("fonte", "IN SRF 162/1998 anexo I", type_=sa.String(255)),
+                sa.bindparam("vf", "1999-01-01", type_=sa.Date()),
             )
         )
 

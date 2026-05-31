@@ -74,3 +74,25 @@ class TestExtracaoPrazo:
     def test_sem_prazo(self) -> None:
         r = classificar("Aviso", "Sem prazo determinado.")
         assert r.prazo_resposta is None
+
+    # ── m2 da auditoria Sprints 4-6: prazo em N dias ─────────────────────────
+
+    def test_prazo_em_dias_calcula_data_a_partir_de_hoje(self) -> None:
+        """`prazo de 30 dias` → date.today() + 30 dias (m2 fix)."""
+        from datetime import timedelta
+
+        r = classificar("Intimação", "Apresente defesa no prazo de 30 dias.")
+        assert r.prazo_resposta == date.today() + timedelta(days=30)
+
+    def test_prazo_em_dias_com_data_limite_prefere_data(self) -> None:
+        """Quando ambos aparecem, data limite explícita ganha."""
+        r = classificar(
+            "Aviso",
+            "Regularizar até 30/06/2026, prazo de 60 dias.",
+        )
+        assert r.prazo_resposta == date(2026, 6, 30)
+
+    def test_prazo_dias_fora_de_faixa_retorna_none(self) -> None:
+        """Prazos > 365 dias são ignorados (input ruim)."""
+        r = classificar("Aviso", "Apresente defesa no prazo de 999 dias.")
+        assert r.prazo_resposta is None

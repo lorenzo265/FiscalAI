@@ -31,11 +31,13 @@ from app.modules.contabil.lancador_auto import (
     ALGORITMO_VERSAO,
     ContasAuto,
     DepreciacaoFatoView,
+    FolhaFatoView,
     LancamentoCandidato,
     NfFatoView,
     ProvisaoFatoView,
     TransacaoFatoView,
     gerar_partidas_de_depreciacao,
+    gerar_partidas_de_folha,
     gerar_partidas_de_nfe,
     gerar_partidas_de_provisao,
     gerar_partidas_de_transacao,
@@ -52,6 +54,7 @@ from app.modules.empresa.repo import EmpresaRepo
 from app.shared.db.models import (
     DepreciacaoMensal,
     DocumentoFiscal,
+    FolhaMensal,
     ProvisaoMensal,
     TransacaoBancaria,
 )
@@ -110,6 +113,12 @@ class LancadorService:
             provisao_13=ids["provisao_13"],
             inss_recolher=ids["inss_recolher"],
             fgts_recolher=ids["fgts_recolher"],
+            # Sprint 19.7 PR1 (#10) — folha contabilizada.
+            irrf_funcionarios_recolher=ids["irrf_funcionarios_recolher"],
+            salarios_pagar=ids["salarios_pagar"],
+            estoques=ids["estoques"],
+            imobilizado=ids["imobilizado"],
+            despesa_servicos=ids["despesa_servicos"],
         )
 
     # ── Lotes por tipo de fato ───────────────────────────────────────────────
@@ -155,6 +164,7 @@ class LancadorService:
                 valor_total=nf.valor_total,
                 emitida_em=nf.emitida_em,
                 numero=nf.numero,
+                cfop=nf.cfop,
             )
             candidato = gerar_partidas_de_nfe(view, contas)
             criou = await self._persistir(
@@ -360,6 +370,67 @@ class LancadorService:
         return LoteResultado(
             competencia=comp_mes1,
             fatos_avaliados=len(provs),
+            lancamentos_criados=criados,
+            lancamentos_existentes=existentes,
+            fatos_pulados=pulados,
+        )
+
+    # ── Sprint 19.7 PR1 (#10) — folha mensal ────────────────────────────────
+
+    async def lote_folha(
+        self,
+        session: AsyncSession,
+        tenant_id: uuid.UUID,
+        empresa_id: uuid.UUID,
+        folha: FolhaMensal,
+    ) -> LoteResultado:
+        """Sprint 19.7 PR1 (#10) — gera lançamento contábil de 1 folha fechada.
+
+        Espera ``folha.status='fechada'`` (caller é ``FolhaService.fechar_folha``
+        ou re-run admin). Idempotente via ``UNIQUE(origem_tipo='folha',
+        origem_id=folha.id)``.
+        """
+        await self._garantir_empresa(session, empresa_id)
+        comp_mes1 = date(folha.competencia.year, folha.competencia.month, 1)
+        contas = await self.resolver_contas(session, empresa_id, comp_mes1)
+
+        view = FolhaFatoView(
+            id=folha.id,
+            competencia=folha.competencia,
+            total_proventos=folha.total_proventos,
+            total_inss_empregado=folha.total_inss_empregado,
+            total_irrf=folha.total_irrf,
+            total_fgts_empregador=folha.total_fgts_empregador,
+        )
+        candidato = gerar_partidas_de_folha(view, contas)
+
+        criados = 0
+        existentes = 0
+        pulados = 0
+        if candidato is None:
+            pulados = 1
+        else:
+            criou = await self._persistir(
+                session, tenant_id, empresa_id, candidato
+            )
+            if criou:
+                criados = 1
+            else:
+                existentes = 1
+
+        await session.commit()
+        log.info(
+            "contabil.auto.folha",
+            empresa_id=str(empresa_id),
+            competencia=comp_mes1.isoformat(),
+            folha_id=str(folha.id),
+            criados=criados,
+            existentes=existentes,
+            pulados=pulados,
+        )
+        return LoteResultado(
+            competencia=comp_mes1,
+            fatos_avaliados=1,
             lancamentos_criados=criados,
             lancamentos_existentes=existentes,
             fatos_pulados=pulados,

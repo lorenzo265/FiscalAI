@@ -28,13 +28,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 
-ALGORITMO_VERSAO = "prov-2026.05"
+ALGORITMO_VERSAO = "prov-2026.06"
 
 _CENTAVO = Decimal("0.01")
 _UM_DOZE = Decimal("1") / Decimal("12")
 _UM_TERCO = Decimal("1") / Decimal("3")
-_ALIQ_INSS_PATRONAL = Decimal("0.2000")
-_ALIQ_FGTS = Decimal("0.0800")
+_ALIQ_INSS_PATRONAL = Decimal("0.200000")
+_ALIQ_FGTS = Decimal("0.080000")
 
 # Regimes onde o INSS patronal sobre folha NÃO se aplica.
 _REGIMES_SEM_INSS_PATRONAL = frozenset({"mei", "simples_nacional"})
@@ -145,9 +145,12 @@ def calcular_provisoes(folha_mes: Decimal, regime: str) -> ResultadoProvisoes:
     )
 
 
-# Aliquota representativa de "1/12" persistida em provisao_mensal.aliquota
-# para auditoria — 0.0833 ≈ 8,33%.
-_UM_DOZE_PCT_ARREDONDADA = Decimal("0.0833")
+# Alíquota "1/12" persistida em provisao_mensal.aliquota a 6 casas decimais
+# (coluna NUMERIC(8,6) desde a migration 0030). Auditor que multiplicar
+# base_calculo × 0.083333 ≈ valor_provisao com erro ≤ R$ 0,01.
+_UM_DOZE_PCT_ARREDONDADA = (Decimal("1") / Decimal("12")).quantize(
+    Decimal("0.000001"), rounding=ROUND_HALF_EVEN
+)
 
 
 def _quantizar(v: Decimal) -> Decimal:

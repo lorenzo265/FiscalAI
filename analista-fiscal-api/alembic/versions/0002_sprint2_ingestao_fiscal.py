@@ -224,12 +224,12 @@ def _seed_tabela_simples() -> None:
                 "(gen_random_uuid(), :anexo, :faixa, :rbt12_ate, :aliq, :parcela, "
                 "'2018-01-01', NULL, :fonte)"
             ).bindparams(
-                anexo=anexo,
-                faixa=faixa,
-                rbt12_ate=rbt12_ate,
-                aliq=aliq,
-                parcela=parcela,
-                fonte=fonte,
+                sa.bindparam("anexo", anexo, type_=sa.CHAR(3)),
+                sa.bindparam("faixa", faixa, type_=sa.Integer()),
+                sa.bindparam("rbt12_ate", rbt12_ate, type_=sa.Numeric(14, 2)),
+                sa.bindparam("aliq", aliq, type_=sa.Numeric(6, 4)),
+                sa.bindparam("parcela", parcela, type_=sa.Numeric(14, 2)),
+                sa.bindparam("fonte", fonte, type_=sa.String(255)),
             )
         )
 

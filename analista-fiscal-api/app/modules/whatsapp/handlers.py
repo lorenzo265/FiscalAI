@@ -124,10 +124,13 @@ def resposta_para_intent(
         case "saldo":
             return _RESPOSTA_SALDO, "resposta"
         case "assistente":
+            # m3 da auditoria Sprints 4-6: handler não delega de fato ao módulo
+            # assistente (Celery ainda opt-in). Honest text — redireciona ao painel
+            # onde o LLM com citação + re-check está disponível end-to-end.
             return (
-                "Entendi! Vou buscar essa informação para você. "
-                "Por favor aguarde alguns instantes… ⏳",
-                "assistente",
+                "Para perguntas mais detalhadas sobre seu fiscal/contábil, "
+                "acesse seu painel:\nhttps://app.fiscalai.com.br 📊",
+                "dashboard",
             )
         case _:
             return _RESPOSTA_FALLBACK, "fallback"

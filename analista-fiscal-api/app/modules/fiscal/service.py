@@ -163,6 +163,9 @@ class FiscalService:
                 "uf": resultado.uf,
                 "sublimite_aplicado": str(resultado.sublimite_aplicado),
                 "sublimite_excedido": resultado.sublimite_excedido,
+                "receitas_por_anexo": {
+                    a: str(v) for a, v in resultado.receitas_por_anexo.items()
+                },
             },
             faixas_usadas={"faixas": faixas_dict, "anexo_efetivo": anexo_efetivo},
             algoritmo_versao=resultado.algoritmo_versao,

@@ -20,7 +20,11 @@ from app.modules.empresa.repo import EmpresaRepo
 from app.modules.notas.repo import NotasRepo
 from app.modules.notas.schemas import EmitirNfseIn, EmitirNfseOut, NfseStatusOut
 from app.shared.db.models import Empresa
-from app.shared.exceptions import EmpresaNaoEncontrada, NfseNaoEncontrada
+from app.shared.exceptions import (
+    EmpresaNaoEncontrada,
+    MunicipioIbgeAusente,
+    NfseNaoEncontrada,
+)
 from app.shared.types import JsonObject
 
 
@@ -65,7 +69,7 @@ def _construir_payload_focus(
         "prestador": {
             "cnpj": empresa.cnpj,
             "inscricao_municipal": empresa.im or "",
-            "codigo_municipio": empresa.municipio or "",
+            "codigo_municipio": empresa.codigo_municipio_ibge or "",
         },
         "tomador": {},
         "servico": {
@@ -109,6 +113,12 @@ class NotasService:
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
 
+        if not empresa.codigo_municipio_ibge:
+            raise MunicipioIbgeAusente(
+                "Cadastre o código IBGE 7-dígitos do município da empresa antes "
+                "de emitir NFS-e. Use PATCH /v1/empresas/{eid}/municipio-ibge."
+            )
+
         # RPS sequencial por empresa (exigência ABNT NBR 15032 / ISS-e municipal).
         # SELECT FOR UPDATE garante alocação atômica sob concorrência.
         numero_int = await empresa_repo.alocar_proximo_numero_rps(empresa_id)
@@ -136,12 +146,16 @@ class NotasService:
             focus_ref=focus_ref,
             status=resultado.get("status"),
         )
+        # Aviso ISS só enquanto a empresa não validou a alíquota (m5 da auditoria
+        # Sprints 4-6). Após validação manual via PATCH /v1/empresas/{eid}, some.
+        aviso_iss = None if getattr(empresa, "aliquota_iss_validada", False) else _AVISO_ISS
+
         return EmitirNfseOut(
             focus_ref=focus_ref,
             status=resultado.get("status", "processando"),
             documento_fiscal_id=doc.id,
             mensagem="NFS-e em processamento. Acompanhe o status pelo número de referência.",
-            aviso_iss=_AVISO_ISS,
+            aviso_iss=aviso_iss,
         )
 
     async def consultar_status(

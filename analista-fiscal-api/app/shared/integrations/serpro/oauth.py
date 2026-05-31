@@ -21,8 +21,8 @@ from app.shared.exceptions import SerproOAuthErro, SerproTimeout
 
 log = structlog.get_logger(__name__)
 
-_TOKEN_REDIS_KEY = "serpro:oauth2:access_token"
-_TOKEN_PATH = "/oauth2/token"
+_TOKEN_REDIS_KEY = "serpro:oauth2:access_token"  # nosec B105 — chave Redis, não credencial
+_TOKEN_PATH = "/oauth2/token"  # nosec B105 — caminho de URL, não credencial
 
 
 class SerproOAuthClient:

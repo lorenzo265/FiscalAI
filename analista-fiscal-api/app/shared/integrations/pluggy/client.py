@@ -33,7 +33,7 @@ from app.shared.integrations.pluggy.auth import PluggyAuthClient
 
 log = structlog.get_logger(__name__)
 
-_PATH_CONNECT_TOKEN = "/connect_token"
+_PATH_CONNECT_TOKEN = "/connect_token"  # nosec B105 — caminho de URL, não credencial
 _PATH_ITEMS = "/items"
 _PATH_ACCOUNTS = "/accounts"
 _PATH_TRANSACTIONS = "/transactions"
@@ -177,7 +177,10 @@ class PluggyClient:
 
         if resp.status_code == 401:
             await self._auth.invalidar()
-            raise PluggyErro(f"Pluggy {path} retornou 401 (API key vencida ou inválida)")
+            raise PluggyErro(
+                f"Pluggy {path} retornou 401 (API key vencida ou inválida)",
+                status_upstream=401,
+            )
 
         if resp.status_code == 404 and path.startswith(_PATH_ITEMS):
             raise ItemNaoEncontrado(f"Pluggy item não encontrado em {path}")
@@ -192,7 +195,8 @@ class PluggyClient:
                 corpo=resp.text[:300],
             )
             raise PluggyErro(
-                f"Pluggy {path} retornou {resp.status_code}: {resp.text[:300]}"
+                f"Pluggy {path} retornou {resp.status_code}: {resp.text[:300]}",
+                status_upstream=resp.status_code,
             )
 
         log.info(

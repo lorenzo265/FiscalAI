@@ -11,7 +11,12 @@ from uuid import UUID
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.contabil.plano_referencial import (
+    codigo as conta_codigo,
+    codigos_do_grupo,
+)
 from app.modules.empresa.repo import EmpresaRepo
+from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.modules.relatorios.calcula_balanco import calcular_balanco
 from app.modules.relatorios.calcula_dfc import EntradaDfc, calcular_dfc
 from app.modules.relatorios.calcula_dre import calcular_dre
@@ -228,56 +233,59 @@ class RelatoriosService:
         )
         dre = calcular_dre(saldos_dre, irpj_csll_apurado=irpj_csll)
 
-        # Não-caixa: depreciação do período (acumulada na conta 5.1.04).
+        # Não-caixa: depreciação do período (acumulada na conta de despesa).
         depreciacao = await saldos_repo.soma_movimento_codigo_periodo(
-            empresa_id, "5.1.04", payload.periodo_inicio, payload.periodo_fim,
+            empresa_id,
+            conta_codigo("despesa_depreciacao"),
+            payload.periodo_inicio,
+            payload.periodo_fim,
         )
 
         # Variações de saldos finais (fim − início do período).
+        # Códigos vêm de `plano_referencial.GRUPOS_CONTABEIS` — fonte canônica única.
         antes = _date_anterior(payload.periodo_inicio)
-        clientes_fim = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.1.2.01", payload.periodo_fim,
+        cod_clientes = codigos_do_grupo("clientes")
+        cod_estoques = codigos_do_grupo("estoques")
+        cod_fornec = codigos_do_grupo("fornecedores")
+        cod_encargos = codigos_do_grupo("encargos_a_pagar")
+        cod_imob = codigos_do_grupo("imobilizado_bruto")
+        cod_caixa = codigos_do_grupo("caixa_equivalentes")
+
+        clientes_fim = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_clientes, payload.periodo_fim,
         )
-        clientes_ini = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.1.2.01", antes,
+        clientes_ini = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_clientes, antes,
         )
-        estoques_fim = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.1.3.01", payload.periodo_fim,
+        estoques_fim = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_estoques, payload.periodo_fim,
         )
-        estoques_ini = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.1.3.01", antes,
+        estoques_ini = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_estoques, antes,
         )
-        fornec_fim = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "2.1.1.01", payload.periodo_fim,
+        fornec_fim = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_fornec, payload.periodo_fim,
         )
-        fornec_ini = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "2.1.1.01", antes,
+        fornec_ini = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_fornec, antes,
         )
-        # Encargos a pagar: soma INSS + FGTS + sal a pagar
         encargos_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id,
-            ("2.1.2.01", "2.1.3.01", "2.1.3.02"),
-            payload.periodo_fim,
+            saldos_repo, empresa_id, cod_encargos, payload.periodo_fim,
         )
         encargos_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id,
-            ("2.1.2.01", "2.1.3.01", "2.1.3.02"),
-            antes,
+            saldos_repo, empresa_id, cod_encargos, antes,
         )
-        imob_fim = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.2.3.01", payload.periodo_fim,
+        imob_fim = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_imob, payload.periodo_fim,
         )
-        imob_ini = await saldos_repo.saldo_conta_codigo_em(
-            empresa_id, "1.2.3.01", antes,
+        imob_ini = await _soma_saldos_codigos(
+            saldos_repo, empresa_id, cod_imob, antes,
         )
-        # Caixa = soma de 1.1.1.01 + 1.1.1.02 (Caixa + Bancos).
         caixa_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id,
-            ("1.1.1.01", "1.1.1.02"), payload.periodo_fim,
+            saldos_repo, empresa_id, cod_caixa, payload.periodo_fim,
         )
         caixa_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id,
-            ("1.1.1.01", "1.1.1.02"), antes,
+            saldos_repo, empresa_id, cod_caixa, antes,
         )
 
         entrada = EntradaDfc(
@@ -505,31 +513,18 @@ def _data_trimestre(ano: int, trimestre: int) -> tuple[date, date]:
 
 
 def _to_apuracao_input(ap: ApuracaoFiscal) -> ApuracaoFiscalInput:
-    """Converte ``ApuracaoFiscal`` ORM → input do algoritmo puro."""
-    out = ap.output_jsonb
-    inp = ap.input_jsonb
-    if ap.tipo == "irpj":
-        valor = Decimal(str(out.get("irpj_total", "0")))
-        base = Decimal(str(out.get("base_total", "0")))
-    elif ap.tipo == "csll":
-        valor = Decimal(str(out.get("csll", "0")))
-        base = Decimal(str(out.get("base_total", "0")))
-    elif ap.tipo in ("pis", "cofins"):
-        valor = Decimal(str(out.get("tributo", "0")))
-        base = Decimal(str(out.get("base_calculo", "0")))
-    elif ap.tipo == "icms":
-        valor = Decimal(str(out.get("icms_a_recolher", "0")))
-        base = None
-    elif ap.tipo == "iss":
-        valor = Decimal(str(out.get("iss", inp.get("valor", "0"))))
-        base = None
-    elif ap.tipo == "das":
-        valor = Decimal(str(out.get("valor", "0")))
-        base = None
-    else:
-        valor = Decimal("0")
-        base = None
-    return ApuracaoFiscalInput(tipo=ap.tipo, valor=valor, base_calculo=base)
+    """Converte ``ApuracaoFiscal`` ORM → input do algoritmo puro.
+
+    Usa `parse_apuracao_output` (Pydantic discriminator) — fonte canônica
+    de schema. Adicionar tipo novo de tributo = registrar Snapshot no
+    discriminator, não tocar este código.
+    """
+    snap = parse_apuracao_output(ap.tipo, ap.output_jsonb, input_jsonb=ap.input_jsonb)
+    return ApuracaoFiscalInput(
+        tipo=ap.tipo,
+        valor=snap.valor_devido,
+        base_calculo=snap.base_calculo,
+    )
 
 
 async def _soma_saldos_codigos(

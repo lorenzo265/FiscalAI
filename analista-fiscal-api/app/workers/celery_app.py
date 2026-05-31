@@ -17,6 +17,7 @@ Beat schedule:
   │ imobilizado.depreciacao    │ 03:00 dia 1°/mês │ gerar_depreciacao_empresa│
   │ provisoes.mensal           │ 23:00 último dia │ gerar_provisao_empresa   │
   │ rbt12.refresh_mensal       │ 06:00 dia 2/mês  │ refresh_rbt12_mensal     │
+  │ whatsapp.expurgar_proc.    │ 04:00 diário     │ expurgar_mensagens_proc. │
   └────────────────────────────┴──────────────────┴──────────────────────────┘
 
 Para ativar Celery real:
@@ -77,7 +78,7 @@ def _beat_schedule() -> dict[str, Any]:
     instalado, usamos ``None`` como sentinel (o stub ignora qualquer schedule).
     """
     try:
-        from celery.schedules import crontab  # type: ignore[import-not-found]
+        from celery.schedules import crontab
     except ImportError:
         return {}
 
@@ -111,13 +112,121 @@ def _beat_schedule() -> dict[str, Any]:
             "schedule": crontab(day_of_month=2, hour=6, minute=0),
             "options": {"queue": "default"},
         },
+        "whatsapp.expurgar_processadas": {
+            # Fase 2 PR7 — apaga registros de mensagens processadas > 7 dias.
+            # Mantém a tabela enxuta; Meta não retry além de algumas horas.
+            "task": "whatsapp.expurgar_processadas",
+            "schedule": crontab(hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 13 PR3 — marketplace ──────────────────────────────────
+        "marketplace.expirar_sla": {
+            "task": "marketplace.expirar_sla",
+            "schedule": crontab(minute=0),  # de hora em hora
+            "options": {"queue": "default"},
+        },
+        "marketplace.recalcular_rating": {
+            "task": "marketplace.recalcular_rating",
+            "schedule": crontab(hour=2, minute=0),
+            "options": {"queue": "default"},
+        },
+        "marketplace.expurgar_pii": {
+            "task": "marketplace.expurgar_pii",
+            "schedule": crontab(hour=3, minute=0),
+            "options": {"queue": "default"},
+        },
+        "marketplace.check_crc_mensal": {
+            "task": "marketplace.check_crc_mensal",
+            "schedule": crontab(day_of_month=5, hour=6, minute=0),
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 14 PR3 — Reforma Tributária ────────────────────────────
+        "reforma.refresh_cbs_ibs_historico": {
+            "task": "reforma.refresh_cbs_ibs_historico",
+            "schedule": crontab(hour=4, minute=30),  # diário 04:30
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 15 PR1 — AI Advisor ────────────────────────────────────
+        "advisor.detectar_anomalias_diario": {
+            "task": "advisor.detectar_anomalias_diario",
+            "schedule": crontab(hour=7, minute=30),  # diário 07:30 BR
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 15 PR3 — Weekly digest ─────────────────────────────────
+        "advisor.gerar_digest_semanal": {
+            "task": "advisor.gerar_digest_semanal",
+            "schedule": crontab(day_of_week=1, hour=6, minute=0),  # segunda 06:00 BR
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 15.5 — Envio do digest via Meta WhatsApp template ───────
+        "advisor.enviar_digests_preparados": {
+            "task": "advisor.enviar_digests_preparados",
+            "schedule": crontab(day_of_week=1, hour=6, minute=30),  # segunda 06:30 BR
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 16 PR3 — geração proativa anual SPED ECD/ECF ────────────
+        "sped.gerar_ecd_anual": {
+            # 03/abril 04:00 BR — ~30 dias antes do prazo legal (último
+            # dia útil de maio). Idempotente: empresas que já têm ECD
+            # ativa do ano caem em SpedJaGerado (não-erro).
+            "task": "sped.gerar_ecd_anual",
+            "schedule": crontab(month_of_year=4, day_of_month=3, hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
+        "sped.gerar_ecf_anual": {
+            # 03/junho 04:00 BR — ~30 dias antes do prazo legal (último
+            # dia útil de julho).
+            "task": "sped.gerar_ecf_anual",
+            "schedule": crontab(month_of_year=6, day_of_month=3, hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 19.5 PR2 — Painel admin de tabelas tributárias ──────────
+        "tabelas.verificar_vigencias": {
+            # Diário 06:15 BR — 15min após o sync e-CAC para não competir por
+            # conexões Postgres. Cria alertas idempotentes em alerta_admin.
+            "task": "tabelas.verificar_vigencias",
+            "schedule": crontab(hour=6, minute=15),
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 19.6 PR4 (#34) — EFD mensal proativa ────────────────────
+        "sped.gerar_efd_contribuicoes_mensal": {
+            # Dia 5 às 04:00 BR — gera EFD-Contribuições do mês anterior
+            # (prazo legal: 10º dia útil do 2º mês subsequente, ~6 semanas).
+            "task": "sped.gerar_efd_contribuicoes_mensal",
+            "schedule": crontab(day_of_month=5, hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
+        "sped.gerar_efd_icms_ipi_mensal": {
+            # Dia 5 às 04:00 BR — gera EFD ICMS-IPI do mês anterior. Prazo
+            # varia por UF (SP dia 20, MG dia 9 etc. — ver migration 0046).
+            "task": "sped.gerar_efd_icms_ipi_mensal",
+            "schedule": crontab(day_of_month=5, hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
+        # ── Sprint 19.5 PR3 — Scraper DOU + LLM extrai estrutura ───────────
+        # ── Sprint 19.6 PR4 (#4) — drain de webhook events Pluggy ─────────
+        "open_finance.processar_webhook_events": {
+            # A cada 5 minutos — drena eventos não processados como
+            # backup ao trigger imediato do webhook (que pode falhar
+            # se Celery estiver indisponível no momento).
+            "task": "open_finance.processar_webhook_events",
+            "schedule": crontab(minute="*/5"),
+            "options": {"queue": "default"},
+        },
+        "tabelas.varrer_dou_mensal": {
+            # Mensal dia 5 às 04:00 BR — busca matérias INSS/IRRF dos
+            # últimos 60 dias, expira sugestões > 60 dias.
+            "task": "tabelas.varrer_dou_mensal",
+            "schedule": crontab(day_of_month=5, hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
     }
 
 
 def _build() -> _CeleryStub:
     """Constrói a Celery app real se o pacote estiver disponível, senão o stub."""
     try:
-        from celery import Celery  # type: ignore[import-not-found]
+        from celery import Celery
     except ImportError:
         settings = get_settings()
         return _CeleryStub("analista-fiscal", broker=settings.REDIS_URL)
@@ -140,3 +249,29 @@ def _build() -> _CeleryStub:
 
 
 celery_app: _CeleryStub = _build()
+
+
+def enqueue(task: Any, *args: Any, **kwargs: Any) -> None:
+    """Sprint 19.6 PR4 helper — chama ``task.delay(*args, **kwargs)`` quando
+    Celery real está ativo; faz log no-op com stub.
+
+    Permite que callers (webhooks, services) disparem tasks sem checar a
+    cada vez se o broker está disponível. Em dev (stub) o evento fica
+    apenas registrado no banco e será processado pelo próximo beat
+    schedule quando Celery for ativado.
+    """
+    import structlog
+
+    _log = structlog.get_logger(__name__)
+    delay = getattr(task, "delay", None)
+    task_name = getattr(task, "__name__", str(task))
+    if delay is None:
+        # Stub — task é função pura. Não roda síncrono (bloquearia
+        # request HTTP); apenas loga. Beat schedule eventual drena depois.
+        _log.info("celery.enqueue.stub", task=task_name)
+        return
+    try:
+        delay(*args, **kwargs)
+        _log.info("celery.enqueue.ok", task=task_name)
+    except Exception:
+        _log.exception("celery.enqueue.falhou", task=task_name)

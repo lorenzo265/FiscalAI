@@ -13,6 +13,7 @@ from app.shared.db.models import (
     ContaContabil,
     LancamentoContabil,
     PartidaLancamento,
+    SaldoContaMes,
 )
 
 
@@ -198,3 +199,27 @@ class PartidaRepo:
             .order_by(asc(PartidaLancamento.ordem))
         )
         return list((await self._s.execute(stmt)).scalars().all())
+
+
+class SaldoContaMesRepo:
+    """Acessor de ``saldo_conta_mes`` — materialização do balancete mensal."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def competencia_encerrada(
+        self, empresa_id: UUID, competencia: date
+    ) -> bool:
+        """True se houver pelo menos uma linha ``status='fechado'`` na competência.
+
+        Usado como guarda em ``criar_lancamento_manual`` — defesa em
+        profundidade além do CHECK de ``status`` em ``lancamento_contabil``.
+        """
+        stmt = (
+            select(SaldoContaMes.id)
+            .where(SaldoContaMes.empresa_id == empresa_id)
+            .where(SaldoContaMes.competencia == competencia)
+            .where(SaldoContaMes.status == "fechado")
+            .limit(1)
+        )
+        return (await self._s.execute(stmt)).scalar_one_or_none() is not None

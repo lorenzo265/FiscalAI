@@ -38,6 +38,7 @@ class EmpresaService:
             anexo_simples=payload.anexo_simples,
             cnae_principal=payload.cnae_principal,
             municipio=payload.municipio,
+            codigo_municipio_ibge=payload.codigo_municipio_ibge,
             uf=payload.uf,
             ie=payload.ie,
             im=payload.im,
@@ -61,4 +62,37 @@ class EmpresaService:
         empresa = await EmpresaRepo(session).por_id(empresa_id)
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+        return empresa
+
+    async def atualizar_municipio_ibge(
+        self,
+        session: AsyncSession,
+        empresa_id: UUID,
+        codigo_municipio_ibge: str,
+    ) -> Empresa:
+        """Atualiza o código IBGE da empresa (PATCH manual)."""
+        empresa = await EmpresaRepo(session).atualizar_municipio_ibge(
+            empresa_id, codigo_municipio_ibge
+        )
+        if empresa is None:
+            raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+        await session.commit()
+        log.info(
+            "empresa.municipio_ibge.atualizado",
+            empresa_id=str(empresa_id),
+            codigo_ibge=codigo_municipio_ibge,
+        )
+        return empresa
+
+    async def marcar_iss_validada(
+        self,
+        session: AsyncSession,
+        empresa_id: UUID,
+    ) -> Empresa:
+        """Confirma que o contador validou a alíquota ISS — aviso não aparece mais."""
+        empresa = await EmpresaRepo(session).marcar_iss_validada(empresa_id)
+        if empresa is None:
+            raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+        await session.commit()
+        log.info("empresa.iss_validada", empresa_id=str(empresa_id))
         return empresa

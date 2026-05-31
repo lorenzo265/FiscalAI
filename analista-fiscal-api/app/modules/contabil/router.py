@@ -18,6 +18,7 @@ from app.modules.contabil.repo import (
     PartidaRepo,
 )
 from app.modules.contabil.schemas import (
+    AberturaExercicioOut,
     BalanceteOut,
     ClonarPlanoOut,
     ContaContabilOut,
@@ -433,4 +434,35 @@ async def encerrar_ano(
         despesas_zeradas=resultado.despesas_zeradas,
         resultado_exercicio=resultado.resultado_exercicio,
         lancamento_apuracao_id=resultado.lancamento_apuracao_id,
+    )
+
+
+@router.post(
+    "/{empresa_id}/contabil/exercicio/{ano}/abrir",
+    response_model=AberturaExercicioOut,
+    status_code=200,
+    summary="Abre exercício — transporta saldos patrimoniais e zera resultado (Sprint 18 PR1)",
+    description=(
+        "Materializa ``saldo_conta_mes`` de janeiro/ano com saldo_inicial "
+        "herdado de dezembro/ano-1 para contas patrimoniais (Ativo/Passivo/PL/"
+        "ContaResultado) e zero para receita/despesa. Idempotente — re-chamada "
+        "não duplica linhas. Disparado automaticamente pelo encerramento anual; "
+        "este endpoint serve para correção manual ou rebuild após edição "
+        "retroativa de saldos."
+    ),
+)
+async def abrir_exercicio(
+    empresa_id: UUID,
+    ano: int,
+    ctx: TenantDep,
+    session: SessionDep,
+) -> AberturaExercicioOut:
+    resultado = await EncerramentoService().abrir_exercicio(
+        session, ctx.tenant_id, empresa_id, ano
+    )
+    return AberturaExercicioOut(
+        ano=resultado.ano,
+        contas_patrimoniais=resultado.contas_patrimoniais,
+        contas_resultado=resultado.contas_resultado,
+        saldo_total_transportado=resultado.saldo_total_transportado,
     )

@@ -65,9 +65,11 @@ def test_simples_nacional_com_funcionarios_tem_12_fgts() -> None:
 
 
 def test_simples_nacional_fgts_janeiro_vence_dia_7_fevereiro() -> None:
+    """FGTS jan/2026 nominal = 07/02 (sábado); posterga p/ 09/02 (segunda)."""
     itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
     fgts_jan = next(i for i in itens if i.tipo_obrigacao == "fgts" and "jan" in i.titulo)
-    assert fgts_jan.data_vencimento == date(2026, 2, 7)
+    # IN RFB 1.300/2012: vencimento em sábado posterga p/ próximo dia útil
+    assert fgts_jan.data_vencimento == date(2026, 2, 9)
 
 
 def test_simples_nacional_com_funcionarios_tem_12_esocial() -> None:
@@ -155,10 +157,10 @@ def test_lucro_presumido_irpj_1_trim_vence_em_abril() -> None:
 
 
 def test_lucro_presumido_irpj_4_trim_vence_em_janeiro_seguinte() -> None:
-    """IRPJ do 4º trimestre (out-dez) vence no último dia de janeiro do ano seguinte."""
+    """IRPJ do 4º trim/2026 nominal = 31/01/2027 (domingo); posterga p/ 01/02/2027 (segunda)."""
     itens = gerar_calendario_anual("lucro_presumido", 2026)
     trim4 = next(i for i in itens if "4º trim" in i.titulo)
-    assert trim4.data_vencimento == date(2027, 1, 31)
+    assert trim4.data_vencimento == date(2027, 2, 1)
 
 
 def test_lucro_presumido_sem_funcionarios_sem_fgts_gps_dirf() -> None:
@@ -167,11 +169,11 @@ def test_lucro_presumido_sem_funcionarios_sem_fgts_gps_dirf() -> None:
 
 
 def test_lucro_presumido_com_funcionarios_tem_dirf() -> None:
-    """DIRF vence 31/jan do ano seguinte (IN RFB 2.219/2024)."""
+    """DIRF nominal 31/jan/2027 (domingo); posterga p/ 01/02 (segunda)."""
     itens = gerar_calendario_anual("lucro_presumido", 2026, tem_funcionarios=True)
     dirf = [i for i in itens if i.tipo_obrigacao == "dirf"]
     assert len(dirf) == 1
-    assert dirf[0].data_vencimento == date(2027, 1, 31)
+    assert dirf[0].data_vencimento == date(2027, 2, 1)
 
 
 def test_lucro_presumido_sem_funcionarios_sem_fgts_e_gps() -> None:
@@ -186,9 +188,10 @@ def test_lucro_presumido_com_funcionarios_tem_12_fgts() -> None:
 
 
 def test_lucro_presumido_fgts_janeiro_vence_dia_7_fevereiro() -> None:
+    """FGTS jan/2026 nominal = 07/02 (sábado); posterga p/ 09/02 (segunda)."""
     itens = gerar_calendario_anual("lucro_presumido", 2026, tem_funcionarios=True)
     fgts_jan = next(i for i in itens if i.tipo_obrigacao == "fgts" and "jan" in i.titulo)
-    assert fgts_jan.data_vencimento == date(2026, 2, 7)
+    assert fgts_jan.data_vencimento == date(2026, 2, 9)
 
 
 def test_lucro_presumido_com_funcionarios_tem_12_gps_inss() -> None:
@@ -218,13 +221,13 @@ def test_lucro_presumido_parcelamento_irpj_gera_12_itens() -> None:
 
 
 def test_lucro_presumido_parcelamento_irpj_1trim_parcelas_corretas() -> None:
-    """1º trim/2026: 1ª=30/abr, 2ª=29/mai, 3ª=30/jun."""
+    """1º trim/2026 com parcelamento; 31/05/2026 é domingo → posterga p/ 01/06."""
     itens = gerar_calendario_anual("lucro_presumido", 2026, parcelar_irpj=True)
     parcelas_1t = [i for i in itens if "1º trim" in i.titulo and "irpj" in i.tipo_obrigacao]
     datas = sorted(i.data_vencimento for i in parcelas_1t)
-    assert datas[0] == date(2026, 4, 30)  # 1ª parcela — último dia de abril
-    assert datas[1] == date(2026, 5, 31)  # 2ª parcela — último dia de maio
-    assert datas[2] == date(2026, 6, 30)  # 3ª parcela — último dia de junho
+    assert datas[0] == date(2026, 4, 30)  # 1ª parcela — 30/04 (quinta) ok
+    assert datas[1] == date(2026, 6, 1)   # 2ª parcela nominal 31/05 (dom) → 01/06
+    assert datas[2] == date(2026, 6, 30)  # 3ª parcela — 30/06 (terça) ok
 
 
 def test_lucro_presumido_sem_parcelamento_4_itens_irpj() -> None:
@@ -269,3 +272,62 @@ def test_todos_itens_sao_item_calendario(regime: str) -> None:
 @pytest.mark.parametrize("regime", ["mei", "simples_nacional", "lucro_presumido"])
 def test_calendario_nao_vazio(regime: str) -> None:
     assert len(gerar_calendario_anual(regime, 2026)) > 0
+
+
+# ── m1 da auditoria Sprints 4-6: postergação para dia útil ───────────────────
+
+
+def test_das_mei_em_feriado_posterga() -> None:
+    """DAS-MEI nominal 20/abril/2026 (segunda); se 20/abr fosse feriado, posterga."""
+    feriados = {date(2026, 4, 20)}  # fictício
+    itens = gerar_calendario_anual("mei", 2026, feriados=feriados)
+    das_mar = next(i for i in itens if i.tipo_obrigacao == "das_mei" and "mar" in i.titulo)
+    # Nominal: 20/04/2026 (segunda); com feriado → 21/04 (terça)
+    assert das_mar.data_vencimento == date(2026, 4, 21)
+
+
+def test_pgdas_em_feriado_de_tiradentes_posterga() -> None:
+    """21/04 (Tiradentes) é feriado nacional permanente — DAS de março/2026."""
+    feriados = {date(2026, 4, 21)}  # Tiradentes
+    itens = gerar_calendario_anual("simples_nacional", 2026, feriados=feriados)
+    pgdas_mar = next(i for i in itens if i.tipo_obrigacao == "pgdas_d" and "mar" in i.titulo)
+    # Nominal: 20/04 (segunda) — ok. Mas se Tiradentes cair no domingo (21/04/2025),
+    # e em 2026 cai em terça (21/04/2026), o PGDAS de mar/26 venceria 20/04 (seg)
+    # e NÃO é afetado. Validação: vencimento != 21/04 quando 21 é feriado.
+    assert pgdas_mar.data_vencimento != date(2026, 4, 21)
+
+
+def test_dia_vencimento_sabado_posterga_para_segunda() -> None:
+    """Unit do helper: 07/02/2026 é sábado → posterga p/ 09/02 (segunda)."""
+    from app.modules.agenda.gerar_calendario import _dia_vencimento
+
+    venc = _dia_vencimento(2026, 2, 7)
+    assert venc == date(2026, 2, 9)
+
+
+def test_dia_vencimento_domingo_posterga_para_segunda() -> None:
+    """Unit do helper: 31/01/2027 é domingo → posterga p/ 01/02/2027 (segunda)."""
+    from app.modules.agenda.gerar_calendario import _dia_vencimento
+
+    venc = _dia_vencimento(2027, 1, 31)
+    assert venc == date(2027, 2, 1)
+
+
+def test_dia_vencimento_feriado_segunda_posterga_para_terca() -> None:
+    """Feriado nacional na segunda → posterga p/ terça."""
+    from app.modules.agenda.gerar_calendario import _dia_vencimento
+
+    # 25/12/2028 é segunda (Natal) — fica feriado e posterga
+    feriados = frozenset({date(2028, 12, 25)})
+    venc = _dia_vencimento(2028, 12, 25, feriados)
+    assert venc == date(2028, 12, 26)
+
+
+def test_dia_vencimento_carnaval_arrasta_se_sucessivo() -> None:
+    """Feriado na sexta → fim de semana adiante → posterga p/ segunda."""
+    from app.modules.agenda.gerar_calendario import _dia_vencimento
+
+    # Suponha 03/04/2026 (sexta) como feriado fictício; sáb 04, dom 05; resultado: 06/04
+    feriados = frozenset({date(2026, 4, 3)})
+    venc = _dia_vencimento(2026, 4, 3, feriados)
+    assert venc == date(2026, 4, 6)

@@ -203,3 +203,16 @@ class EncerramentoAnualOut(BaseModel):
     despesas_zeradas: Decimal
     resultado_exercicio: Decimal
     lancamento_apuracao_id: UUID
+
+
+class AberturaExercicioOut(BaseModel):
+    """Resultado da reabertura de exercício (Sprint 18 PR1 — pendência #8).
+
+    Transporte de saldos patrimoniais de dezembro/ano-1 para janeiro/ano.
+    Contas de resultado (receita/despesa) começam em zero. Idempotente.
+    """
+
+    ano: int
+    contas_patrimoniais: int
+    contas_resultado: int
+    saldo_total_transportado: Decimal

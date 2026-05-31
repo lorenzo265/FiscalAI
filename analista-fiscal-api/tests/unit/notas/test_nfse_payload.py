@@ -45,7 +45,8 @@ class TestConstruirPayloadFocus:
         return SimpleNamespace(
             cnpj="12345678000195",
             im="123456",
-            municipio="3550308",  # código IBGE São Paulo
+            municipio="São Paulo",
+            codigo_municipio_ibge="3550308",  # IBGE São Paulo
         )
 
     def _payload(
@@ -72,6 +73,15 @@ class TestConstruirPayloadFocus:
         assert "servico" in data
         assert data["prestador"]["cnpj"] == "12345678000195"
         assert data["numero_rps"] == "001"
+
+    def test_codigo_municipio_usa_ibge_nao_nome(self) -> None:
+        """Focus NFe exige código IBGE 7-dígitos, nunca nome do município."""
+        empresa = self._empresa()
+        payload = self._payload()
+        data = _construir_payload_focus(empresa, payload, "001")  # type: ignore[arg-type]
+
+        # IBGE 7-dígitos vai para codigo_municipio (não "São Paulo")
+        assert data["prestador"]["codigo_municipio"] == "3550308"
 
     def test_calculo_iss_correto(self) -> None:
         empresa = self._empresa()

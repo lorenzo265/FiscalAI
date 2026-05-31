@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.modules.relatorios.calcula_balanco import (
     SaldoConta as SaldoContaBalanco,
 )
@@ -210,7 +211,12 @@ class SaldosPeriodoRepo:
     async def irpj_csll_apurado_no_periodo(
         self, empresa_id: UUID, periodo_inicio: date, periodo_fim: date
     ) -> Decimal:
-        """Soma IRPJ + CSLL apurados (Sprint 11 PR1) no período."""
+        """Soma IRPJ + CSLL apurados (Sprint 11 PR1) no período.
+
+        Para DRE: usa `valor_devido` (= IRPJ bruto + CSLL) — a despesa
+        accrued no período, não o caixa efetivo. IRRF compensado é ativo
+        a recuperar, não reduz a despesa contábil de IRPJ.
+        """
         stmt = select(ApuracaoFiscal).where(
             ApuracaoFiscal.empresa_id == empresa_id,
             ApuracaoFiscal.competencia >= periodo_inicio,
@@ -219,11 +225,10 @@ class SaldosPeriodoRepo:
         )
         total = Decimal("0")
         for ap in (await self._s.execute(stmt)).scalars().all():
-            out = ap.output_jsonb
-            if ap.tipo == "irpj":
-                total += Decimal(str(out.get("irpj_total", "0")))
-            elif ap.tipo == "csll":
-                total += Decimal(str(out.get("csll", "0")))
+            snap = parse_apuracao_output(
+                ap.tipo, ap.output_jsonb, input_jsonb=ap.input_jsonb,
+            )
+            total += snap.valor_devido
         return total
 
     async def apuracoes_do_trimestre(

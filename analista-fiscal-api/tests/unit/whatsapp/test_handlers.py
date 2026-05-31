@@ -50,9 +50,12 @@ class TestRespostaParaIntent:
         texto, tipo = resposta_para_intent("saldo", 0)
         assert tipo == "resposta"
 
-    def test_resposta_assistente(self) -> None:
+    def test_resposta_assistente_redireciona_painel(self) -> None:
+        """m3 da auditoria Sprints 4-6: intent assistente redireciona ao painel
+        em vez de prometer resposta que nunca chega."""
         texto, tipo = resposta_para_intent("assistente", 0)
-        assert tipo == "assistente"
+        assert tipo == "dashboard"
+        assert "painel" in texto.lower() or "app.fiscalai" in texto
 
     def test_resposta_desconhecido(self) -> None:
         texto, tipo = resposta_para_intent("desconhecido", 0)

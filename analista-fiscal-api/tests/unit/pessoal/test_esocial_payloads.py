@@ -19,7 +19,7 @@ from app.modules.pessoal.esocial_payloads import (
     gerar_s1210_pagamento,
     gerar_s2200_admissao,
     gerar_s2299_desligamento,
-    gerar_s2400_beneficiario,
+    gerar_s2300_inicio_tsve,
 )
 
 EMP = EmpregadorInput(cnpj="12345678000190", razao_social="Acme LTDA")
@@ -161,15 +161,51 @@ class TestS2299:
         assert p["info_deslig"]["mtvDeslig"] == codigo
 
 
-class TestS2400:
-    def test_socio_pro_labore(self) -> None:
-        p = gerar_s2400_beneficiario(
+class TestS2300:
+    """Sprint 19.6 PR1 (#14): substitui o teste antigo de S-2400 (RPPS uso
+    adaptado) pelo evento canônico S-2300 (TSVE — Trabalhador sem Vínculo
+    de Emprego).
+    """
+
+    def test_socio_pro_labore_emite_tsve(self) -> None:
+        p = gerar_s2300_inicio_tsve(
             EMP, TRAB,
             data_inicio=date(2026, 1, 1),
             valor_referencia=Decimal("5000"),
         )
-        _bloco_comum(p, "S-2400")
-        assert p["info_benef"]["codCateg"] == 701
-        assert p["info_benef"]["vrReferencia"] == "5000"
-        assert p["info_benef"]["dtInicio"] == "2026-01-01"
-        assert p["ide_beneficiario"]["cpfBenef"] == "11122233344"
+        _bloco_comum(p, "S-2300")
+        # Categoria 723 = sócio empresário / contribuinte individual (correto).
+        assert p["infoTSVInicio"]["codCateg"] == 723
+        # RGPS — sócio recolhe INSS via folha (não RPPS de servidor público).
+        assert p["infoTSVInicio"]["tpRegPrev"] == 1
+        # Cadastramento inicial → "S".
+        assert p["infoTSVInicio"]["cadIni"] == "S"
+        # Natureza atividade urbana (default).
+        assert p["infoTSVInicio"]["natAtividade"] == 1
+        assert p["infoTSVInicio"]["dtInicio"] == "2026-01-01"
+        # CPF do trabalhador no bloco TSVE (não no antigo ideBeneficiario).
+        assert p["trabSemVinc"]["cpfTrab"] == "11122233344"
+        # Nome vem do TRAB fixture do arquivo — qualquer string serve.
+        assert p["trabSemVinc"]["nmTrab"]
+        # vrReferencia (último pró-labore) preservado em observação.
+        assert "5000" in p["observacao"]
+
+    def test_cad_inicial_falso_emite_n(self) -> None:
+        """Bandeira ``cad_inicial=False`` → ``cadIni="N"`` (novo período)."""
+        p = gerar_s2300_inicio_tsve(
+            EMP, TRAB,
+            data_inicio=date(2026, 1, 1),
+            valor_referencia=Decimal("5000"),
+            cad_inicial=False,
+        )
+        assert p["infoTSVInicio"]["cadIni"] == "N"
+
+    def test_natureza_rural_emite_2(self) -> None:
+        """Bandeira ``natureza_atividade_urbana=False`` → ``natAtividade=2``."""
+        p = gerar_s2300_inicio_tsve(
+            EMP, TRAB,
+            data_inicio=date(2026, 1, 1),
+            valor_referencia=Decimal("5000"),
+            natureza_atividade_urbana=False,
+        )
+        assert p["infoTSVInicio"]["natAtividade"] == 2

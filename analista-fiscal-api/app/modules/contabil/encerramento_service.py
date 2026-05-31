@@ -13,6 +13,15 @@ Anual:
   2. Apura resultado: zera contas de receita/despesa contra
      ``3.9.01 Resultado do Exercício`` via UM lançamento de encerramento.
   3. Cria saldo_conta_mes final do ano para contas de resultado em zero.
+  4. Sprint 18 PR1: chama ``abrir_exercicio(ano+1)`` automaticamente para
+     transportar saldos patrimoniais e zerar contas de resultado em
+     janeiro do próximo ano (pendência #8 resolvida).
+
+Abertura de exercício (Sprint 18 PR1):
+  * ``abrir_exercicio(ano)`` materializa ``saldo_conta_mes`` de janeiro/ano
+    com ``saldo_inicial = saldo_final(dezembro/ano-1)`` para contas
+    patrimoniais e ``0`` para receita/despesa. Idempotente via UNIQUE
+    natural de ``saldo_conta_mes`` + ON CONFLICT DO NOTHING.
 """
 
 from __future__ import annotations
@@ -37,12 +46,14 @@ from app.modules.contabil.repo import (
 )
 from app.modules.empresa.repo import EmpresaRepo
 from app.shared.db.models import (
+    ContaContabil,
     LancamentoContabil,
     SaldoContaMes,
 )
 from app.shared.exceptions import (
     CompetenciaJaEncerrada,
     EmpresaNaoEncontrada,
+    EncerramentoMensalAusente,
     PlanoContasIncompleto,
 )
 
@@ -63,6 +74,21 @@ class EncerramentoAnualResultado:
     despesas_zeradas: Decimal
     resultado_exercicio: Decimal  # signed: positivo = lucro; negativo = prejuízo
     lancamento_apuracao_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class AberturaExercicioResultado:
+    """Resultado da reabertura de exercício (Sprint 18 PR1 — pendência #8).
+
+    Transporte de saldos patrimoniais de dezembro/ano-1 para janeiro/ano e
+    zeragem das contas de resultado. ``saldo_total_transportado`` é a
+    soma absoluta dos saldos patrimoniais — útil para audit.
+    """
+
+    ano: int
+    contas_patrimoniais: int
+    contas_resultado: int
+    saldo_total_transportado: Decimal
 
 
 class EncerramentoService:
@@ -139,37 +165,40 @@ class EncerramentoService:
         competencia: date,
         linhas: list[LinhaBalancete],
     ) -> int:
-        """ON CONFLICT DO UPDATE para tornar a operação idempotente."""
-        persistidos = 0
-        for linha in linhas:
-            stmt = (
-                pg_insert(SaldoContaMes)
-                .values(
-                    tenant_id=tenant_id,
-                    empresa_id=empresa_id,
-                    conta_contabil_id=linha.conta_id,
-                    competencia=competencia,
-                    saldo_inicial=linha.saldo_inicial,
-                    total_debitos=linha.total_debitos,
-                    total_creditos=linha.total_creditos,
-                    saldo_final=linha.saldo_final,
-                    status="fechado",
-                )
-                .on_conflict_do_update(
-                    constraint="uq_saldo_empresa_conta_comp",
-                    set_={
-                        "saldo_inicial": linha.saldo_inicial,
-                        "total_debitos": linha.total_debitos,
-                        "total_creditos": linha.total_creditos,
-                        "saldo_final": linha.saldo_final,
-                        "status": "fechado",
-                    },
-                )
-                .returning(SaldoContaMes.id)
-            )
-            await session.execute(stmt)
-            persistidos += 1
-        return persistidos
+        """Bulk INSERT ... ON CONFLICT DO UPDATE — idempotente, 1 round-trip ao DB.
+
+        Antes era 1 execute por linha (N round-trips para ~36 contas).
+        """
+        if not linhas:
+            return 0
+
+        valores = [
+            {
+                "tenant_id": tenant_id,
+                "empresa_id": empresa_id,
+                "conta_contabil_id": linha.conta_id,
+                "competencia": competencia,
+                "saldo_inicial": linha.saldo_inicial,
+                "total_debitos": linha.total_debitos,
+                "total_creditos": linha.total_creditos,
+                "saldo_final": linha.saldo_final,
+                "status": "fechado",
+            }
+            for linha in linhas
+        ]
+        base_stmt = pg_insert(SaldoContaMes).values(valores)
+        upsert_stmt = base_stmt.on_conflict_do_update(
+            constraint="uq_saldo_empresa_conta_comp",
+            set_={
+                "saldo_inicial": base_stmt.excluded.saldo_inicial,
+                "total_debitos": base_stmt.excluded.total_debitos,
+                "total_creditos": base_stmt.excluded.total_creditos,
+                "saldo_final": base_stmt.excluded.saldo_final,
+                "status": base_stmt.excluded.status,
+            },
+        ).returning(SaldoContaMes.id)
+        rows = (await session.execute(upsert_stmt)).all()
+        return len(rows)
 
     # ── Anual ────────────────────────────────────────────────────────────────
 
@@ -205,13 +234,11 @@ class EncerramentoService:
         )
         rows = (await session.execute(stmt)).all()
         if not rows:
-            raise CompetenciaJaEncerrada(
+            raise EncerramentoMensalAusente(
                 f"Saldos de dezembro/{ano} ausentes — encerre o mês primeiro"
             )
 
         # Carrega metadata das contas em uma só query.
-        from app.shared.db.models import ContaContabil
-
         ids_contas = [r.conta_contabil_id for r in rows]
         contas_rows = (
             await session.execute(
@@ -234,21 +261,28 @@ class EncerramentoService:
         despesas_total = Decimal("0")
         partidas: list[tuple[UUID, str, Decimal]] = []
 
+        # ``saldo_final`` em ``relatorios.calcular_saldo_final`` é signed pela
+        # natureza: receita (nat. C) positiva = mais créditos que débitos; se
+        # estornos > vendas, vira negativa e representa "perda em receita".
+        # Para zerar contra 3.9.01, lança o oposto da natureza pela valor absoluto.
         for r in rows:
             conta = contas_por_id.get(r.conta_contabil_id)
             if conta is None:
                 continue
             saldo = Decimal(str(r.saldo_final))
-            if saldo <= Decimal("0"):
+            if saldo == Decimal("0"):
                 continue
+            valor_abs = saldo.copy_abs()
             if conta.tipo == "receita":
-                # Receita tem natureza C — saldo positivo C. Para zerar, lança D.
-                partidas.append((conta.id, "D", saldo))
-                receitas_total += saldo
+                # Saldo positivo (C) → zera com D. Saldo negativo (inversão) → zera com C.
+                tipo = "D" if saldo > 0 else "C"
+                partidas.append((conta.id, tipo, valor_abs))
+                receitas_total += saldo  # signed — preserva sinal no líquido
             elif conta.tipo == "despesa":
-                # Despesa tem natureza D — saldo positivo D. Para zerar, lança C.
-                partidas.append((conta.id, "C", saldo))
-                despesas_total += saldo
+                # Saldo positivo (D) → zera com C. Saldo negativo (recuperação) → zera com D.
+                tipo = "C" if saldo > 0 else "D"
+                partidas.append((conta.id, tipo, valor_abs))
+                despesas_total += saldo  # signed
 
         # Resultado líquido vai para 3.9.01.
         resultado = receitas_total - despesas_total
@@ -259,7 +293,9 @@ class EncerramentoService:
             # Prejuízo: 3.9.01 recebe débito.
             partidas.append((resultado_conta.id, "D", resultado.copy_abs()))
         else:
-            # Resultado zero — não há nada para apurar.
+            # Resultado zero — não há nada para apurar, mas ainda abrimos
+            # o exercício seguinte para transportar saldos patrimoniais.
+            await self.abrir_exercicio(session, tenant_id, empresa_id, ano + 1)
             return EncerramentoAnualResultado(
                 ano=ano,
                 receitas_zeradas=receitas_total,
@@ -275,6 +311,8 @@ class EncerramentoService:
         lanc_repo = LancamentoRepo(session)
         existente = await lanc_repo.por_origem("encerramento", origem_id)
         if existente is not None:
+            # Re-chamada — garante que abertura também foi disparada.
+            await self.abrir_exercicio(session, tenant_id, empresa_id, ano + 1)
             return EncerramentoAnualResultado(
                 ano=ano,
                 receitas_zeradas=receitas_total,
@@ -311,12 +349,147 @@ class EncerramentoService:
             resultado=str(resultado),
             lancamento_id=str(lancamento.id),
         )
+
+        # Sprint 18 PR1: dispara abertura do exercício seguinte (pendência #8).
+        # Transporta saldos patrimoniais e zera contas de resultado em janeiro/ano+1.
+        # Falha silenciosa? Não — abertura é idempotente; deixar exceção subir.
+        await self.abrir_exercicio(session, tenant_id, empresa_id, ano + 1)
+
         return EncerramentoAnualResultado(
             ano=ano,
             receitas_zeradas=receitas_total,
             despesas_zeradas=despesas_total,
             resultado_exercicio=resultado,
             lancamento_apuracao_id=lancamento.id,
+        )
+
+    # ── Abertura do exercício seguinte (Sprint 18 PR1) ──────────────────────
+
+    async def abrir_exercicio(
+        self,
+        session: AsyncSession,
+        tenant_id: UUID,
+        empresa_id: UUID,
+        ano: int,
+    ) -> AberturaExercicioResultado:
+        """Materializa saldos iniciais de janeiro/ano (pendência #8).
+
+        Para cada conta com saldo em dezembro/ano-1:
+
+          * Patrimonial (``ativo``, ``passivo``, ``patrimonio_liquido``,
+            ``conta_resultado``) → ``saldo_inicial(janeiro/ano)`` =
+            ``saldo_final(dezembro/ano-1)``.
+          * Resultado (``receita``, ``despesa``) → ``saldo_inicial = 0``.
+
+        Idempotente via UNIQUE (empresa_id, conta_contabil_id, competencia)
+        em ``saldo_conta_mes`` + ON CONFLICT DO NOTHING. Re-execução é
+        no-op (preserva ``saldo_conta_mes`` que já tenha movimento de
+        janeiro registrado).
+
+        Pré-condição: dezembro/ano-1 deve estar encerrado (``status='fechado'``
+        em pelo menos uma linha de saldo). Sem isso, levanta
+        ``EncerramentoMensalAusente``.
+        """
+        empresa = await EmpresaRepo(session).por_id(empresa_id)
+        if empresa is None:
+            raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+
+        dezembro_anterior = date(ano - 1, 12, 1)
+        janeiro = date(ano, 1, 1)
+
+        # Pré-condição: dezembro do ano anterior deve estar encerrado.
+        fechado = (
+            await session.execute(
+                select(SaldoContaMes.id)
+                .where(
+                    SaldoContaMes.empresa_id == empresa_id,
+                    SaldoContaMes.competencia == dezembro_anterior,
+                    SaldoContaMes.status == "fechado",
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if fechado is None:
+            raise EncerramentoMensalAusente(
+                f"Dezembro/{ano - 1} ausente — encerre antes de abrir {ano}"
+            )
+
+        # Junta saldo_final com tipo da conta em uma única query.
+        stmt = (
+            select(
+                SaldoContaMes.conta_contabil_id,
+                SaldoContaMes.saldo_final,
+                ContaContabil.tipo,
+            )
+            .join(
+                ContaContabil,
+                ContaContabil.id == SaldoContaMes.conta_contabil_id,
+            )
+            .where(
+                SaldoContaMes.empresa_id == empresa_id,
+                SaldoContaMes.competencia == dezembro_anterior,
+            )
+        )
+        rows = (await session.execute(stmt)).all()
+
+        patrimonial = {"ativo", "passivo", "patrimonio_liquido", "conta_resultado"}
+
+        valores: list[dict[str, object]] = []
+        contas_patrimoniais = 0
+        contas_resultado = 0
+        saldo_total_transportado = Decimal("0")
+
+        for r in rows:
+            if r.tipo in patrimonial:
+                saldo_inicial = Decimal(str(r.saldo_final))
+                contas_patrimoniais += 1
+                saldo_total_transportado += saldo_inicial.copy_abs()
+            else:
+                saldo_inicial = Decimal("0")
+                contas_resultado += 1
+            valores.append(
+                {
+                    "tenant_id": tenant_id,
+                    "empresa_id": empresa_id,
+                    "conta_contabil_id": r.conta_contabil_id,
+                    "competencia": janeiro,
+                    "saldo_inicial": saldo_inicial,
+                    "total_debitos": Decimal("0"),
+                    "total_creditos": Decimal("0"),
+                    "saldo_final": saldo_inicial,
+                    "status": "aberto",
+                }
+            )
+
+        if valores:
+            base_stmt = pg_insert(SaldoContaMes).values(valores)
+            # ON CONFLICT DO NOTHING preserva saldos eventualmente já calculados
+            # de movimento de janeiro — só insere as contas que ainda não têm
+            # linha materializada.
+            stmt_upsert = base_stmt.on_conflict_do_nothing(
+                index_elements=[
+                    "empresa_id",
+                    "conta_contabil_id",
+                    "competencia",
+                ]
+            )
+            await session.execute(stmt_upsert)
+            await session.commit()
+
+        log.info(
+            "contabil.abertura.exercicio",
+            empresa_id=str(empresa_id),
+            ano=ano,
+            contas_patrimoniais=contas_patrimoniais,
+            contas_resultado=contas_resultado,
+            saldo_total=str(saldo_total_transportado),
+        )
+
+        return AberturaExercicioResultado(
+            ano=ano,
+            contas_patrimoniais=contas_patrimoniais,
+            contas_resultado=contas_resultado,
+            saldo_total_transportado=saldo_total_transportado,
         )
 
 

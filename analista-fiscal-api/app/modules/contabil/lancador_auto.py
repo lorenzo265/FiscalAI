@@ -34,7 +34,16 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-ALGORITMO_VERSAO = "lancador-auto-2026.05"
+from app.modules.contabil.classificador_cfop import (
+    classificar_conta_debito_entrada,
+)
+
+ALGORITMO_VERSAO = "lancador-auto-2026.07"
+# Sprint 19.7 PR4 (#6) — quando transação CONFIRMED tem match com NF
+# (``ConciliacaoMatch`` em status AUTO/MANUAL), `gerar_partidas_de_transacao`
+# substitui a contra-partida genérica (`outras_receitas`/`outras_despesas`)
+# por baixa de duplicata: CREDIT × NF saída → C `clientes`; DEBIT × NF
+# entrada → D `fornecedores`. Sem match, comportamento v06 preservado.
 
 
 # ── Views imutáveis dos fatos ────────────────────────────────────────────────
@@ -50,6 +59,22 @@ class NfFatoView:
     valor_total: Decimal
     emitida_em: datetime
     numero: str
+    cfop: str | None = None  # usado pelo classificador na NF entrada
+
+
+@dataclass(frozen=True, slots=True)
+class MatchDocumentoFatoView:
+    """Match conciliação consumido pelo lançamento (Sprint 19.7 PR4 #6).
+
+    Subset de ``ConciliacaoMatch`` + dados da NF casada — suficiente
+    pro lançador escolher a contra-partida correta sem importar o
+    módulo de conciliação (evita ciclo).
+    """
+
+    documento_id: UUID
+    documento_tipo: Literal["nfe", "nfse"]
+    documento_direcao: Literal["saida", "entrada"]
+    documento_numero: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +86,9 @@ class TransacaoFatoView:
     tipo: Literal["CREDIT", "DEBIT"]
     data_transacao: date
     descricao: str | None
+    # Sprint 19.7 PR4 (#6) — match conciliação opcional. Quando presente,
+    # lançamento substitui contra-partida genérica por baixa de duplicata.
+    match: MatchDocumentoFatoView | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +108,27 @@ class ProvisaoFatoView:
     competencia: date
     tipo: str  # ferias|13_salario|inss_ferias|inss_13|fgts_ferias|fgts_13
     valor_provisao: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class FolhaFatoView:
+    """Subset de ``FolhaMensal`` — Sprint 19.7 PR1 (#10).
+
+    Totais consolidados da folha fechada. Algoritmo lê só esses totais
+    (não itera holerites individualmente — o consolidado já cumpre o
+    fato contábil mensal §8.2).
+
+    Mapeamento ``ProvisaoFatoView`` já cobre encargos sobre férias/13º;
+    aqui cobrimos a folha mensal "ordinária" (salários + INSS + IRRF +
+    FGTS dos funcionários ativos no mês).
+    """
+
+    id: UUID
+    competencia: date
+    total_proventos: Decimal  # salário bruto consolidado
+    total_inss_empregado: Decimal  # retenção empregado (passivo)
+    total_irrf: Decimal  # IRRF retido na fonte (passivo)
+    total_fgts_empregador: Decimal  # FGTS 8% pago pela empresa (despesa)
 
 
 # ── Resultado ────────────────────────────────────────────────────────────────
@@ -139,6 +188,29 @@ class ContasAuto:
     provisao_13: UUID
     inss_recolher: UUID
     fgts_recolher: UUID
+    irrf_funcionarios_recolher: UUID  # Sprint 19.7 PR1 (#10) — IRRF retido folha
+    salarios_pagar: UUID  # Sprint 19.7 PR1 (#10) — passivo "líquido a pagar"
+    estoques: UUID  # NF entrada compra-revenda/industrialização
+    imobilizado: UUID  # NF entrada bem para ativo imobilizado
+    despesa_servicos: UUID  # NF entrada serviço (comunicação, sub-empreitada)
+
+    def conta_por_chave(self, chave: str) -> UUID:
+        """Resolve chave de ``CODIGOS_PADRAO_LANCAMENTO_AUTO`` → UUID.
+
+        Usado pelo classificador CFOP para indireção dinâmica. Para chaves
+        desconhecidas (futuras), faz fallback explícito em ``outras_despesas``.
+        """
+        # Mapa estático para evitar getattr() — mantém mypy strict feliz.
+        if chave == "estoques":
+            return self.estoques
+        if chave == "imobilizado":
+            return self.imobilizado
+        if chave == "despesa_servicos":
+            return self.despesa_servicos
+        if chave == "outras_despesas":
+            return self.outras_despesas
+        # Chave nova ou inválida — degrada para fallback determinístico.
+        return self.outras_despesas
 
 
 # ── Conversores puros — um por tipo de fato ─────────────────────────────────
@@ -163,12 +235,16 @@ def gerar_partidas_de_nfe(
         )
         historico = f"Receita NF {nf.numero} (NF saída)"
     else:
-        # Empresa compra: D Despesa a classificar / C Fornecedor
+        # Empresa compra: D <classificado por CFOP> / C Fornecedor.
+        # Classificador determinístico — fallback explícito em "outras_despesas".
+        chave_debito = classificar_conta_debito_entrada(nf.cfop)
+        conta_debito = contas.conta_por_chave(chave_debito)
         partidas = (
-            PartidaCandidata(conta_id=contas.outras_despesas, tipo="D", valor=valor),
+            PartidaCandidata(conta_id=conta_debito, tipo="D", valor=valor),
             PartidaCandidata(conta_id=contas.fornecedores, tipo="C", valor=valor),
         )
-        historico = f"NF entrada {nf.numero}"
+        sufixo = f" ({chave_debito})" if chave_debito != "outras_despesas" else ""
+        historico = f"NF entrada {nf.numero}{sufixo}"
 
     return LancamentoCandidato(
         historico=historico,
@@ -183,16 +259,57 @@ def gerar_partidas_de_nfe(
 def gerar_partidas_de_transacao(
     tx: TransacaoFatoView, contas: ContasAuto
 ) -> LancamentoCandidato:
-    """Transação bancária CONFIRMED → lançamento simples banco × resultado.
+    """Transação bancária CONFIRMED → lançamento banco × resultado/duplicata.
 
-    CREDIT (entrada): D Banco / C Outras Receitas (fallback — match com NF
-    fica para iteração futura via conciliacao_match).
-    DEBIT (saída):    D Outras Despesas / C Banco.
+    Sprint 19.7 PR4 (#6) — quando ``tx.match`` está preenchido com NF
+    casada, contra-partida vira **baixa de duplicata** (não receita/despesa
+    diretas — a receita/despesa já foi reconhecida na emissão da NF):
+
+      * CREDIT × NF saída → D Banco / C Clientes (recebimento de cliente).
+      * DEBIT × NF entrada → D Fornecedores / C Banco (pagamento a fornecedor).
+      * Mismatch direcional (CREDIT × NF entrada, DEBIT × NF saída) cai no
+        fluxo sem-match (fallback) — match desses pares é improvável e o
+        score do conciliador já filtra a maioria.
+
+    Sem match, comportamento v06 preservado:
+      * CREDIT (entrada): D Banco / C Outras Receitas.
+      * DEBIT (saída):    D Outras Despesas / C Banco.
     """
     competencia = date(tx.data_transacao.year, tx.data_transacao.month, 1)
     valor_abs = tx.valor.copy_abs()
     descricao_curta = (tx.descricao or "")[:200]
 
+    # Sprint 19.7 PR4 #6 — baixa de duplicata quando match dirige.
+    match_baixa = _match_baixa_duplicata(tx)
+    if match_baixa is not None and tx.match is not None:
+        if tx.tipo == "CREDIT":
+            partidas = (
+                PartidaCandidata(conta_id=contas.banco, tipo="D", valor=valor_abs),
+                PartidaCandidata(conta_id=contas.clientes, tipo="C", valor=valor_abs),
+            )
+            historico = (
+                f"Recebimento NF {tx.match.documento_numero} — {descricao_curta}"
+            )
+        else:
+            partidas = (
+                PartidaCandidata(
+                    conta_id=contas.fornecedores, tipo="D", valor=valor_abs
+                ),
+                PartidaCandidata(conta_id=contas.banco, tipo="C", valor=valor_abs),
+            )
+            historico = (
+                f"Pagamento NF {tx.match.documento_numero} — {descricao_curta}"
+            )
+        return LancamentoCandidato(
+            historico=historico,
+            data_lancamento=tx.data_transacao,
+            competencia=competencia,
+            origem_tipo="transacao",
+            origem_id=tx.id,
+            partidas=partidas,
+        )
+
+    # Fluxo sem-match — fallback determinístico (comportamento v06).
     if tx.tipo == "CREDIT":
         partidas = (
             PartidaCandidata(conta_id=contas.banco, tipo="D", valor=valor_abs),
@@ -214,6 +331,23 @@ def gerar_partidas_de_transacao(
         origem_id=tx.id,
         partidas=partidas,
     )
+
+
+def _match_baixa_duplicata(tx: TransacaoFatoView) -> MatchDocumentoFatoView | None:
+    """Retorna o match somente se a direção bate com baixa de duplicata.
+
+    Sprint 19.7 PR4 #6 — guarda direcional pra evitar contas incorretas:
+      * CREDIT × NF saída → OK (cliente paga).
+      * DEBIT × NF entrada → OK (empresa paga fornecedor).
+      * Outras combinações → ``None`` (cai no fluxo sem-match).
+    """
+    if tx.match is None:
+        return None
+    if tx.tipo == "CREDIT" and tx.match.documento_direcao == "saida":
+        return tx.match
+    if tx.tipo == "DEBIT" and tx.match.documento_direcao == "entrada":
+        return tx.match
+    return None
 
 
 def gerar_partidas_de_depreciacao(
@@ -313,5 +447,81 @@ def gerar_partidas_de_provisao(
         competencia=competencia,
         origem_tipo="provisao",
         origem_id=prov.id,
+        partidas=partidas,
+    )
+
+
+def gerar_partidas_de_folha(
+    folha: FolhaFatoView, contas: ContasAuto
+) -> LancamentoCandidato | None:
+    """Sprint 19.7 PR1 (#10) — folha fechada → lançamento contábil.
+
+    Modelo de partidas (5 partidas):
+
+      D 5.1.02 Despesa com Pessoal       (total_proventos)
+        C 2.1.2.01 Salários a Pagar       (líquido a pagar)
+        C 2.1.3.01 INSS a Recolher        (INSS retido empregado)
+        C 2.1.3.03 IRRF Funcionários a Recolher (IRRF retido)
+
+      D 5.1.03 Encargos Sociais          (FGTS empregador 8%)
+        C 2.1.3.02 FGTS a Recolher        (FGTS retido p/ depósito)
+
+    O total dos débitos (Despesa Pessoal + Encargos) = total dos créditos
+    (Salários + INSS + IRRF + FGTS). Partidas dobradas §8.4 cravadas.
+
+    ``valor_liquido_pagar = total_proventos - total_inss - total_irrf``.
+
+    Retorna ``None`` se ``total_proventos=0`` (folha sem funcionários
+    ativos no mês — sem fato contábil).
+    """
+    if folha.total_proventos <= Decimal("0"):
+        return None
+
+    competencia = date(folha.competencia.year, folha.competencia.month, 1)
+    liquido_pagar = (
+        folha.total_proventos - folha.total_inss_empregado - folha.total_irrf
+    )
+
+    partidas: tuple[PartidaCandidata, ...] = (
+        # Bloco 1 — folha bruta = salário líquido + retenções (passivos)
+        PartidaCandidata(
+            conta_id=contas.despesa_pessoal,
+            tipo="D",
+            valor=folha.total_proventos,
+        ),
+        PartidaCandidata(
+            conta_id=contas.salarios_pagar,
+            tipo="C",
+            valor=liquido_pagar,
+        ),
+        PartidaCandidata(
+            conta_id=contas.inss_recolher,
+            tipo="C",
+            valor=folha.total_inss_empregado,
+        ),
+        PartidaCandidata(
+            conta_id=contas.irrf_funcionarios_recolher,
+            tipo="C",
+            valor=folha.total_irrf,
+        ),
+        # Bloco 2 — encargo empregador FGTS
+        PartidaCandidata(
+            conta_id=contas.encargos_sociais,
+            tipo="D",
+            valor=folha.total_fgts_empregador,
+        ),
+        PartidaCandidata(
+            conta_id=contas.fgts_recolher,
+            tipo="C",
+            valor=folha.total_fgts_empregador,
+        ),
+    )
+    historico = f"Folha mensal {competencia:%Y-%m}"
+    return LancamentoCandidato(
+        historico=historico,
+        data_lancamento=competencia,
+        competencia=competencia,
+        origem_tipo="folha",
+        origem_id=folha.id,
         partidas=partidas,
     )

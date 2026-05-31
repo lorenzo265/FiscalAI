@@ -82,4 +82,13 @@ class WebhookService:
                 event_type=event_type,
                 pluggy_item_id=item_pluggy_id,
             )
+            # Sprint 19.6 PR4 (#4) — enqueue drain ASAP. Em dev (Celery
+            # stub) é no-op + log; em prod (Celery real) dispara worker
+            # que faz routing cross-tenant via admin role.
+            from app.workers.celery_app import enqueue
+            from app.workers.tasks.sync_pluggy import (
+                processar_webhook_events_pendentes,
+            )
+
+            enqueue(processar_webhook_events_pendentes)
         return resultado

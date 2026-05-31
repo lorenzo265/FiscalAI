@@ -14,9 +14,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
-CLASSIFICADOR_VERSAO = "kw-2026.05"
+CLASSIFICADOR_VERSAO = "kw-2026.05.01"
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +126,11 @@ def classificar(assunto: str, corpo: str | None) -> Classificacao:
 
 
 def _extrair_prazo(corpo: str, texto_norm: str) -> date | None:
-    """Tenta extrair data limite — primeiro "até DD/MM/AAAA", depois "N dias"."""
+    """Tenta extrair data limite — primeiro "até DD/MM/AAAA", depois "prazo de N dias".
+
+    Quando só há prazo em dias (sem data explícita), calcula data limite a partir
+    de ``date.today()``. v2 da heurística (CLASSIFICADOR_VERSAO=kw-2026.05.01).
+    """
     m = _REGEX_DATA_LIMITE.search(corpo)
     if m:
         dia, mes, ano = (int(g) for g in m.groups())
@@ -134,4 +138,12 @@ def _extrair_prazo(corpo: str, texto_norm: str) -> date | None:
             return date(ano, mes, dia)
         except ValueError:
             return None
+    m2 = _REGEX_PRAZO_DIAS.search(corpo)
+    if m2:
+        try:
+            dias = int(m2.group(1))
+        except (TypeError, ValueError):
+            return None
+        if 1 <= dias <= 365:
+            return date.today() + timedelta(days=dias)
     return None

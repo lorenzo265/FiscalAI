@@ -299,6 +299,38 @@ class EventoESocialRepo:
         await self._s.refresh(e)
         return e
 
+    # Sprint 19.7 PR2 (#13) — helpers do pipeline de transmissão.
+
+    async def por_id(self, evento_id: UUID) -> EventoESocial | None:
+        stmt = select(EventoESocial).where(EventoESocial.id == evento_id)
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
+    async def listar_por_status(
+        self,
+        empresa_id: UUID,
+        *,
+        status: str,
+        limite: int = 200,
+    ) -> list[EventoESocial]:
+        stmt = (
+            select(EventoESocial)
+            .where(EventoESocial.empresa_id == empresa_id)
+            .where(EventoESocial.status == status)
+            .order_by(EventoESocial.criado_em.asc())
+            .limit(limite)
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
+    async def listar_por_lote(
+        self, lote_protocolo: str
+    ) -> list[EventoESocial]:
+        stmt = (
+            select(EventoESocial)
+            .where(EventoESocial.lote_protocolo == lote_protocolo)
+            .order_by(EventoESocial.criado_em.asc())
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
 
 class TabelasTributariasRepo:
     """Leitura SCD Type 2 das tabelas tributárias (§8.3)."""

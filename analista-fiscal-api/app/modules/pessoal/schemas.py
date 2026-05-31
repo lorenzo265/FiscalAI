@@ -218,7 +218,9 @@ class TipoEventoESocialIn(StrEnum):
     S_1210 = "S-1210"
     S_2200 = "S-2200"
     S_2299 = "S-2299"
-    S_2400 = "S-2400"
+    # Sprint 19.6 PR1 (#14): S-2400 substituído por S-2300 (TSVE — evento
+    # canônico do leiaute pra registrar sócio com pró-labore).
+    S_2300 = "S-2300"
 
 
 class SocioIn(BaseModel):
@@ -280,7 +282,13 @@ class DistribuicaoIn(BaseModel):
 
     data_distribuicao: date
     valor: Annotated[Decimal, Field(ge=0, decimal_places=2)]
-    limite_isento_apurado: Annotated[Decimal, Field(ge=0, decimal_places=2)]
+    # Sprint 19.7 PR1 (#15): quando None, service calcula automaticamente
+    # via `DistribuicaoService._apurar_limite_isento_automatico` a partir
+    # da receita do período + presunção SCD (LP) ou anexo (SN) - impostos
+    # pagos. Admin pode override passando valor explícito.
+    limite_isento_apurado: (
+        Annotated[Decimal, Field(ge=0, decimal_places=2)] | None
+    ) = None
     base_calculo_referencia: BaseCalculoIn
 
 

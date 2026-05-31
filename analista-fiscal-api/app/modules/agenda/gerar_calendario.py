@@ -23,14 +23,17 @@ Regras por regime:
     - GPS/INSS: dia 20 do mês seguinte (quando tem_funcionarios=True)
     - eSocial S-1200: dia 15 do mês seguinte (quando tem_funcionarios=True)
 
-Observação: "dia útil" é simplificado (sem calendário de feriados nesta versão).
-A versão com feriados requer integração com API de feriados — Sprint 6.
+Dia útil:
+  ``_dia_vencimento`` posterga para o próximo dia útil quando cai em sábado,
+  domingo ou feriado nacional (IN RFB 1.300/2012 art. 26). Os feriados são
+  passados pelo caller (chamada à BrasilAPI ``/feriados/v1/{ano}`` cacheada).
 """
 from __future__ import annotations
 
 import calendar
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ def gerar_calendario_anual(
     ano: int,
     tem_funcionarios: bool = False,
     parcelar_irpj: bool = False,
+    feriados: Iterable[date] | None = None,
 ) -> list[ItemCalendario]:
     """Gera todos os itens de calendário fiscal para um ano e regime.
 
@@ -56,27 +60,31 @@ def gerar_calendario_anual(
         tem_funcionarios: True inclui FGTS, eSocial S-1200 e GPS/INSS (LP).
         parcelar_irpj: True gera 3 datas por trimestre (art. 5º Lei 9.430/1996).
                        False (padrão) gera apenas a 1ª data (pagamento único).
+        feriados: Conjunto de feriados nacionais a postergar para próximo dia
+                  útil (IN RFB 1.300/2012 art. 26). Quando None, só sábado/domingo
+                  são postergados.
 
     Returns:
         Lista de ItemCalendario ordenada por data_vencimento.
     """
+    feriados_set = frozenset(feriados) if feriados else frozenset()
     if regime == "mei":
-        return _calendario_mei(ano)
+        return _calendario_mei(ano, feriados_set)
     if regime == "simples_nacional":
-        return _calendario_simples_nacional(ano, tem_funcionarios)
+        return _calendario_simples_nacional(ano, tem_funcionarios, feriados_set)
     if regime == "lucro_presumido":
-        return _calendario_lucro_presumido(ano, tem_funcionarios, parcelar_irpj)
+        return _calendario_lucro_presumido(ano, tem_funcionarios, parcelar_irpj, feriados_set)
     raise ValueError(f"Regime não suportado para calendário: {regime!r}")
 
 
-def _calendario_mei(ano: int) -> list[ItemCalendario]:
+def _calendario_mei(ano: int, feriados: frozenset[date]) -> list[ItemCalendario]:
     items: list[ItemCalendario] = []
 
     for mes in range(1, 13):
         # DAS-MEI vence dia 20 do mês SEGUINTE à competência (LC 123/2006, art. 18-A, §3º)
         mes_venc = mes + 1 if mes < 12 else 1
         ano_venc = ano if mes < 12 else ano + 1
-        venc = _dia_vencimento(ano_venc, mes_venc, 20)
+        venc = _dia_vencimento(ano_venc, mes_venc, 20, feriados)
         items.append(ItemCalendario(
             titulo=f"DAS-MEI {_mes_nome(mes)}/{ano}",
             descricao=f"Pagamento do DAS-MEI referente a {_mes_nome(mes)}/{ano}",
@@ -89,7 +97,7 @@ def _calendario_mei(ano: int) -> list[ItemCalendario]:
     items.append(ItemCalendario(
         titulo=f"DASN-SIMEI {ano}",
         descricao=f"Declaração Anual do Simples Nacional para MEI — ano-base {ano}",
-        data_vencimento=date(ano + 1, 5, 31),
+        data_vencimento=_proximo_dia_util(date(ano + 1, 5, 31), feriados),
         regime="mei",
         tipo_obrigacao="dasn_simei",
     ))
@@ -97,14 +105,18 @@ def _calendario_mei(ano: int) -> list[ItemCalendario]:
     return sorted(items, key=lambda i: i.data_vencimento)
 
 
-def _calendario_simples_nacional(ano: int, tem_funcionarios: bool = False) -> list[ItemCalendario]:
+def _calendario_simples_nacional(
+    ano: int,
+    tem_funcionarios: bool = False,
+    feriados: frozenset[date] = frozenset(),
+) -> list[ItemCalendario]:
     items: list[ItemCalendario] = []
 
     for mes in range(1, 13):
         # PGDAS-D e DAS vencem dia 20 do mês seguinte
         mes_seguinte = mes + 1 if mes < 12 else 1
         ano_seguinte = ano if mes < 12 else ano + 1
-        venc = _dia_vencimento(ano_seguinte, mes_seguinte, 20)
+        venc = _dia_vencimento(ano_seguinte, mes_seguinte, 20, feriados)
 
         items.append(ItemCalendario(
             titulo=f"PGDAS-D {_mes_nome(mes)}/{ano}",
@@ -118,13 +130,13 @@ def _calendario_simples_nacional(ano: int, tem_funcionarios: bool = False) -> li
     items.append(ItemCalendario(
         titulo=f"DEFIS {ano}",
         descricao=f"Declaração de Informações Socioeconômicas e Fiscais — ano-base {ano}",
-        data_vencimento=date(ano + 1, 3, 31),
+        data_vencimento=_proximo_dia_util(date(ano + 1, 3, 31), feriados),
         regime="simples_nacional",
         tipo_obrigacao="defis",
     ))
 
     if tem_funcionarios:
-        items.extend(_obrigacoes_trabalhistas(ano, "simples_nacional", incluir_gps=False))
+        items.extend(_obrigacoes_trabalhistas(ano, "simples_nacional", incluir_gps=False, feriados=feriados))
 
     return sorted(items, key=lambda i: i.data_vencimento)
 
@@ -133,6 +145,7 @@ def _calendario_lucro_presumido(
     ano: int,
     tem_funcionarios: bool = False,
     parcelar_irpj: bool = False,
+    feriados: frozenset[date] = frozenset(),
 ) -> list[ItemCalendario]:
     items: list[ItemCalendario] = []
 
@@ -140,7 +153,7 @@ def _calendario_lucro_presumido(
     for mes in range(1, 13):
         mes_venc = mes + 1 if mes < 12 else 1
         ano_venc = ano if mes < 12 else ano + 1
-        venc = _dia_vencimento(ano_venc, mes_venc, 25)
+        venc = _dia_vencimento(ano_venc, mes_venc, 25, feriados)
         items.append(ItemCalendario(
             titulo=f"PIS/Cofins {_mes_nome(mes)}/{ano}",
             descricao=f"DARF PIS e Cofins cumulativo referente a {_mes_nome(mes)}/{ano}",
@@ -165,7 +178,7 @@ def _calendario_lucro_presumido(
             mes_venc = offset if offset <= 12 else offset - 12
             ano_venc = ano if offset <= 12 else ano + 1
             ultimo_dia = calendar.monthrange(ano_venc, mes_venc)[1]
-            venc = date(ano_venc, mes_venc, ultimo_dia)
+            venc = _proximo_dia_util(date(ano_venc, mes_venc, ultimo_dia), feriados)
             if parcelar_irpj:
                 titulo = f"IRPJ/CSLL {rotulo}/{ano} — {parcela}ª parcela"
                 descricao = (
@@ -188,7 +201,7 @@ def _calendario_lucro_presumido(
     for mes in range(1, 13):
         mes_venc = mes + 2 if mes <= 10 else (mes + 2) - 12
         ano_venc = ano if mes <= 10 else ano + 1
-        venc = _dia_vencimento(ano_venc, mes_venc, 15)
+        venc = _dia_vencimento(ano_venc, mes_venc, 15, feriados)
         items.append(ItemCalendario(
             titulo=f"DCTFWeb {_mes_nome(mes)}/{ano}",
             descricao=f"Declaração de Débitos e Créditos Tributários Federais Web — {_mes_nome(mes)}/{ano}",
@@ -198,7 +211,7 @@ def _calendario_lucro_presumido(
         ))
 
     if tem_funcionarios:
-        items.extend(_obrigacoes_trabalhistas(ano, "lucro_presumido", incluir_gps=True))
+        items.extend(_obrigacoes_trabalhistas(ano, "lucro_presumido", incluir_gps=True, feriados=feriados))
         # DIRF — obrigação anual, vence 31/jan do ano seguinte (IN RFB 2.219/2024)
         items.append(ItemCalendario(
             titulo=f"DIRF {ano}",
@@ -206,7 +219,7 @@ def _calendario_lucro_presumido(
                 f"Declaração do Imposto sobre a Renda Retido na Fonte "
                 f"— ano-calendário {ano}"
             ),
-            data_vencimento=date(ano + 1, 1, 31),
+            data_vencimento=_proximo_dia_util(date(ano + 1, 1, 31), feriados),
             regime="lucro_presumido",
             tipo_obrigacao="dirf",
         ))
@@ -218,6 +231,7 @@ def _obrigacoes_trabalhistas(
     ano: int,
     regime: str,
     incluir_gps: bool,
+    feriados: frozenset[date] = frozenset(),
 ) -> list[ItemCalendario]:
     """FGTS (dia 7), eSocial S-1200 (dia 15) e GPS/INSS (dia 20, LP apenas)."""
     items: list[ItemCalendario] = []
@@ -230,7 +244,7 @@ def _obrigacoes_trabalhistas(
         items.append(ItemCalendario(
             titulo=f"FGTS {_mes_nome(mes)}/{ano}",
             descricao=f"Recolhimento do FGTS referente à folha de {_mes_nome(mes)}/{ano}",
-            data_vencimento=_dia_vencimento(ano_venc, mes_venc, 7),
+            data_vencimento=_dia_vencimento(ano_venc, mes_venc, 7, feriados),
             regime=regime,
             tipo_obrigacao="fgts",
         ))
@@ -239,7 +253,7 @@ def _obrigacoes_trabalhistas(
         items.append(ItemCalendario(
             titulo=f"eSocial S-1200 {_mes_nome(mes)}/{ano}",
             descricao=f"Remunerações dos trabalhadores via eSocial — {_mes_nome(mes)}/{ano}",
-            data_vencimento=_dia_vencimento(ano_venc, mes_venc, 15),
+            data_vencimento=_dia_vencimento(ano_venc, mes_venc, 15, feriados),
             regime=regime,
             tipo_obrigacao="esocial_s1200",
         ))
@@ -249,7 +263,7 @@ def _obrigacoes_trabalhistas(
             items.append(ItemCalendario(
                 titulo=f"GPS/INSS {_mes_nome(mes)}/{ano}",
                 descricao=f"Recolhimento INSS patronal via GPS referente a {_mes_nome(mes)}/{ano}",
-                data_vencimento=_dia_vencimento(ano_venc, mes_venc, 20),
+                data_vencimento=_dia_vencimento(ano_venc, mes_venc, 20, feriados),
                 regime=regime,
                 tipo_obrigacao="gps_inss",
             ))
@@ -257,10 +271,32 @@ def _obrigacoes_trabalhistas(
     return items
 
 
-def _dia_vencimento(ano: int, mes: int, dia: int) -> date:
-    """Retorna a data de vencimento, ajustando para o último dia do mês se necessário."""
+def _dia_vencimento(
+    ano: int,
+    mes: int,
+    dia: int,
+    feriados: frozenset[date] = frozenset(),
+) -> date:
+    """Retorna a data de vencimento ajustada para o próximo dia útil.
+
+    Aplica IN RFB 1.300/2012 art. 26: vencimento em sábado, domingo ou feriado
+    é postergado para o próximo dia útil. O argumento ``feriados`` é o conjunto
+    de feriados nacionais (passado pelo caller — agenda obtém via BrasilAPI).
+
+    Ajustes:
+      * ``min(dia, ultimo)``: se o dia não existe no mês (ex.: 31/fev), usa o
+        último dia do mês como base, depois posterga se cair em não-útil.
+    """
     ultimo = calendar.monthrange(ano, mes)[1]
-    return date(ano, mes, min(dia, ultimo))
+    candidato = date(ano, mes, min(dia, ultimo))
+    return _proximo_dia_util(candidato, feriados)
+
+
+def _proximo_dia_util(d: date, feriados: frozenset[date]) -> date:
+    """Posterga ``d`` enquanto cair em sábado/domingo/feriado."""
+    while d.weekday() >= 5 or d in feriados:
+        d += timedelta(days=1)
+    return d
 
 
 def _mes_nome(mes: int) -> str:

@@ -27,12 +27,18 @@ def _payload() -> EmitirNfseIn:
     )
 
 
-def _empresa_mock(empresa_id: uuid.UUID) -> SimpleNamespace:
+def _empresa_mock(
+    empresa_id: uuid.UUID,
+    codigo_ibge: str | None = "3550308",
+    iss_validada: bool = False,
+) -> SimpleNamespace:
     return SimpleNamespace(
         id=empresa_id,
         cnpj="12345678000195",
         im="123456",
-        municipio="3550308",
+        municipio="São Paulo",
+        codigo_municipio_ibge=codigo_ibge,
+        aliquota_iss_validada=iss_validada,
     )
 
 
@@ -112,3 +118,102 @@ async def test_emitir_nfse_rps_diferentes_geram_focus_refs_diferentes() -> None:
         )
 
     assert out1.focus_ref != out2.focus_ref
+
+
+@pytest.mark.asyncio
+async def test_emitir_nfse_falha_quando_empresa_sem_ibge() -> None:
+    """Sem `codigo_municipio_ibge`, emissão levanta MunicipioIbgeAusente (422)."""
+    from app.shared.exceptions import MunicipioIbgeAusente
+
+    empresa_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    focus_client = AsyncMock()
+
+    empresa_repo_mock = AsyncMock()
+    empresa_repo_mock.por_id = AsyncMock(
+        return_value=_empresa_mock(empresa_id, codigo_ibge=None)
+    )
+
+    with patch("app.modules.notas.service.EmpresaRepo", return_value=empresa_repo_mock):
+        with pytest.raises(MunicipioIbgeAusente) as exc_info:
+            await NotasService().emitir_nfse(
+                session, tenant_id, empresa_id, _payload(), focus_client=focus_client
+            )
+
+    assert exc_info.value.http_status == 422
+    # Focus não foi chamado — guard preserva idempotência da numeração RPS
+    focus_client.emitir_nfse.assert_not_awaited()
+    empresa_repo_mock.alocar_proximo_numero_rps.assert_not_awaited()
+
+
+# ── m5 da auditoria: aviso ISS conforme flag aliquota_iss_validada ───────────
+
+
+@pytest.mark.asyncio
+async def test_emitir_nfse_aviso_iss_aparece_quando_nao_validada() -> None:
+    """Empresa sem `aliquota_iss_validada` recebe o `aviso_iss` na resposta."""
+    empresa_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    focus_client = AsyncMock()
+    focus_client.emitir_nfse = AsyncMock(return_value={"status": "processando"})
+
+    empresa_repo_mock = AsyncMock()
+    empresa_repo_mock.por_id = AsyncMock(
+        return_value=_empresa_mock(empresa_id, iss_validada=False)
+    )
+    empresa_repo_mock.alocar_proximo_numero_rps = AsyncMock(return_value=1)
+
+    notas_repo_mock = AsyncMock()
+    notas_repo_mock.criar_nfse = AsyncMock(
+        return_value=SimpleNamespace(id=uuid.uuid4())
+    )
+
+    with (
+        patch("app.modules.notas.service.EmpresaRepo", return_value=empresa_repo_mock),
+        patch("app.modules.notas.service.NotasRepo", return_value=notas_repo_mock),
+    ):
+        out = await NotasService().emitir_nfse(
+            session, tenant_id, empresa_id, _payload(), focus_client=focus_client
+        )
+
+    assert out.aviso_iss is not None
+    assert "LC 116/2003" in out.aviso_iss
+
+
+@pytest.mark.asyncio
+async def test_emitir_nfse_aviso_iss_some_quando_validada() -> None:
+    """Empresa com `aliquota_iss_validada=True` não recebe mais o aviso ISS."""
+    empresa_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    focus_client = AsyncMock()
+    focus_client.emitir_nfse = AsyncMock(return_value={"status": "processando"})
+
+    empresa_repo_mock = AsyncMock()
+    empresa_repo_mock.por_id = AsyncMock(
+        return_value=_empresa_mock(empresa_id, iss_validada=True)
+    )
+    empresa_repo_mock.alocar_proximo_numero_rps = AsyncMock(return_value=1)
+
+    notas_repo_mock = AsyncMock()
+    notas_repo_mock.criar_nfse = AsyncMock(
+        return_value=SimpleNamespace(id=uuid.uuid4())
+    )
+
+    with (
+        patch("app.modules.notas.service.EmpresaRepo", return_value=empresa_repo_mock),
+        patch("app.modules.notas.service.NotasRepo", return_value=notas_repo_mock),
+    ):
+        out = await NotasService().emitir_nfse(
+            session, tenant_id, empresa_id, _payload(), focus_client=focus_client
+        )
+
+    assert out.aviso_iss is None

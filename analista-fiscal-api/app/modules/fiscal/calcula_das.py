@@ -15,18 +15,27 @@ v2 (Fase 1.4 do plano de remediação):
   tabela CGSN, pendência da Fase 5). Em vez disso, calcula o DAS cheio e sinaliza
   via flag ``sublimite_excedido`` que o cliente deve recolher ICMS/ISS por fora —
   o frontend deve mostrar aviso e o contador deve agir.
+
+v3 (Fase 2 PR8 — MAJOR M2 da auditoria Sprints 4-6):
+- ``ResultadoDAS.receitas_por_anexo`` discrimina a receita por anexo. PGDAS-D
+  exige isso quando empresa tem atividades em anexos diferentes (Anexo I + III,
+  ou Fator R alternando III↔V). Single-anexo continua passando: ``{anexo_efetivo:
+  receita_mes}`` é serializado automaticamente.
+- ``calcular_das_multi_anexo()`` orquestra cálculo por anexo: a RBT12 é a mesma
+  (compartilhada) mas cada anexo usa sua tabela CGSN; o DAS total é a soma.
+  Compat: ``calcular_das()`` single-anexo é inalterado (chamado por dentro).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 
 from app.shared.exceptions import EmpresaForaSimplesNacional
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "sn.das.v2"
+ALGORITMO_VERSAO = "sn.das.v3"
 
 _CENT = Decimal("0.01")
 _ALIQ_DISPLAY = Decimal("0.0001")
@@ -69,6 +78,11 @@ class ResultadoDAS:
     # cheio (com ICMS/ISS embutidos), porque a decomposição por tributo da tabela
     # CGSN ainda não está no schema. O caller deve mostrar aviso explícito
     # ("ICMS/ISS devem ser apurados pelo regime normal estadual/municipal").
+    # ── v3: discriminação por anexo ────────────────────────────────────
+    receitas_por_anexo: dict[str, Decimal] = field(default_factory=dict)
+    # ``{"I": Decimal("10000.00"), "III": Decimal("5000.00")}``. Em single-anexo,
+    # contém apenas ``{anexo_efetivo: receita_mes}``. PGDAS-D usa para iterar
+    # ``atividades[]`` (multi-anexo exige discriminação por idAtividade).
 
 
 def resolver_anexo_fator_r(anexo: str, fator_r: Decimal) -> str:
@@ -166,4 +180,137 @@ def calcular_das(
         uf=uf,
         sublimite_aplicado=sublimite,
         sublimite_excedido=sublimite_excedido,
+        receitas_por_anexo={ef: receita_mes},
     )
+
+
+_TOLERANCIA_SOMA = Decimal("0.01")
+
+
+def calcular_das_multi_anexo(
+    rbt12: Decimal,
+    receitas_por_anexo: dict[str, Decimal],
+    faixas_por_anexo: dict[str, list[FaixaDAS]],
+    *,
+    anexo_declarado: str = "I",
+    fator_r: Decimal | None = None,
+    uf: str | None = None,
+    sublimite_estadual: Decimal | None = None,
+    algoritmo_versao: str = ALGORITMO_VERSAO,
+) -> ResultadoDAS:
+    """Calcula DAS quando a empresa tem receitas em múltiplos anexos no mês.
+
+    Cada anexo usa sua própria tabela CGSN (faixas), mas a RBT12 é compartilhada
+    (é uma só por empresa). O DAS total é a soma dos DAS calculados por anexo.
+
+    Args:
+        rbt12: RBT12 compartilhada — mesma para todos os anexos.
+        receitas_por_anexo: ``{"I": Decimal("10000"), "III": Decimal("5000")}``.
+            Apenas anexos com receita > 0 são processados.
+        faixas_por_anexo: ``{"I": [FaixaDAS, ...], "III": [...]}``. Cada lista é
+            a tabela CGSN vigente daquele anexo no mês de competência.
+        anexo_declarado: Anexo "principal" da empresa (informativo no resultado).
+        fator_r: Quando informado e empresa tem Anexo III/V, é aplicado APENAS
+            à parcela do Anexo III/V; demais anexos não são afetados.
+        uf, sublimite_estadual, algoritmo_versao: Idem ``calcular_das``.
+
+    Returns:
+        ResultadoDAS com ``valor`` somado e ``receitas_por_anexo`` preservado.
+        ``anexo_efetivo`` reflete o anexo principal (após resolução Fator R, se
+        aplicável); ``aliquota_efetiva`` reflete o anexo principal (informativa).
+
+    Raises:
+        ValueError: ``receitas_por_anexo`` vazio ou ``faixas_por_anexo`` faltando
+            tabela para algum anexo presente.
+        EmpresaForaSimplesNacional: ``rbt12`` > teto federal R$4.800.000.
+    """
+    if not receitas_por_anexo:
+        raise ValueError("receitas_por_anexo não pode ser vazio")
+
+    receitas_positivas = {a: r for a, r in receitas_por_anexo.items() if r > _ZERO}
+    if not receitas_positivas:
+        raise ValueError("ao menos um anexo deve ter receita > 0")
+
+    anexos_faltando = set(receitas_positivas) - set(faixas_por_anexo)
+    if anexos_faltando:
+        raise ValueError(
+            f"faixas_por_anexo não cobre os anexos: {sorted(anexos_faltando)}"
+        )
+
+    # Resolução de Fator R aplica-se SOMENTE quando há receita em III ou V.
+    anexo_efetivo_principal = anexo_declarado
+    if anexo_declarado in ("III", "V") and fator_r is not None:
+        anexo_efetivo_principal = resolver_anexo_fator_r(anexo_declarado, fator_r)
+        # Se a empresa declarou III/V mas tem receita no outro, alinha:
+        if anexo_declarado in receitas_positivas and anexo_efetivo_principal != anexo_declarado:
+            receitas_positivas[anexo_efetivo_principal] = (
+                receitas_positivas.pop(anexo_declarado)
+                + receitas_positivas.get(anexo_efetivo_principal, _ZERO)
+            )
+            if anexo_efetivo_principal not in faixas_por_anexo:
+                raise ValueError(
+                    f"Fator R resolveu para {anexo_efetivo_principal}, mas "
+                    f"faixas_por_anexo não tem essa tabela"
+                )
+
+    valor_total = _ZERO
+    detalhes: list[ResultadoDAS] = []
+    for anexo, receita in sorted(receitas_positivas.items()):
+        parcial = calcular_das(
+            rbt12=rbt12,
+            receita_mes=receita,
+            faixas=faixas_por_anexo[anexo],
+            anexo=anexo,
+            anexo_efetivo=anexo,
+            fator_r=fator_r if anexo == anexo_efetivo_principal else None,
+            uf=uf,
+            sublimite_estadual=sublimite_estadual,
+            algoritmo_versao=algoritmo_versao,
+        )
+        valor_total += parcial.valor
+        detalhes.append(parcial)
+
+    # Resultado agregado: usa o anexo "principal" (após Fator R) como referência
+    # para faixa/alíquota informativas. ``valor`` é a soma; ``receitas_por_anexo``
+    # preserva a discriminação para o PGDAS-D iterar.
+    principal = next(
+        (d for d in detalhes if d.anexo == anexo_efetivo_principal),
+        detalhes[0],
+    )
+    receita_total = sum(receitas_positivas.values(), start=_ZERO)
+
+    return ResultadoDAS(
+        anexo=anexo_declarado,
+        anexo_efetivo=anexo_efetivo_principal,
+        faixa=principal.faixa,
+        rbt12_usado=rbt12,
+        aliquota_nominal=principal.aliquota_nominal,
+        parcela_deduzir=principal.parcela_deduzir,
+        aliquota_efetiva=principal.aliquota_efetiva,
+        receita_mes=receita_total,
+        valor=valor_total,
+        fator_r=fator_r,
+        algoritmo_versao=algoritmo_versao,
+        uf=uf,
+        sublimite_aplicado=principal.sublimite_aplicado,
+        sublimite_excedido=principal.sublimite_excedido,
+        receitas_por_anexo=dict(receitas_positivas),
+    )
+
+
+def validar_soma_receitas(
+    receita_mes: Decimal,
+    receitas_por_anexo: dict[str, Decimal],
+    tolerancia: Decimal = _TOLERANCIA_SOMA,
+) -> None:
+    """Verifica que a soma de ``receitas_por_anexo`` casa com ``receita_mes``.
+
+    Usado por callers que recebem ambos do usuário (proteção contra input ruim).
+    """
+    soma = sum(receitas_por_anexo.values(), start=_ZERO)
+    diferenca = (soma - receita_mes).copy_abs()
+    if diferenca > tolerancia:
+        raise ValueError(
+            f"receitas_por_anexo soma R${soma}; esperado R${receita_mes} "
+            f"(diferença R${diferenca} > tolerância R${tolerancia})"
+        )

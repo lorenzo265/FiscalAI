@@ -14,6 +14,7 @@ contas (UNIQUE pluggy_account_id) e transações (UNIQUE pluggy_transaction_id).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
@@ -23,6 +24,12 @@ from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from app.modules.open_finance.repo import PluggyItemRepo
 from app.modules.open_finance.transacoes_repo import (
@@ -40,6 +47,24 @@ log = structlog.get_logger(__name__)
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 _PLUGGY_PAGE_SIZE = 200
 _PLUGGY_MAX_PAGES = 50  # Bombeio de segurança — 10k transações por sync.
+
+# Retry resiliente: §8.9 (idempotência permite retry seguro). Cobertura:
+#   * PluggyTimeout — sempre retentável (falha de transporte).
+#   * PluggyErro — só se ``retentavel`` (5xx ou 429); 4xx aborta a página/conta.
+# 4 tentativas com jitter exponencial (2s, 4-8s, 8-16s, 16-30s) ~30s de janela.
+_RETRY_WAIT = wait_exponential_jitter(initial=2, max=30)
+_RETRY_STOP = stop_after_attempt(4)
+
+
+_FactoryCoroutine = Callable[[], Awaitable[JsonObject]]
+
+
+def _eh_retentavel(exc: BaseException) -> bool:
+    if isinstance(exc, PluggyTimeout):
+        return True
+    if isinstance(exc, PluggyErro):
+        return exc.retentavel
+    return False
 
 
 class _ClienteSync(Protocol):
@@ -91,8 +116,11 @@ class SyncService:
             await session.commit()
             return resultado
 
+        def _fetch_accounts() -> Awaitable[JsonObject]:
+            return pluggy_client.list_accounts(item.pluggy_item_id)
+
         try:
-            accounts_resp = await pluggy_client.list_accounts(item.pluggy_item_id)
+            accounts_resp = await _chamar_com_retry(_fetch_accounts)
         except (PluggyErro, PluggyTimeout) as exc:
             await repo_item.atualizar_status(
                 item_uuid,
@@ -104,6 +132,7 @@ class SyncService:
                 "open_finance.sync.accounts_falhou",
                 item_id=str(item_uuid),
                 erro=exc.codigo,
+                status_upstream=getattr(exc, "status_upstream", None),
             )
             return resultado
 
@@ -125,24 +154,30 @@ class SyncService:
             if novo:
                 resultado.contas_novas += 1
 
-            # Paginação de transações
+            # Paginação de transações — retry por página antes de abortar a conta.
             page = 1
             while page <= _PLUGGY_MAX_PAGES:
-                try:
-                    tx_resp = await pluggy_client.list_transactions(
+                def _fetch_page(p: int = page) -> Awaitable[JsonObject]:
+                    return pluggy_client.list_transactions(
                         account_id=conta_dto["pluggy_account_id"],
                         from_date=from_date.isoformat() if from_date else None,
                         to_date=to_date.isoformat() if to_date else None,
                         page_size=_PLUGGY_PAGE_SIZE,
-                        page=page,
+                        page=p,
                     )
+
+                try:
+                    tx_resp = await _chamar_com_retry(_fetch_page)
                 except (PluggyErro, PluggyTimeout) as exc:
+                    # Retries esgotados ou erro 4xx não-retentável.
+                    # Aborta apenas esta conta, próximas continuam.
                     log.warning(
-                        "open_finance.sync.transactions_falhou",
+                        "open_finance.sync.transactions_falhou_apos_retry",
                         item_id=str(item_uuid),
                         account_id=conta_dto["pluggy_account_id"],
                         page=page,
                         erro=exc.codigo,
+                        status_upstream=getattr(exc, "status_upstream", None),
                     )
                     break
 
@@ -184,6 +219,28 @@ class SyncService:
 
 
 # ── helpers puros (sem I/O) ──────────────────────────────────────────────────
+
+
+async def _chamar_com_retry(
+    coro_factory: _FactoryCoroutine,
+) -> JsonObject:
+    """Executa ``coro_factory()`` retentando exceções transitórias.
+
+    ``coro_factory`` é callable que cria a coroutine — necessário porque
+    tenacity recria a chamada a cada tentativa, e coroutines não são
+    re-entrantes.
+
+    Retentável: PluggyTimeout (sempre), PluggyErro 5xx/429. 4xx falha rápido.
+    """
+    async for tentativa in AsyncRetrying(
+        wait=_RETRY_WAIT,
+        stop=_RETRY_STOP,
+        retry=retry_if_exception(_eh_retentavel),
+        reraise=True,
+    ):
+        with tentativa:
+            return await coro_factory()
+    raise RuntimeError("AsyncRetrying esgotado sem raise — inalcançável")
 
 
 def _lista_de(resp: JsonObject, chave: str) -> list[JsonObject]:

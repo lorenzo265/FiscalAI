@@ -34,6 +34,31 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="URL do Redis 7 (cache + Celery broker a partir da Sprint 2).",
     )
+
+    # Sprint 19 PR1 — pool de conexões + slow query log (perf/escala).
+    # Default SQLAlchemy é 5+10 (estoura em 1k empresas concorrentes).
+    DB_POOL_SIZE: int = Field(
+        default=20,
+        description="Tamanho do pool de conexões ao Postgres por engine.",
+    )
+    DB_MAX_OVERFLOW: int = Field(
+        default=30,
+        description="Conexões extras permitidas além de DB_POOL_SIZE em pico.",
+    )
+    DB_POOL_TIMEOUT: int = Field(
+        default=30,
+        description="Segundos a esperar por conexão livre antes de levantar.",
+    )
+    DB_POOL_RECYCLE: int = Field(
+        default=1800,
+        description="Segundos antes de reciclar conexão ociosa (30min default).",
+    )
+    SLOW_QUERY_THRESHOLD_MS: int = Field(
+        default=500,
+        description=(
+            "Limite em ms para logar 'db.slow_query' estruturado. <=0 desliga."
+        ),
+    )
     OLLAMA_URL: str = Field(
         default="http://localhost:11434",
         description="URL do servidor Ollama (LLM local).",
@@ -53,7 +78,7 @@ class Settings(BaseSettings):
 
     # JWT — Sprint 1
     JWT_SECRET: str = Field(
-        default="TROCAR_EM_PRODUCAO_gere_com_openssl_rand_hex_32",
+        default="TROCAR_EM_PRODUCAO_gere_com_openssl_rand_hex_32",  # nosec B105
         description="Chave secreta para assinar tokens JWT. OBRIGATÓRIO trocar em prod.",
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="Algoritmo JWT (RS256 na Sprint 13+).")
@@ -67,6 +92,16 @@ class Settings(BaseSettings):
     FOCUS_NFE_SANDBOX: bool = Field(
         default=True,
         description="True = homologacao.focusnfe.com.br; False = api.focusnfe.com.br.",
+    )
+    FOCUS_NFSE_ENVIA_CBS_IBS: bool = Field(
+        default=False,
+        description=(
+            "Sprint 14 PR2 — Reforma Tributária. Quando True, NotasService "
+            "injeta campos CBS/IBS/cClassTrib no payload NFS-e enviado à "
+            "Focus NFe. Default False — Focus ainda não documenta a API "
+            "para todos os municípios (pendência: aguardar regulamentação "
+            "do Comitê Gestor IBS e cobertura completa pela Focus)."
+        ),
     )
 
     # Sprint 5 — Meta WhatsApp Cloud API
@@ -83,8 +118,25 @@ class Settings(BaseSettings):
         description="App secret do Meta para verificação HMAC-SHA256 do webhook.",
     )
     META_WHATSAPP_VERIFY_TOKEN: str = Field(
-        default="fiscalai-webhook-verify",
+        default="fiscalai-webhook-verify",  # nosec B105
         description="Token de verificação do webhook Meta (string fixa definida no painel).",
+    )
+
+    # Sprint 15.5 — Envio do digest semanal via Meta WhatsApp utility template
+    WHATSAPP_DIGEST_TEMPLATE_NAME: str = Field(
+        default="weekly_digest_pt_br",
+        description="Nome do template Meta UTILITY usado para o digest semanal.",
+    )
+    WHATSAPP_DIGEST_LANG_CODE: str = Field(
+        default="pt_BR",
+        description="Código de idioma do template Meta (BCP-47 com underscore).",
+    )
+    WHATSAPP_DIGEST_TEMPLATE_ATIVO: bool = Field(
+        default=False,
+        description=(
+            "Flag opt-in para envio real. False = digest fica em "
+            "status='preparado' sem enviar (ambiente sem template aprovado)."
+        ),
     )
 
     # Sprint 5 — BrasilAPI (CNPJ lookup)
@@ -146,6 +198,121 @@ class Settings(BaseSettings):
     PLUGGY_API_KEY_TTL_MARGIN_SEC: int = Field(
         default=120,
         description="Margem subtraída do TTL da API key (2h) para renovação antecipada.",
+    )
+
+    # Sprint 13 — Marketplace (curadoria admin)
+    MARKETPLACE_ADMIN_TOKEN: str = Field(
+        default="",
+        description=(
+            "Token estático compartilhado para endpoints administrativos do "
+            "marketplace (aprovar parceiro, listar todos). Vazio = endpoints "
+            "admin retornam 503. Em prod vem do secret manager."
+        ),
+    )
+
+    # Sprint 19.6 PR3 — Storage de blobs (PDFs/XMLs/recibos). Substitui
+    # anti-pattern de BYTEA em Postgres. Default 'local' = .storage/
+    # (dev/CI). Em prod usar 's3' com bucket + endpoint_url (opcional para
+    # MinIO/R2) + region (default sa-east-1 = LGPD §8.7).
+    STORAGE_BACKEND: str = Field(
+        default="local",
+        description="Backend de storage: 'local' | 'memory' | 's3'.",
+    )
+    STORAGE_BASE_PATH: str = Field(
+        default=".storage",
+        description="Diretório base do LocalDiskStorage (dev/CI).",
+    )
+    STORAGE_BUCKET: str = Field(
+        default="",
+        description="Bucket S3-compatível. Obrigatório se STORAGE_BACKEND=s3.",
+    )
+    STORAGE_S3_ENDPOINT_URL: str = Field(
+        default="",
+        description=(
+            "Endpoint URL S3-compatível. Vazio = AWS S3 padrão; preenchido "
+            "= MinIO/R2/etc. Ex.: 'https://minio.fiscalai.local:9000'."
+        ),
+    )
+    STORAGE_S3_REGION: str = Field(
+        default="sa-east-1",
+        description="Região S3. Default sa-east-1 alinhado à LGPD §8.7.",
+    )
+
+    # Sprint 19.6 PR1 — Scrapers CRF (Caixa) + CNDT (TST). Refactor #3.
+    # Default "not_implemented" = adapter sinaliza gate operacional não-código
+    # (decisão de stack Playwright + provider captcha). Quando provider real
+    # estiver pronto, trocar pra "playwright" ou similar.
+    CRF_SCRAPER_PROVIDER: str = Field(
+        default="not_implemented",
+        description=(
+            "Provider do scraper CRF: 'not_implemented' (fallback manual) ou "
+            "'playwright' (quando Sprint 19.6 PR3 instalar Playwright + captcha)."
+        ),
+    )
+    CNDT_SCRAPER_PROVIDER: str = Field(
+        default="not_implemented",
+        description=(
+            "Provider do scraper CNDT: 'not_implemented' (fallback manual) ou "
+            "'playwright' (idem CRF)."
+        ),
+    )
+
+    # Sprint 19.7 PR2 (#13) — eSocial transmissão real.
+    # Base URLs oficiais: produção restrita (sandbox) vs produção real.
+    # Mantém o anti-pattern dos demais Sandbox flags: True em dev por
+    # default, opt-in explícito pra produção.
+    ESOCIAL_BASE_URL_SANDBOX: str = Field(
+        default="https://webservices.producaorestrita.esocial.gov.br",
+        description="Endpoint sandbox/produção restrita do eSocial.",
+    )
+    ESOCIAL_BASE_URL_PROD: str = Field(
+        default="https://webservices.esocial.gov.br",
+        description="Endpoint produção real do eSocial.",
+    )
+    ESOCIAL_SANDBOX: bool = Field(
+        default=True,
+        description=(
+            "True = produção restrita (tpAmb=2); False = produção real "
+            "(tpAmb=1). Default True em dev pra nunca emitir evento real."
+        ),
+    )
+    ESOCIAL_TRANSMISSAO_ATIVA: bool = Field(
+        default=False,
+        description=(
+            "§8.12 — Transmissão é ato consciente. Flag opt-in: False = "
+            "evento fica em status='assinado' sem enviar (pronto pra "
+            "admin baixar e transmitir manualmente). True = pipeline "
+            "envia automaticamente após assinatura."
+        ),
+    )
+    ESOCIAL_LOTE_MAX_EVENTOS: int = Field(
+        default=50,
+        description=(
+            "Máximo de eventos por lote. Limite oficial = 50 (POST "
+            "/lotes/eventos). Service quebra automaticamente lotes maiores."
+        ),
+    )
+    ESOCIAL_TIMEOUT_SEC: int = Field(
+        default=30,
+        description="Timeout HTTP por chamada à API eSocial.",
+    )
+    ESOCIAL_RECIBO_POLL_INTERVAL_SEC: int = Field(
+        default=15,
+        description=(
+            "Intervalo entre polls de GET /lotes/eventos/{protocolo} "
+            "enquanto processamento não finaliza (estado != 4)."
+        ),
+    )
+
+    # Sprint 19.5 PR2 — Painel admin de tabelas tributárias
+    ADMIN_WHATSAPP_PHONE: str | None = Field(
+        default=None,
+        description=(
+            "Número WhatsApp do contador admin do sistema (não da PME). "
+            "Quando configurado, o digest semanal Sprint 15.5 inclui bullets "
+            "dos alertas críticos abertos em ``alerta_admin``. Vazio = hook "
+            "noop (alertas só aparecem nos endpoints REST)."
+        ),
     )
 
     @model_validator(mode="after")

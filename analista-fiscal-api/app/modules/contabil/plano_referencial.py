@@ -171,6 +171,19 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         "2.01.03.02.01.01",
         4,
     ),
+    # Sprint 19.7 PR1 (#10) — IRRF retido na folha. Subconta de Encargos a
+    # Recolher (2.1.3.x) ao invés de Impostos (2.1.4.x) pra manter a
+    # contrapartida da folha agrupada (consistente com INSS/FGTS).
+    ItemPlano(
+        "2.1.3.03",
+        "IRRF Funcionários a Recolher",
+        "2.1.3",
+        "C",
+        "passivo",
+        True,
+        "2.01.03.03.01.01",
+        4,
+    ),
     ItemPlano(
         "2.1.4", "Impostos a Recolher", "2.1", "C", "passivo", False, "2.01.04", 3
     ),
@@ -322,6 +335,16 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         3,
     ),
     ItemPlano(
+        "5.1.06",
+        "Serviços de Terceiros",
+        "5.1",
+        "D",
+        "despesa",
+        True,
+        "4.02.07.01.01.01",
+        3,
+    ),
+    ItemPlano(
         "5.1.99",
         "Outras Despesas Operacionais — A Classificar",
         "5.1",
@@ -338,11 +361,15 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
 
 
 CODIGOS_PADRAO_LANCAMENTO_AUTO: dict[str, str] = {
-    # Mapeamento por evento → conta padrão
+    # Mapeamento por evento → conta padrão.
+    # ⚠ Fonte canônica única — sempre que o DFC, encerramento, lançador auto
+    # ou qualquer relatório precisar de um código de conta, leia daqui.
     "caixa": "1.1.1.01",
     "banco": "1.1.1.02",
     "clientes": "1.1.2.01",
+    "estoques": "1.1.3.01",
     "fornecedores": "2.1.1.01",
+    "salarios_pagar": "2.1.2.01",
     "receita_servicos": "4.1.01",
     "receita_vendas": "4.1.02",
     "outras_receitas": "4.9.99",
@@ -350,6 +377,7 @@ CODIGOS_PADRAO_LANCAMENTO_AUTO: dict[str, str] = {
     "despesa_pessoal": "5.1.02",
     "encargos_sociais": "5.1.03",
     "despesa_depreciacao": "5.1.04",
+    "despesa_servicos": "5.1.06",
     "outras_despesas": "5.1.99",
     "imobilizado": "1.2.3.01",
     "depreciacao_acumulada": "1.2.3.99",
@@ -357,4 +385,36 @@ CODIGOS_PADRAO_LANCAMENTO_AUTO: dict[str, str] = {
     "provisao_13": "2.1.2.03",
     "inss_recolher": "2.1.3.01",
     "fgts_recolher": "2.1.3.02",
+    # Sprint 19.7 PR1 (#10) — IRRF retido na folha (contrapartida do desconto).
+    "irrf_funcionarios_recolher": "2.1.3.03",
 }
+
+
+def codigo(chave: str) -> str:
+    """Retorna o código contábil para uma chave simbólica.
+
+    Falha rápido (KeyError) se a chave não estiver mapeada — evita typo
+    silencioso virar saldo zero no relatório.
+    """
+    return CODIGOS_PADRAO_LANCAMENTO_AUTO[chave]
+
+
+# Agrupamentos para consumidores (DFC, indicadores, etc.).
+# Lista de chaves simbólicas — o consumidor resolve via `codigo()`.
+GRUPOS_CONTABEIS: dict[str, tuple[str, ...]] = {
+    # DFC — caixa equivalentes (1.1.1.x)
+    "caixa_equivalentes": ("caixa", "banco"),
+    # DFC — capital de giro
+    "clientes": ("clientes",),
+    "estoques": ("estoques",),
+    "fornecedores": ("fornecedores",),
+    # DFC — "Encargos a Pagar" = salários + INSS + FGTS a recolher
+    "encargos_a_pagar": ("salarios_pagar", "inss_recolher", "fgts_recolher"),
+    # DFC — Imobilizado bruto (sem depreciação acumulada — vai à parte)
+    "imobilizado_bruto": ("imobilizado",),
+}
+
+
+def codigos_do_grupo(grupo: str) -> tuple[str, ...]:
+    """Retorna a tupla de códigos contábeis de um grupo simbólico."""
+    return tuple(codigo(k) for k in GRUPOS_CONTABEIS[grupo])

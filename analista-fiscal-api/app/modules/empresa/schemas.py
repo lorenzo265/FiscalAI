@@ -52,6 +52,11 @@ class EmpresaIn(BaseModel):
     anexo_simples: AnexoSimples | None = None
     cnae_principal: str | None = Field(default=None, max_length=10)
     municipio: str | None = Field(default=None, max_length=100)
+    codigo_municipio_ibge: str | None = Field(
+        default=None,
+        pattern=r"^\d{7}$",
+        description="Código IBGE 7-dígitos do município (exigido por Focus NFe e SERPRO PGDAS-D).",
+    )
     uf: str | None = Field(default=None, min_length=2, max_length=2)
     ie: str | None = Field(default=None, max_length=20)
     im: str | None = Field(default=None, max_length=20)
@@ -83,9 +88,11 @@ class EmpresaOut(BaseModel):
     anexo_simples: str | None
     cnae_principal: str | None
     municipio: str | None
+    codigo_municipio_ibge: str | None
     uf: str | None
     faturamento_12m: Decimal | None
     ativa: bool
+    aliquota_iss_validada: bool = False
 
 
 class OnboardingCnpjIn(BaseModel):
@@ -108,6 +115,17 @@ class OnboardingCnpjIn(BaseModel):
         return v
 
 
+class MunicipioIbgeIn(BaseModel):
+    """Payload do PATCH manual de código IBGE — usado quando resolver automático falha."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    codigo_municipio_ibge: str = Field(
+        pattern=r"^\d{7}$",
+        description="Código IBGE 7-dígitos do município (ex.: '3550308' para São Paulo).",
+    )
+
+
 class OnboardingResultadoOut(BaseModel):
     """Resultado do onboarding: dados da Receita Federal + regime sugerido."""
 
@@ -119,8 +137,64 @@ class OnboardingResultadoOut(BaseModel):
     cnae_principal: str | None
     cnae_descricao: str | None
     municipio: str | None
+    codigo_municipio_ibge: str | None
     uf: str | None
     regime_sugerido: RegimeTributario
     anexo_sugerido: AnexoSimples | None
     empresa_criada: EmpresaOut | None = None
     aviso: str | None = None
+
+
+# ── Sprint 19 PR4: Onboarding bundle ────────────────────────────────────────
+
+
+class OnboardingBundleIn(BaseModel):
+    """Payload do bootstrap de onboarding self-service.
+
+    Mantido pequeno: o cliente normalmente chama imediatamente após criar a
+    empresa, e tudo que precisa derivar (perfil, regime) já está em
+    ``Empresa``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Data de início de vigência do plano referencial. Default é hoje no
+    # service — schema deixa override opcional para onboarding retroativo.
+    valid_from: str | None = Field(
+        default=None,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$",
+        description="Data ISO (YYYY-MM-DD) de início de vigência. Default: hoje.",
+    )
+    welcome_digest_optin: bool = Field(
+        default=False,
+        description="Marca empresa para receber digest WhatsApp na próxima 2ª-feira.",
+    )
+
+
+class OnboardingPassoOut(BaseModel):
+    """Item da checklist de próximos passos retornada pelo bundle.
+
+    O frontend usa ``chave`` para pintar ícone, ``titulo``/``descricao`` para
+    texto, e ``endpoint`` como hint do call-to-action.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    chave: str
+    titulo: str
+    descricao: str
+    endpoint: str | None
+    concluido: bool
+
+
+class OnboardingBundleOut(BaseModel):
+    """Resultado do bootstrap: o que foi feito + checklist do que falta."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    empresa_id: UUID
+    perfil_ui: PerfilUI
+    plano_contas_criadas: int
+    plano_contas_existentes: int
+    welcome_digest_optin: bool
+    proximos_passos: list[OnboardingPassoOut]

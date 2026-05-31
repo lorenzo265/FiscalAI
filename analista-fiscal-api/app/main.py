@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from app.config import Settings, get_settings
+from app.modules.advisor.router import router as advisor_router
 from app.modules.agenda.router import router as agenda_router
 from app.modules.assistente.router import router as assistente_router
 from app.modules.auth.router import router as auth_router
@@ -32,11 +32,27 @@ from app.modules.imobilizado.router import router as imobilizado_router
 from app.modules.icms.router import router as icms_router
 from app.modules.ingestao.router import router as ingestao_router
 from app.modules.lucro_presumido.router import router as lucro_presumido_router
+from app.modules.marketplace.parceiros_router import router as marketplace_parceiros_router
+from app.modules.marketplace.router import (
+    router as marketplace_router,
+    webhook_router as marketplace_webhook_router,
+)
 from app.modules.monitor_cadastral.router import router as monitor_cadastral_router
 from app.modules.multa_juros.router import router as multa_juros_router
 from app.modules.parcelamentos.router import router as parcelamentos_router
 from app.modules.reinf.router import router as reinf_router
+from app.modules.migracao.router import router as migracao_router
 from app.modules.relatorios.router import router as relatorios_router
+from app.modules.sped.ecd.router import router as sped_ecd_router
+from app.modules.sped.ecf.router import router as sped_ecf_router
+from app.modules.sped.efd.router import router as sped_efd_router
+from app.modules.sped.router import router as sped_router
+from app.modules.tabelas_admin.router import (
+    alertas_router as tabelas_admin_alertas_router,
+    router as tabelas_admin_router,
+    stats_router as tabelas_admin_stats_router,
+    sugestoes_router as tabelas_admin_sugestoes_router,
+)
 from app.modules.notas.router import router as notas_router
 from app.modules.open_finance.router import (
     router as open_finance_router,
@@ -45,7 +61,12 @@ from app.modules.open_finance.router import (
 from app.modules.pessoal.router import router as pessoal_router
 from app.modules.pgdas.router import router as pgdas_router
 from app.modules.provisoes.router import router as provisoes_router
+from app.modules.reforma.router import router as reforma_router
 from app.modules.whatsapp.router import router as whatsapp_router
+from app.shared.cache import Cache
+from app.shared.middleware.rate_limit import RateLimitMiddleware
+from app.shared.storage import build_storage
+from app.shared.db.perf import build_async_engine, install_slow_query_listener
 from app.shared.exceptions import DomainError
 from app.shared.integrations.brasil_api.client import BrasilApiClient
 from app.shared.integrations.focus_nfe.client import FocusNfeClient
@@ -63,11 +84,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configurar_logging(settings)
 
-    engine: AsyncEngine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+    # Sprint 19 PR1 — pool config + slow query listener centralizados em
+    # ``app/shared/db/perf.py``. Workers Celery passam pelo mesmo builder.
+    engine: AsyncEngine = build_async_engine(settings)
+    install_slow_query_listener(engine, settings.SLOW_QUERY_THRESHOLD_MS)
     session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
         engine, expire_on_commit=False
     )
     redis_client = redis_async.from_url(settings.REDIS_URL, decode_responses=True)
+
+    # Sprint 19 PR2 — cache wrapper compartilhado para SCD lookups + outros
+    # read-mostly. Repos aceitam ``Cache | None`` via DI; quando ausente,
+    # fallback transparente ao DB (testes unitários, ambientes sem Redis).
+    cache = Cache(redis_client)
+
+    # Sprint 19.6 PR3 (#2) — storage de blobs. Default 'local' grava em
+    # `.storage/`. Em prod usar 's3' + STORAGE_BUCKET via settings.
+    storage = build_storage(
+        backend=settings.STORAGE_BACKEND,
+        base_path=settings.STORAGE_BASE_PATH,
+        bucket=settings.STORAGE_BUCKET or None,
+        endpoint_url=settings.STORAGE_S3_ENDPOINT_URL or None,
+        region=settings.STORAGE_S3_REGION,
+    )
 
     llm_client = LLMClient(settings=settings, redis=redis_client)
     focus_client = FocusNfeClient(settings=settings)
@@ -80,6 +119,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.redis = redis_client
+    app.state.cache = cache
+    app.state.storage = storage
     app.state.llm_client = llm_client
     app.state.focus_client = focus_client
     app.state.brasil_api_client = brasil_api_client
@@ -120,10 +161,52 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Analista Fiscal API",
-    description="Backend do Analista Fiscal — sistema fiscal-contábil multi-tenant para PMEs.",
-    version="0.1.0",
+    description=(
+        "Backend do **Analista Fiscal (FiscalAI)** — sistema fiscal-contábil multi-tenant "
+        "para PMEs brasileiras (Simples Nacional + Lucro Presumido).\n\n"
+        "## Autenticação\n\n"
+        "Todos os endpoints (exceto `/v1/auth/login` e `/v1/auth/register`) exigem "
+        "`Authorization: Bearer <token>` com JWT gerado em `/v1/auth/login`.\n\n"
+        "## Rate Limiting\n\n"
+        "Limites por tenant: **1000 req/hora** (endpoints comuns) e **100 req/hora** "
+        "(endpoints sensíveis: auth, PGDAS, SPED, notas, certidões). "
+        "Headers `X-RateLimit-Limit/Remaining/Reset` em todas as respostas.\n\n"
+        "## Princípios\n\n"
+        "- Multi-tenant via PostgreSQL RLS — isolamento total entre empresas.\n"
+        "- Fatos fiscais imutáveis — cancelamento gera nova linha.\n"
+        "- LLM nunca grava fatos — pipeline determinístico calcula/persiste.\n"
+        "- Toda alíquota é SCD Type 2 (valid_from/valid_to)."
+    ),
+    version="1.0.0",
+    contact={
+        "name": "FiscalAI — Suporte Técnico",
+        "email": "dev@fiscalai.com.br",
+    },
+    license_info={
+        "name": "Proprietário — uso restrito",
+    },
+    openapi_tags=[
+        {"name": "auth", "description": "Autenticação e registro de empresas."},
+        {"name": "empresa", "description": "Perfil e configuração da empresa."},
+        {"name": "fiscal", "description": "Apuração DAS — Simples Nacional."},
+        {"name": "lucro_presumido", "description": "IRPJ/CSLL/PIS/Cofins LP, DARF, checklist trimestral."},
+        {"name": "contabil", "description": "Plano de contas, lançamentos, balancetes, encerramento."},
+        {"name": "pessoal", "description": "Folha CLT, eSocial, pró-labore."},
+        {"name": "relatorios", "description": "DRE, Balanço Patrimonial, DFC, indicadores."},
+        {"name": "sped", "description": "ECD, ECF, EFD-Contribuições, EFD ICMS-IPI."},
+        {"name": "advisor", "description": "Sugestões determinísticas SN e LP (Camada 1)."},
+        {"name": "ingestao", "description": "Upload de XML NF-e e PDFs."},
+        {"name": "notas", "description": "Emissão NF-e e NFS-e via Focus NFe."},
+        {"name": "certidoes", "description": "Certidões CND/CRF/CNDT via SERPRO."},
+        {"name": "open_finance", "description": "Sincronização bancária via Pluggy."},
+        {"name": "agenda", "description": "Calendário fiscal personalizado."},
+        {"name": "marketplace", "description": "Marketplace de contadores parceiros."},
+        {"name": "tabelas_admin", "description": "Administração de tabelas tributárias SCD (admin)."},
+        {"name": "health", "description": "Probes de saúde (liveness/readiness)."},
+    ],
     lifespan=lifespan,
 )
+app.add_middleware(RateLimitMiddleware)
 
 app.include_router(auth_router)
 app.include_router(empresa_router)
@@ -152,6 +235,20 @@ app.include_router(det_router)
 app.include_router(monitor_cadastral_router)
 app.include_router(parcelamentos_router)
 app.include_router(relatorios_router)
+app.include_router(marketplace_router)
+app.include_router(marketplace_parceiros_router)
+app.include_router(marketplace_webhook_router)
+app.include_router(reforma_router)
+app.include_router(advisor_router)
+app.include_router(sped_ecd_router)
+app.include_router(sped_ecf_router)
+app.include_router(sped_efd_router)
+app.include_router(sped_router)
+app.include_router(migracao_router)
+app.include_router(tabelas_admin_router)
+app.include_router(tabelas_admin_alertas_router)
+app.include_router(tabelas_admin_sugestoes_router)
+app.include_router(tabelas_admin_stats_router)
 
 
 @app.exception_handler(DomainError)

@@ -20,9 +20,10 @@ import structlog
 
 from app.shared.types import JsonObject
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.config import get_settings
+from app.shared.db.perf import build_async_engine
 from app.workers.celery_app import celery_app
 
 log = structlog.get_logger(__name__)
@@ -40,7 +41,7 @@ def refresh_rbt12_mensal() -> JsonObject:
 
     async def _run() -> None:
         settings = get_settings()
-        engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+        engine = build_async_engine(settings)
         try:
             sess_factory = async_sessionmaker(engine, expire_on_commit=False)
             async with sess_factory() as session:

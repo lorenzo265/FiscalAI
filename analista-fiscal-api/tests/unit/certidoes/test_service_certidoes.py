@@ -197,3 +197,146 @@ async def test_emitir_empresa_inexistente_levanta() -> None:
             await CertidoesService().emitir(
                 session, uuid.uuid4(), uuid.uuid4(), CertidaoTipo.CND, serpro_client=AsyncMock()
             )
+
+
+# ── Sprint 19.6 PR1 (#3) — refactor CRF/CNDT scrapers ──────────────────────
+
+
+from datetime import date  # noqa: E402
+
+from app.modules.certidoes.scrapers import (  # noqa: E402
+    CertidaoExtraida,
+    NotImplementedScraper,
+)
+from app.shared.exceptions import CertidaoEmissaoFalhou  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_crf_sem_scraper_configurado_cai_em_processando() -> None:
+    """Service sem scraper injetado mantém comportamento legado."""
+    empresa = _empresa()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+
+    empresa_repo = AsyncMock()
+    empresa_repo.por_id = AsyncMock(return_value=empresa)
+
+    repo_mock = AsyncMock()
+    repo_mock.criar = AsyncMock(
+        return_value=SimpleNamespace(
+            id=uuid.uuid4(),
+            numero=None,
+            status=CertidaoStatus.PROCESSANDO.value,
+            valid_until=None,
+        )
+    )
+
+    with (
+        patch("app.modules.certidoes.service.EmpresaRepo", return_value=empresa_repo),
+        patch("app.modules.certidoes.service.CertidoesRepo", return_value=repo_mock),
+    ):
+        out = await CertidoesService().emitir(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CertidaoTipo.CRF,
+            serpro_client=None,
+            crf_scraper=None,
+        )
+    assert out.status == CertidaoStatus.PROCESSANDO
+    assert "manualmente" in out.mensagem.lower()
+
+
+@pytest.mark.asyncio
+async def test_crf_com_not_implemented_scraper_persiste_erro() -> None:
+    """``NotImplementedScraper`` levanta ``CertidaoEmissaoFalhou`` → status='erro'."""
+    empresa = _empresa()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+
+    empresa_repo = AsyncMock()
+    empresa_repo.por_id = AsyncMock(return_value=empresa)
+
+    repo_mock = AsyncMock()
+    repo_mock.criar = AsyncMock(
+        return_value=SimpleNamespace(
+            id=uuid.uuid4(),
+            numero=None,
+            status=CertidaoStatus.ERRO.value,
+            valid_until=None,
+        )
+    )
+
+    with (
+        patch("app.modules.certidoes.service.EmpresaRepo", return_value=empresa_repo),
+        patch("app.modules.certidoes.service.CertidoesRepo", return_value=repo_mock),
+    ):
+        out = await CertidoesService().emitir(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CertidaoTipo.CRF,
+            serpro_client=None,
+            crf_scraper=NotImplementedScraper(tipo="CRF"),
+        )
+    assert out.status == CertidaoStatus.ERRO
+    chamada = repo_mock.criar.await_args
+    assert chamada.kwargs["status"] == CertidaoStatus.ERRO.value
+
+
+@pytest.mark.asyncio
+async def test_crf_com_scraper_real_sucesso_persiste_negativa() -> None:
+    """Scraper que devolve ``CertidaoExtraida`` válida → status='negativa'."""
+    empresa = _empresa()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+
+    empresa_repo = AsyncMock()
+    empresa_repo.por_id = AsyncMock(return_value=empresa)
+
+    repo_mock = AsyncMock()
+    repo_mock.criar = AsyncMock(
+        return_value=SimpleNamespace(
+            id=uuid.uuid4(),
+            numero="CRF-2026-001",
+            status=CertidaoStatus.NEGATIVA.value,
+            valid_until=date(2026, 7, 27),
+        )
+    )
+
+    class _FakeCrfScraper:
+        async def emitir(
+            self, cnpj: str, *, idempotency_key: str
+        ) -> CertidaoExtraida:
+            return CertidaoExtraida(
+                numero="CRF-2026-001",
+                valid_until=date(2026, 7, 27),
+                status_normalizado=CertidaoStatus.NEGATIVA.value,
+                pdf_base64=None,
+            )
+
+    with (
+        patch("app.modules.certidoes.service.EmpresaRepo", return_value=empresa_repo),
+        patch("app.modules.certidoes.service.CertidoesRepo", return_value=repo_mock),
+    ):
+        out = await CertidoesService().emitir(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CertidaoTipo.CRF,
+            serpro_client=None,
+            crf_scraper=_FakeCrfScraper(),
+        )
+    assert out.status == CertidaoStatus.NEGATIVA
+    assert out.numero == "CRF-2026-001"
+    chamada = repo_mock.criar.await_args
+    assert chamada.kwargs["status"] == CertidaoStatus.NEGATIVA.value
+    assert chamada.kwargs["valid_until"] == date(2026, 7, 27)
+
+
+@pytest.mark.asyncio
+async def test_not_implemented_scraper_levanta_certidao_emissao_falhou() -> None:
+    """Smoke test do adapter padrão — direto, sem service."""
+    scraper = NotImplementedScraper(tipo="CRF")
+    with pytest.raises(CertidaoEmissaoFalhou, match="não configurado"):
+        await scraper.emitir("12345678000195", idempotency_key="x")

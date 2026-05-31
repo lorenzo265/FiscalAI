@@ -1,9 +1,11 @@
 ---
-tags: [sprint, marketplace, fase-2, proxima]
+tags: [sprint, marketplace, fase-2, concluida]
 fonte: "[[PlanoBackend]] §10, §5.8, §11"
-status: proxima
+status: concluida
 fase: 2
 marco: "50 pagantes + MRR R$10k+"
+testes_final: 1199
+concluida_em: 2026-05-21
 ---
 
 # Sprint 13 — Marketplace de contadores + primeiros pagantes

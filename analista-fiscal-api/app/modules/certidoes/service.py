@@ -31,6 +31,11 @@ from app.modules.certidoes.schemas import (
     CertidaoTipo,
     EmitirCertidaoOut,
 )
+from app.modules.certidoes.scrapers import (
+    CertidaoExtraida,
+    CndtScraper,
+    CrfScraper,
+)
 from app.modules.empresa.repo import EmpresaRepo
 from app.shared.exceptions import (
     CertidaoEmissaoFalhou,
@@ -68,7 +73,14 @@ class CertidoesService:
         tipo: CertidaoTipo,
         *,
         serpro_client: _ClienteCnd | None,
+        crf_scraper: CrfScraper | None = None,
+        cndt_scraper: CndtScraper | None = None,
     ) -> EmitirCertidaoOut:
+        """Sprint 19.6 PR1 (#3): aceita ``crf_scraper`` e ``cndt_scraper``
+        opcionais por DI. Quando passados, tenta scrape real; quando
+        levanta ``CertidaoEmissaoFalhou``, fallback no comportamento
+        legado (status=processando + mensagem manual).
+        """
         empresa = await EmpresaRepo(session).por_id(empresa_id)
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
@@ -84,8 +96,26 @@ class CertidoesService:
                 cnpj=empresa.cnpj,
                 serpro_client=serpro_client,
             )
+        elif tipo is CertidaoTipo.CRF and crf_scraper is not None:
+            certidao = await self._emitir_via_scraper(
+                repo=repo,
+                tenant_id=tenant_id,
+                empresa_id=empresa_id,
+                tipo=tipo,
+                cnpj=empresa.cnpj,
+                scraper=crf_scraper,
+            )
+        elif tipo is CertidaoTipo.CNDT and cndt_scraper is not None:
+            certidao = await self._emitir_via_scraper(
+                repo=repo,
+                tenant_id=tenant_id,
+                empresa_id=empresa_id,
+                tipo=tipo,
+                cnpj=empresa.cnpj,
+                scraper=cndt_scraper,
+            )
         else:
-            # CRF e CNDT: skeleton no PR1 — fallback manual.
+            # Sem scraper configurado — comportamento legado: status='processando'.
             certidao = await self._emitir_skeleton(
                 repo=repo,
                 tenant_id=tenant_id,
@@ -97,9 +127,16 @@ class CertidoesService:
 
         if certidao.status == CertidaoStatus.PROCESSANDO.value:
             mensagem = (
-                "Emissão registrada. Para CRF/CNDT, o módulo automático será "
-                "ativado no PR3 da Sprint 6 — por ora baixe manualmente em "
-                "consulta-crf.caixa.gov.br ou cndt-certidao.tst.jus.br."
+                "Emissão registrada. Scraper CRF/CNDT ainda não configurado em "
+                "produção — por ora baixe manualmente em "
+                "consulta-crf.caixa.gov.br ou cndt-certidao.tst.jus.br. "
+                "Ativação automática depende de provider de captcha (pendência "
+                "operacional rastreada no log_agente.md #3)."
+            )
+        elif certidao.status == CertidaoStatus.ERRO.value:
+            mensagem = (
+                f"Falha ao consultar {tipo.value}. Detalhes registrados; "
+                f"tente novamente em alguns minutos ou consulte o portal oficial."
             )
         else:
             mensagem = f"Certidão {tipo.value} emitida com sucesso."
@@ -111,6 +148,64 @@ class CertidoesService:
             numero=certidao.numero,
             valid_until=certidao.valid_until,
             mensagem=mensagem,
+        )
+
+    async def _emitir_via_scraper(
+        self,
+        *,
+        repo: CertidoesRepo,
+        tenant_id: uuid.UUID,
+        empresa_id: uuid.UUID,
+        tipo: CertidaoTipo,
+        cnpj: str,
+        scraper: CrfScraper | CndtScraper,
+    ) -> Certidao:
+        """Sprint 19.6 PR1 (#3): caminho do scraper real.
+
+        Se ``scraper.emitir`` levanta ``CertidaoEmissaoFalhou`` ou
+        qualquer exceção, persiste como ``erro`` com payload de
+        diagnóstico — não propaga. UI/admin retenta depois.
+        """
+        idempotency_key = _gerar_idempotency_key(empresa_id, tipo.value.lower())
+        agora = datetime.now(_TZ_BR)
+        try:
+            extracao: CertidaoExtraida = await scraper.emitir(
+                cnpj, idempotency_key=idempotency_key
+            )
+        except CertidaoEmissaoFalhou as exc:
+            log.warning(
+                "certidoes.scraper_falhou",
+                empresa_id=str(empresa_id),
+                tipo=tipo.value,
+                mensagem=exc.mensagem,
+            )
+            return await repo.criar(
+                tenant_id=tenant_id,
+                empresa_id=empresa_id,
+                tipo=tipo.value,
+                status=CertidaoStatus.ERRO.value,
+                emitida_em=agora,
+                payload_json={"mensagem": exc.mensagem},
+            )
+
+        pdf_storage_key = (
+            _persistir_pdf(empresa_id, tipo, extracao.pdf_base64)
+            if extracao.pdf_base64
+            else None
+        )
+        valid_until = extracao.valid_until or (
+            agora + timedelta(days=_VALIDADE_DIAS[tipo])
+        ).date()
+        return await repo.criar(
+            tenant_id=tenant_id,
+            empresa_id=empresa_id,
+            tipo=tipo.value,
+            status=extracao.status_normalizado,
+            emitida_em=agora,
+            numero=extracao.numero,
+            valid_until=valid_until,
+            pdf_storage_key=pdf_storage_key,
+            payload_json=extracao.payload_bruto or {},
         )
 
     async def _emitir_cnd(

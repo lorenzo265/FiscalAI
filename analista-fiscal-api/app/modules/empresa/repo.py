@@ -94,6 +94,7 @@ class EmpresaRepo:
         anexo_simples: str | None = None,
         cnae_principal: str | None = None,
         municipio: str | None = None,
+        codigo_municipio_ibge: str | None = None,
         uf: str | None = None,
         ie: str | None = None,
         im: str | None = None,
@@ -109,11 +110,41 @@ class EmpresaRepo:
             anexo_simples=anexo_simples,
             cnae_principal=cnae_principal,
             municipio=municipio,
+            codigo_municipio_ibge=codigo_municipio_ibge,
             uf=uf,
             ie=ie,
             im=im,
             faturamento_12m=faturamento_12m,
         )
         self._s.add(empresa)
+        await self._s.flush()
+        return empresa
+
+    async def atualizar_municipio_ibge(
+        self, empresa_id: UUID, codigo_municipio_ibge: str
+    ) -> Empresa | None:
+        """Atualiza apenas ``codigo_municipio_ibge`` da empresa.
+
+        Usado no PATCH manual quando o resolver automático falhou (homônimo,
+        nome divergente entre BrasilAPI e IBGE, empresa cadastrada antes da
+        Fase 2 PR6).
+        """
+        empresa = await self.por_id(empresa_id)
+        if empresa is None:
+            return None
+        empresa.codigo_municipio_ibge = codigo_municipio_ibge
+        await self._s.flush()
+        return empresa
+
+    async def marcar_iss_validada(self, empresa_id: UUID) -> Empresa | None:
+        """Marca ``aliquota_iss_validada=True`` (m5 da auditoria Sprints 4-6).
+
+        Após confirmação manual do contador, o aviso ISS deixa de aparecer em
+        emissões de NFS-e subsequentes.
+        """
+        empresa = await self.por_id(empresa_id)
+        if empresa is None:
+            return None
+        empresa.aliquota_iss_validada = True
         await self._s.flush()
         return empresa

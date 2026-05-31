@@ -1,10 +1,11 @@
 ---
 tags: [roadmap, evolucao, sprints]
-fonte: "[[PlanoBackend]] §11 + log_agente.md"
-atualizado: 2026-05-20
-testes_atuais: 992
-sprints_concluidas: 13
-sprints_total: 23
+fonte: "[[PlanoBackend]] §11 + log_agente.md + trilha 100% (2026-05-27)"
+atualizado: 2026-05-31
+testes_atuais: 2200
+sprints_concluidas: 27
+sprints_extras: 7
+sprints_total: 28
 ---
 
 # 🗺️ Roadmap — evolução do projeto
@@ -13,10 +14,12 @@ sprints_total: 23
 
 ## 📈 Onde estamos
 
-- **Sprints concluídas:** 0–12 (13 de 23) ✅
-- **Próxima:** [[sprints/sprint-13-marketplace|Sprint 13 — Marketplace]] (estava pausada até o hardening da Fase 2; PRs 1–4 da Fase 2 já fechados)
-- **Suite atual:** **992 testes** passando, 2 skipped · mypy strict 0 erros
-- **Fase 1 (MVP, S0–6):** ✅ fechada · **Fase 2 (S7–13):** 7–12 ✅, 13 próxima · **Fase 3 (S14–20):** pendente · **Fase 4 (S21–22):** pendente
+- **Sprints concluídas:** 0–19 + 19.5 + 19.6 + 19.7 + 19.8 (24 de 28) ✅ + 4 sprints extras (15.5 + 19.5 + 19.6 + 19.7 + 19.8) ✅
+- **Trilha 100% FECHADA** (pós-19.5, pré-piloto pago): **19.6 ✅ → 19.7 ✅ → 19.8 ✅** — 3 de 3 sprints extras concluídas. **100% das pendências conscientes** resolvidas ou documentadas como `[externo-runbook]` em `docs/pendencias/runbook-ativacao-externos.md`.
+- **🎉 ROADMAP COMPLETO — Sprints 0–22 concluídas.** Produto completo PME-alvo pronto para 1.000+ pagantes.
+- **Suite atual:** **2200 testes** passando, 2 skipped · mypy strict 0 erros · 22 sprints entregues em 4 fases.
+- **Fase 3 — Sprint 19.5 entregou:** PR1 painel admin (`/v1/admin/tabelas/<tipo>/vigencia` substitui migration por POST estruturado + audit log + idempotência UUID5) → PR2 worker Celery `tabelas.verificar_vigencias` (diário 06:15 com 7 avaliadores + auto-resolução ao postar nova vigência + hook digest admin) → PR3 worker `tabelas.varrer_dou_mensal` (mensal dia 5: scraper DOU + LLM extrai → sugestão pendente com re-check §8.6 + admin aprova com 1 clique). Pendências **#9** + **#37** estruturalmente resolvidas.
+- **Fase 1 (MVP, S0–6):** ✅ fechada · **Fase 2 (S7–13):** ✅ fechada · **Fase 3 (S14–20):** 🚧 14 ✅ · 15 ✅ · 15.5 ✅ · 16 ✅ · 17 ✅ · 18 ✅ · 19 ✅ · 19.5 ✅ · 19.6 ✅ · 19.7 ✅ · 19.8 ✅ · 20 🔜 · **Fase 4 (S21–22):** pendente
 
 Legenda de status: ✅ concluída · 🔜 próxima · ⏳ pendente · ⏸️ pausada · 🚧 em andamento
 
@@ -44,21 +47,26 @@ Legenda de status: ✅ concluída · 🔜 próxima · ⏳ pendente · ⏸️ pau
 | 10 | Pessoal completo → [[modulos/pessoal]] | ✅ | 860 |
 | 11 | Lucro Presumido + ICMS + compliance v2 → [[modulos/lucro-presumido]] | ✅ | 931 |
 | 12 | Relatórios → [[modulos/relatorios]] | ✅ | 980 |
-| 13 | Marketplace de contadores → [[sprints/sprint-13-marketplace]] | 🔜 | — |
+| 13 | Marketplace de contadores → [[sprints/sprint-13-marketplace]] | ✅ | 1199 |
 
-> Hardening pós-S12 (Review + Fase 1.x + Fase 2 PR1–4): suite chegou a **992** e cravou §8.2/§8.3/§8.9 no DB. Marco Fase 2: **50 pagantes + MRR R$10k+**.
+> Hardening pós-S12 (Review + Fase 1.x + Fase 2 PR1–4): suite chegou a **992** e cravou §8.2/§8.3/§8.9 no DB. Sprint 13 (3 PRs) fecha o marketplace + auth parceiro + pagamento stub (ADR 0015) + Celery + LGPD revoke. Marco Fase 2: **50 pagantes + MRR R$10k+** — agora dependente de aquisição + ativação do provider real (pendência rastreada).
 
 ## Fase 3 — SPED + Reforma + escala (S14–20)
 
 | Sprint | Tema | Status | Testes |
 |---|---|---|---|
-| 14 | Reforma Tributária (CBS/IBS informacional) | ⏳ | — |
-| 15 | AI Advisor proativo | ⏳ | — |
-| 16 | SPED ECD + ECF | ⏳ | — |
-| 17 | EFD-Contribuições + EFD ICMS-IPI | ⏳ | — |
-| 18 | Migração de escritório antigo | ⏳ | — |
-| 19 | Polish + escala (load test 1k empresas) | ⏳ | — |
-| 20 | Lucro Presumido pronto pra venda | ⏳ | — |
+| 14 | Reforma Tributária (CBS/IBS informacional) → [[sprints/sprint-14-reforma]] | ✅ | 1288 |
+| 15 | AI Advisor proativo → [[sprints/sprint-15-advisor]] | ✅ | 1386 |
+| 15.5 | Envio real digest WhatsApp (extra) → [[sprints/sprint-15-advisor]] | ✅ | 1417 |
+| 16 | SPED ECD + ECF | ✅ | 1556 |
+| 17 | EFD-Contribuições + EFD ICMS-IPI | ✅ | 1604 |
+| 18 | Migração de escritório antigo → [[sprints/sprint-18-migracao]] | ✅ | 1671 |
+| 19 | Polish + escala (perf DB + k6 harness + cache Redis + onboarding bundle) → [[sprints/sprint-19-performance]] | ✅ | 1716 |
+| 19.5 | Painel admin de tabelas tributárias (3 camadas: API admin + Celery alerta + DOU+LLM) → [[sprints/sprint-19-5-tabelas-tributarias]] | ✅ | 1821 |
+| 19.6 | Housekeeping pré-piloto — 16 de 17 [risco-*] resolvidos → [[sprints/sprint-19-6-housekeeping-pre-piloto]] | ✅ | 1885 |
+| 19.7 | Backlog técnico — 10 scope-cuts prioritários (eSocial transmissão real é o maior) → [[sprints/sprint-19-7-backlog-tecnico]] | ✅ | 1993 |
+| 19.8 | Cleanup + runbook externos — fecha 100% das pendências ativas → [[sprints/sprint-19-8-cleanup-externos]] | ✅ | 2012 |
+| 20 | Lucro Presumido pronto pra venda → [[sprints/sprint-20-lp-piloto]] | ✅ | 2121 |
 
 > Marco Fase 3: **200 pagantes + MRR R$40k+**.
 
@@ -66,8 +74,8 @@ Legenda de status: ✅ concluída · 🔜 próxima · ⏳ pendente · ⏸️ pau
 
 | Sprint | Tema | Status | Testes |
 |---|---|---|---|
-| 21 | Hardening + segurança (pen test) | ⏳ | — |
-| 22 | Documentação + handover | ⏳ | — |
+| 21 | Hardening + segurança → [[sprints/sprint-21-hardening]] | ✅ | 2187 |
+| 22 | Documentação + handover → [[sprints/sprint-22-documentacao]] | ✅ | 2200 |
 
 ---
 
