@@ -84,7 +84,7 @@ export function CommandPalette() {
           <CommandGroup key={group} heading={group}>
             {items.map((a) => (
               <CommandItem key={a.href} value={`${a.label} ${a.href}`} onSelect={() => go(a.href)}>
-                <a.icon className="size-4 text-[var(--color-txt-3)]" />
+                <a.icon className="size-4 text-[var(--color-ink-3)]" />
                 <span>{a.label}</span>
                 {a.shortcut ? <CommandShortcut>{a.shortcut}</CommandShortcut> : null}
               </CommandItem>
