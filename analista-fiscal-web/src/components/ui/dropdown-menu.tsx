@@ -21,8 +21,8 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 min-w-[10rem] overflow-hidden rounded-md border p-1 shadow-xl",
-        "bg-[var(--color-card)] border-[var(--color-line-2)] text-[var(--color-txt)]",
+        "z-50 min-w-[10rem] overflow-hidden rounded-[var(--radius-md)] border p-1",
+        "bg-[var(--color-card)] border-[var(--color-ink)] text-[var(--color-ink)] shadow-[0_16px_40px_-24px_rgba(27,26,21,0.4)]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
@@ -41,8 +41,8 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
-      "text-[var(--color-txt)] focus:bg-[var(--color-card-2)] focus:text-[var(--color-txt)]",
+      "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-sm outline-none transition-colors",
+      "text-[var(--color-ink)] focus:bg-[var(--color-paper-2)] focus:text-[var(--color-ink)]",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       inset && "pl-8",
       className
@@ -61,7 +61,7 @@ const DropdownMenuLabel = React.forwardRef<
   <DropdownMenuPrimitive.Label
     ref={ref}
     className={cn(
-      "px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)]",
+      "mono px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)]",
       inset && "pl-8",
       className
     )}
@@ -76,7 +76,7 @@ const DropdownMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-[var(--color-line-2)]", className)}
+    className={cn("-mx-1 my-1 h-px bg-[var(--color-rule)]", className)}
     {...props}
   />
 ));
@@ -89,7 +89,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-[var(--color-card-2)]",
+      "relative flex cursor-pointer select-none items-center rounded-[var(--radius-sm)] py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-[var(--color-paper-2)]",
       className
     )}
     checked={checked}
@@ -97,7 +97,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   >
     <span className="absolute left-2 flex size-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check className="size-3 text-[var(--color-lime)]" />
+        <Check className="size-3 text-[var(--color-green)]" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -111,7 +111,7 @@ const DropdownMenuShortcut = ({
 }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span
     className={cn(
-      "ml-auto text-[10px] tracking-[0.1em] text-[var(--color-txt-3)] mono",
+      "ml-auto text-[10px] tracking-[0.1em] text-[var(--color-ink-3)] mono",
       className
     )}
     {...props}
@@ -128,7 +128,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-[var(--color-card-2)] data-[state=open]:bg-[var(--color-card-2)]",
+      "flex cursor-pointer select-none items-center rounded-[var(--radius-sm)] px-2 py-1.5 text-sm outline-none focus:bg-[var(--color-paper-2)] data-[state=open]:bg-[var(--color-paper-2)]",
       inset && "pl-8",
       className
     )}
@@ -147,8 +147,8 @@ const DropdownMenuSubContent = React.forwardRef<
   <DropdownMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      "z-50 min-w-[8rem] overflow-hidden rounded-md border p-1 shadow-xl",
-      "bg-[var(--color-card)] border-[var(--color-line-2)] text-[var(--color-txt)]",
+      "z-50 min-w-[8rem] overflow-hidden rounded-[var(--radius-md)] border p-1",
+      "bg-[var(--color-card)] border-[var(--color-ink)] text-[var(--color-ink)] shadow-[0_16px_40px_-24px_rgba(27,26,21,0.4)]",
       className
     )}
     {...props}

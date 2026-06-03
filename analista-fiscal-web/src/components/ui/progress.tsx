@@ -12,10 +12,10 @@ interface ProgressProps
 }
 
 const tonsMap: Record<ProgressTom, string> = {
-  lime: "bg-[var(--color-lime)]",
-  amber: "bg-[var(--color-amber)]",
-  red: "bg-[var(--color-red)]",
-  blue: "bg-[var(--color-blue)]",
+  lime: "bg-[var(--color-green)]",
+  amber: "bg-[var(--color-ochre)]",
+  red: "bg-[var(--color-danger)]",
+  blue: "bg-[var(--color-ink-2)]",
 };
 
 const Progress = React.forwardRef<
@@ -25,7 +25,7 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      "relative h-2 w-full overflow-hidden rounded-full bg-[var(--color-card-3)]",
+      "relative h-1.5 w-full overflow-hidden rounded-[var(--radius-sm)] bg-[var(--color-rule)]",
       className
     )}
     {...props}

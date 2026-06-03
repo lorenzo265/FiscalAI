@@ -10,10 +10,10 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        "rounded-[10px] border bg-[var(--color-card)] border-[var(--color-line)] text-[var(--color-txt)]",
-        "transition-[transform,border-color,box-shadow] duration-200 ease-out will-change-transform",
+        "rounded-[var(--radius-md)] border bg-[var(--color-card)] border-[var(--color-rule)] text-[var(--color-ink)]",
+        "transition-[transform,border-color] duration-200 ease-[var(--ease-settle)]",
         interactive &&
-          "hover:-translate-y-0.5 hover:border-[var(--color-line-2)] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]",
+          "cursor-pointer hover:-translate-y-px hover:border-[var(--color-ink)]",
         className
       )}
       {...props}
@@ -38,7 +38,7 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
     <div
       ref={ref}
       className={cn(
-        "text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)]",
+        "mono text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-ink-3)]",
         className
       )}
       {...props}
@@ -53,7 +53,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-[var(--color-txt-2)]", className)}
+    className={cn("text-sm text-[var(--color-ink-2)]", className)}
     {...props}
   />
 ));

@@ -7,17 +7,17 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 export function Toaster(props: ToasterProps) {
   return (
     <Sonner
-      theme="dark"
+      theme="light"
       richColors={false}
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-[var(--color-card)] group-[.toaster]:text-[var(--color-txt)] group-[.toaster]:border-[var(--color-line-2)] group-[.toaster]:shadow-lg group-[.toaster]:rounded-md",
-          description: "group-[.toast]:text-[var(--color-txt-2)]",
+            "group toast group-[.toaster]:bg-[var(--color-card)] group-[.toaster]:text-[var(--color-ink)] group-[.toaster]:border group-[.toaster]:border-[var(--color-ink)] group-[.toaster]:rounded-[var(--radius-md)]",
+          description: "group-[.toast]:text-[var(--color-ink-2)]",
           actionButton:
-            "group-[.toast]:bg-[var(--color-lime)] group-[.toast]:text-[#06080f]",
+            "group-[.toast]:bg-[var(--color-green)] group-[.toast]:text-[var(--color-paper)]",
           cancelButton:
-            "group-[.toast]:bg-[var(--color-card-2)] group-[.toast]:text-[var(--color-txt-2)]",
+            "group-[.toast]:bg-[var(--color-paper-2)] group-[.toast]:text-[var(--color-ink-2)]",
         },
       }}
       {...props}

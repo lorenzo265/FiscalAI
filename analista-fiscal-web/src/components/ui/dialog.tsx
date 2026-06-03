@@ -17,7 +17,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm",
+      "fixed inset-0 z-50 bg-[var(--color-ink)]/45 backdrop-blur-[2px]",
       "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
@@ -35,15 +35,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-2xl duration-200",
-        "bg-[var(--color-card)] border-[var(--color-line-2)] text-[var(--color-txt)] rounded-[10px]",
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 duration-200",
+        "bg-[var(--color-card)] border-[var(--color-ink)] text-[var(--color-ink)] rounded-[var(--radius-md)]",
+        "shadow-[0_24px_60px_-30px_rgba(27,26,21,0.45)]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-md p-1 text-[var(--color-txt-3)] hover:text-[var(--color-txt)] hover:bg-[var(--color-card-2)] transition-colors focus:outline-none">
+      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-[var(--radius-sm)] p-1 text-[var(--color-ink-3)] hover:text-[var(--color-ink)] hover:bg-[var(--color-paper-2)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/35">
         <X className="size-4" />
         <span className="sr-only">Fechar</span>
       </DialogPrimitive.Close>
@@ -72,7 +73,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight text-[var(--color-txt)]",
+      "font-[family-name:var(--font-serif)] text-xl font-semibold leading-tight tracking-tight text-[var(--color-ink)]",
       className
     )}
     {...props}
@@ -86,7 +87,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-[var(--color-txt-2)]", className)}
+    className={cn("text-sm text-[var(--color-ink-2)]", className)}
     {...props}
   />
 ));

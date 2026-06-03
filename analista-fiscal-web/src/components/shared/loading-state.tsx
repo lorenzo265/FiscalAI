@@ -16,9 +16,9 @@ export function LoadingState({ titulo = "Carregando...", className }: Props) {
     >
       <Loader2
         className="size-5 animate-spin"
-        style={{ color: "var(--color-lime)" }}
+        style={{ color: "var(--color-green)" }}
       />
-      <span className="text-sm" style={{ color: "var(--color-txt-2)" }}>
+      <span className="mono text-[11px] uppercase tracking-[0.14em]" style={{ color: "var(--color-ink-2)" }}>
         {titulo}
       </span>
     </div>

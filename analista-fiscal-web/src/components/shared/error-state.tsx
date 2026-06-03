@@ -22,29 +22,32 @@ export function ErrorState({
       )}
     >
       <div
-        className="size-12 rounded-full grid place-items-center border"
+        className="size-12 rounded-[var(--radius-md)] grid place-items-center border"
         style={{
-          borderColor: "rgba(255, 85, 102, 0.22)",
-          background: "var(--color-red-d)",
+          borderColor: "var(--color-danger)",
+          background: "var(--color-paper)",
         }}
       >
-        <AlertTriangle className="size-5" style={{ color: "var(--color-red)" }} />
+        <AlertTriangle className="size-5" style={{ color: "var(--color-danger)" }} />
       </div>
-      <h3 className="text-[15px] font-semibold" style={{ color: "var(--color-txt)" }}>
+      <h3
+        className="font-[family-name:var(--font-serif)] text-lg font-semibold leading-tight"
+        style={{ color: "var(--color-ink)" }}
+      >
         {titulo}
       </h3>
-      <p className="text-sm max-w-sm" style={{ color: "var(--color-txt-2)" }}>
+      <p className="text-sm max-w-sm" style={{ color: "var(--color-ink-2)" }}>
         {descricao}
       </p>
       {onTentarNovamente ? (
         <button
           type="button"
           onClick={onTentarNovamente}
-          className="mono mt-2 text-[11px] font-bold uppercase tracking-[0.14em] px-3 py-1.5 rounded-md border transition-colors"
+          className="mono mt-2 text-[11px] font-bold uppercase tracking-[0.14em] px-3 py-1.5 rounded-[var(--radius-sm)] border transition-colors hover:bg-[var(--color-paper-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/35"
           style={{
-            color: "var(--color-txt)",
-            borderColor: "var(--color-line-2)",
-            background: "var(--color-card-2)",
+            color: "var(--color-ink)",
+            borderColor: "var(--color-ink)",
+            background: "transparent",
           }}
         >
           Tentar de novo

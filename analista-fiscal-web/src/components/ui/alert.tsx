@@ -3,17 +3,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "relative w-full rounded-md border p-4 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:size-4 [&>svg~*]:pl-7",
+  "relative w-full rounded-[var(--radius-md)] border p-4 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:size-4 [&>svg~*]:pl-7",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--color-card)] border-[var(--color-line-2)] text-[var(--color-txt)] [&>svg]:text-[var(--color-txt-2)]",
-        info: "bg-[var(--color-blue-d)] border-[rgba(77,142,255,0.22)] text-[var(--color-blue)] [&>svg]:text-[var(--color-blue)]",
-        warn: "bg-[var(--color-amber-d)] border-[rgba(255,184,77,0.22)] text-[var(--color-amber)] [&>svg]:text-[var(--color-amber)]",
+          "bg-[var(--color-card)] border-[var(--color-rule)] text-[var(--color-ink)] [&>svg]:text-[var(--color-ink-2)]",
+        info: "bg-[var(--color-paper-2)] border-[var(--color-rule-2)] text-[var(--color-ink)] [&>svg]:text-[var(--color-ink-2)]",
+        warn: "bg-[var(--color-paper-2)] border-[var(--color-ochre)]/35 text-[var(--color-ink)] [&>svg]:text-[var(--color-ochre)]",
         destructive:
-          "bg-[var(--color-red-d)] border-[rgba(255,85,102,0.22)] text-[var(--color-red)] [&>svg]:text-[var(--color-red)]",
-        ok: "bg-[var(--color-lime-d)] border-[rgba(163,255,107,0.22)] text-[var(--color-lime)] [&>svg]:text-[var(--color-lime)]",
+          "bg-[var(--color-paper-2)] border-[var(--color-danger)]/40 text-[var(--color-ink)] [&>svg]:text-[var(--color-danger)]",
+        ok: "bg-[var(--color-green-wash)] border-[var(--color-green)]/35 text-[var(--color-green-deep)] [&>svg]:text-[var(--color-green)]",
       },
     },
     defaultVariants: { variant: "default" },

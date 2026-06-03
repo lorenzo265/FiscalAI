@@ -10,11 +10,11 @@ const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLI
         type={type}
         ref={ref}
         className={cn(
-          "flex h-9 w-full rounded-md border bg-[var(--color-card-2)] px-3 py-1 text-sm text-[var(--color-txt)] placeholder:text-[var(--color-txt-3)] transition-colors",
-          "border-[var(--color-line-2)]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-lime)]/30 focus-visible:border-[var(--color-lime)]/50",
+          "flex h-9 w-full rounded-[var(--radius-sm)] border bg-[var(--color-paper)] px-3 py-1 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)] transition-colors",
+          "border-[var(--color-rule-2)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/35 focus-visible:border-[var(--color-green)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          "file:border-0 file:bg-transparent file:text-sm file:font-medium",
+          "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-[var(--color-ink)]",
           className
         )}
         {...props}

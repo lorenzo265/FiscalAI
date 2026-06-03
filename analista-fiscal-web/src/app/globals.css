@@ -1,65 +1,99 @@
 @import "tailwindcss";
 
 @theme {
-  /* fontes */
-  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* ─── Fontes (carregadas em layout.tsx via next/font) ───────────────── */
+  --font-serif: var(--font-serif-loaded), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-sans-loaded), system-ui, sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, monospace;
 
-  /* paleta — copiada do fiscalai_v4.html */
-  --color-bg: #06080f;
-  --color-bg-2: #0c0f1a;
-  --color-card: #111624;
-  --color-card-2: #161c2e;
-  --color-card-3: #1c2338;
+  /* ─── Tokens canônicos Arkan "Instrumento" (§2.1) ───────────────────── */
+  /* Papel quente + tinta + UM verde (marca = saúde fiscal). */
+  --color-paper: #efede3;
+  --color-paper-2: #e7e4d7;
+  --color-card: #f7f5ee;
+  --color-glass: rgba(239, 237, 227, 0.72);
 
-  --color-line: rgba(255, 255, 255, 0.06);
-  --color-line-2: rgba(255, 255, 255, 0.11);
+  --color-ink: #1b1a15;
+  --color-ink-2: #59574b;
+  --color-ink-3: #928f7e;
+  --color-graphite: #a7a493;
 
-  --color-lime: #a3ff6b;
-  --color-lime-d: rgba(163, 255, 107, 0.12);
-  --color-blue: #4d8eff;
-  --color-blue-d: rgba(77, 142, 255, 0.12);
-  --color-amber: #ffb84d;
-  --color-amber-d: rgba(255, 184, 77, 0.12);
-  --color-red: #ff5566;
-  --color-red-d: rgba(255, 85, 102, 0.12);
+  --color-rule: #d4d0c0;
+  --color-rule-2: #c1bca9;
 
-  --color-txt: #dde3f0;
-  --color-txt-2: #8892a8;
-  --color-txt-3: #4a5268;
+  /* Único acento cromático: verde. */
+  --color-green: #136a41;
+  --color-green-deep: #0c4327;
+  --color-green-bright: #1b8a55;
+  --color-green-wash: #dde8de;
 
-  /* shape */
-  --radius-md: 10px;
-  --radius-sm: 6px;
+  /* Mundo quente: atenção (ocre) e erro (danger) — não são acentos de marca. */
+  --color-ochre: #a8650f;
+  --color-danger: #b23a33;
 
-  /* easing */
-  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Shape — precisão, não fofura. */
+  --radius-md: 2px;
+  --radius-sm: 2px;
+
+  /* Easings. */
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-reveal: cubic-bezier(0.62, 0.05, 0.01, 0.99);
+  --ease-stamp: cubic-bezier(0.34, 1.56, 0.4, 1);
+
+  /* ─── Aliases de compatibilidade (nomes antigos → Arkan) ─────────────
+     Mantidos só para a Fase 0: 93 arquivos / 291 referências aos nomes
+     antigos seguem compilando e "viram papel/tinta/verde" de imediato.
+     REMOVER na Fase 1 (design-system). Regra-mãe: UM acento (verde) —
+     blue/amber mapeiam para NEUTRO/ocre, nunca um 2º acento cromático. */
+  --color-bg: var(--color-paper);
+  --color-bg-2: var(--color-paper-2);
+  --color-card-2: var(--color-paper-2);
+  --color-card-3: var(--color-rule);
+
+  --color-line: var(--color-rule);
+  --color-line-2: var(--color-rule-2);
+
+  --color-lime: var(--color-green);
+  --color-lime-d: var(--color-green-wash);
+  --color-blue: var(--color-ink-2);
+  --color-blue-d: var(--color-paper-2);
+  --color-amber: var(--color-ochre);
+  --color-amber-d: var(--color-paper-2);
+  --color-red: var(--color-danger);
+  --color-red-d: var(--color-paper-2);
+
+  --color-txt: var(--color-ink);
+  --color-txt-2: var(--color-ink-2);
+  --color-txt-3: var(--color-ink-3);
+
+  --ease-default: var(--ease-settle);
 }
 
 @layer base {
   * {
-    border-color: var(--color-line);
+    border-color: var(--color-rule);
   }
 
   html {
     font-family: var(--font-sans);
-    background: var(--color-bg);
-    color: var(--color-txt);
+    background: var(--color-paper);
+    color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    background-color: var(--color-bg);
+    background-color: var(--color-paper);
+    /* Textura sutil de pauta: fios quase-imperceptíveis em --color-rule. */
     background-image:
-      linear-gradient(rgba(163, 255, 107, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(163, 255, 107, 0.025) 1px, transparent 1px);
+      linear-gradient(rgba(167, 164, 147, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(167, 164, 147, 0.04) 1px, transparent 1px);
     background-size: 48px 48px;
     min-height: 100vh;
-    color: var(--color-txt);
+    color: var(--color-ink);
   }
 
-  /* números fiscais SEMPRE em mono */
+  /* números fiscais SEMPRE em mono tabular */
   .num,
   .mono {
     font-family: var(--font-mono);
@@ -67,21 +101,21 @@
     letter-spacing: -0.01em;
   }
 
-  /* Scrollbar discreta no tema dark */
+  /* Scrollbar clara (papel) */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--color-bg);
+    background: var(--color-paper-2);
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-card-2);
-    border-radius: 6px;
-    border: 2px solid var(--color-bg);
+    background: var(--color-rule-2);
+    border-radius: 2px;
+    border: 2px solid var(--color-paper);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-card-3);
+    background: var(--color-graphite);
   }
 }
 
@@ -90,10 +124,11 @@
     text-wrap: balance;
   }
 
+  /* Pauta técnica sutil (mesma textura do body). */
   .grid-pattern {
     background-image:
-      linear-gradient(rgba(163, 255, 107, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(163, 255, 107, 0.025) 1px, transparent 1px);
+      linear-gradient(rgba(167, 164, 147, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(167, 164, 147, 0.04) 1px, transparent 1px);
     background-size: 48px 48px;
   }
 }

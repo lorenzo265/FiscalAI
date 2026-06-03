@@ -9,9 +9,9 @@ Instruções para agentes Claude trabalhando neste repositório. Leia este arqui
 Sistema fiscal-contábil multi-tenant para PMEs brasileiras (Simples Nacional + Lucro Presumido, faturamento R$200k–R$50M/ano). Dois sub-projetos:
 
 - **`analista-fiscal-api/`** — Backend (FastAPI + Postgres + Redis). Source of truth: `docs/PlanoBackend.md`.
-- **`analista-fiscal-web/`** — Frontend (Next.js + Dexie + TanStack Query, demo/prototype). Source of truth: `analista-fiscal-web/Plano.md`.
+- **`analista-fiscal-web/`** — Frontend (Next.js 15 + React 19 + Tailwind v4 + shadcn/ui). **Em re-engenharia de design** (rebrand do app → **Arkan**; identidade "Instrumento"). Escopo de produto: `analista-fiscal-web/Plano.md`. Re-engenharia/design: seção «Frontend — Re-engenharia Arkan» (abaixo) + `docs/PLANO_REENGENHARIA_FRONTEND_ARKAN.md`.
 
-A maior parte do trabalho ativo está no **backend**. Sprints 0–12 completas; 13–22 pendentes.
+Dois workstreams ativos: **backend** (sprints 0–12 completas; 13–22 pendentes) e **frontend** (re-engenharia de design "Arkan" — ver seção própria).
 
 ---
 
@@ -19,8 +19,11 @@ A maior parte do trabalho ativo está no **backend**. Sprints 0–12 completas; 
 
 1. **Ativar a skill apropriada:**
    - Backend → `fiscalai-backend`
-   - Frontend → `fiscalai-frontend`
+   - Frontend (código de feature) → `fiscalai-frontend`
+   - Frontend (design / identidade visual / motion) → `frontend-design-architect`
    - Domínio fiscal sem código → `analista-fiscal-br`
+
+   > **Roteamento:** se a tarefa é **frontend/design (Arkan)**, pule para a seção «Frontend — Re-engenharia Arkan» e leia `docs/HANDOFF.md` — não o fluxo backend (`log_agente.md` / `PlanoBackend.md`) abaixo.
 
 2. **Ler `log_agente.md`** (na raiz do repo) — histórico de PRs, contagem de testes, pendências conscientes, onde paramos exatamente.
 
@@ -316,6 +319,63 @@ Ao fechar um PR, além de `log_agente.md`:
 Atalho que executa esse write-back: comando `/fechar-sprint` (`.claude/commands/fechar-sprint.md`).
 
 **Vault desatualizado é pior que vault nenhum** — o agente confia nele. Manter sincronizado com o código é parte do Definition of Done.
+
+---
+
+## Frontend — Re-engenharia "Arkan" (Instrumento)
+
+> **Workstream de design ATIVO.** Agente de frontend/design: leia **esta seção + `docs/HANDOFF.md`** antes de tudo. O app está sendo **rebatizado "Arkan"** (empresa: Arkan Fiscal Technologies) e revestido com uma identidade nova. **A arquitetura e as funções ficam; muda a pele.**
+
+### Energia-alvo
+*Uma ferramenta de precisão na mão de um artesão com anos de experiência.* Séria, exata, calma, lindamente desenhada: papel quente + tinta + **um verde** (marca = saúde fiscal), camada técnica de **blueprint** (crop marks, rótulos "Fig.", régua de medição, esquemas que se desenham), tipografia editorial (serifa display + **mono nos dados**) e motion premium. **Nunca** dark/neon nem o look genérico de IA.
+
+### Fontes de verdade (em `docs/`)
+| Arquivo | É o contrato de… |
+|---|---|
+| `docs/PLANO_REENGENHARIA_FRONTEND_ARKAN.md` | plano: fases, frota, invariantes, gates |
+| `docs/arkan-visual-style-merge.md` | **estilo** (tokens, linguagem de componente) |
+| `docs/arkan-motion-extraction.md` | **motion** (Lenis + Framer, receitas de reveal) |
+| `docs/HANDOFF.md` | livro de passagem entre agentes (append-only) |
+
+(O `analista-fiscal-web/Plano.md` segue como fonte de **escopo de produto/feature**.)
+
+### Princípio: re-vestir, não re-arquitetar
+Stack (Next 15 + React 19 + Tailwind v4 + shadcn) é boa e **fica**. O tema é dirigido por tokens no `src/app/globals.css` (bloco `@theme`): **trocar tokens + revestir primitivas propaga por todo o app**. A paleta atual é o dark/neon "copiado do fiscalai_v4.html" — é o que estamos descartando.
+
+### Contrato de código (não divergir)
+- **Importar do design-system; NUNCA reinventar tokens/primitivas** no escopo de uma tela.
+- Camadas-contrato construídas **primeiro** e consumidas por todos:
+  `globals.css` (`@theme`) · fontes em `layout.tsx` (**Fraunces + Hanken Grotesk + Spline Sans Mono** via `next/font`) · `components/ui/*` + `components/shared/*` revestidos · `components/blueprint/*` (`Framed`, `CropMarks`, `Fig`, `Ruler`, `BlueprintSchematic`, `Carimbo`) · `lib/motion/*` (variants, `LenisProvider`, hooks).
+
+### Gates anti-AI-slop (todo PR de tela)
+**Reprova** com: coluna central + cards arredondados flutuando; sombras suaves por toda parte; botões-pílula; ícone em quadradinho de fundo lavado; tudo sans/genérico.
+**Aprova** com: serifa display + mono nos dados; estrutura com fios 1px + crop marks; **um** acento (verde); conteúdo enxuto. Regra-mãe: **detalhe no craft, calma no conteúdo.**
+
+### Invariantes de função (não quebrar ao revestir)
+Toda rota e item de navegação acessível; hooks (`use-*`), providers (Query/Empresa/Auth), Dexie/mock e lógica fiscal **inalterados**; wizards mantêm passos + validação (RHF+Zod); DANFE/PDF/QR/barcode funcionando; charts (Recharts) re-tematizados com os **mesmos dados**; status sempre **cor + ícone + palavra**; **nunca** expor CFOP/CST/NCM crus ao dono de PME — traduzir.
+
+### Motion
+Lenis (scroll suave) + Framer Motion (já instalado). Só animar `transform/opacity/clip-path/filter`. Honrar `prefers-reduced-motion`. 60fps em mobile. Orçamento: **1 entrada + 1 signature por tela**.
+
+### Estratégia multi-agente (Claude Code)
+O **repositório é o barramento.** Subagentes têm contexto próprio e só devolvem o resultado final; o único canal pai→subagente é o prompt. Coordenação por **arquivos**, não por chat:
+- esta `CLAUDE.md` (constituição) + os contratos em `docs/` + `.claude/agents/*.md` (a frota) + `docs/HANDOFF.md`.
+- **Fases:** `0` tokens → `1` design-system → `2` shell (**seriais**) → `3` telas A–E (**paralelo**, 1 git worktree/branch por domínio) → `4` polish. Default = orquestrador + subagentes (barato); *agent teams* só para negociar conflito.
+- **Revisor de contexto fresco** roda os gates + invariantes em **todo PR antes do merge** (maior alavancagem contra deriva de design).
+- Roster em `.claude/agents/`: `explorer` (read-only), `foundation`, `design-system`, `shell`, `screen-implementer` (invocado 1× por lote A–E, em worktree próprio), `motion-polish`, `reviewer` (read-only). A sessão principal é o **orquestrador** (lê esta `CLAUDE.md`).
+- Tela **Notas** = gabarito de ouro que as outras imitam.
+
+### Protocolo HANDOFF (`docs/HANDOFF.md`) — write-back obrigatório
+Append-only. Ao terminar **qualquer etapa**, o agente registra, sem pedir confirmação:
+**data · agente · o que fez · arquivos tocados · pendências · próximo agente.**
+É assim que a frota se coordena sem custo de mensagens diretas (espelha o espírito do `log_agente.md` do backend, mas para o frontend).
+
+### Frontend — NUNCA
+- ❌ Reinventar tokens/primitivas no escopo de uma tela (use o design-system).
+- ❌ Introduzir os "tells" de slop (pílula, card flutuando, sombra suave genérica, tudo sans).
+- ❌ Quebrar uma função ao trocar a pele (ver Invariantes).
+- ❌ Animar `width/height/top/left` em motion frequente.
+- ❌ Voltar ao dark/neon do `fiscalai_v4` ou hardcodar cor fora do `@theme`.
 
 ---
 
