@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,7 +20,6 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,17 +46,28 @@ import {
   StatusNotaPill,
   TipoNotaPill,
 } from "@/components/notas/status-pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { useNotas } from "@/hooks/use-notas";
 import { baixarDANFE, baixarXml } from "@/lib/notas/downloads";
 import { formatarDataBR } from "@/lib/format/data";
 import { formatarCNPJ } from "@/lib/format/cnpj";
 import { formatarCPF } from "@/lib/format/cpf";
+import {
+  reveal,
+  revealChild,
+  staggerChildren,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import type { NotaFiscal } from "@/lib/schemas/nota";
 
 const PAGE_SIZE = 50;
 
 export default function NotasListaPage() {
   const { data, isLoading, isError, refetch } = useNotas();
+  const reduced = useReducedMotion();
 
   const [filtros, setFiltros] = useQueryStates(
     {
@@ -79,7 +90,8 @@ export default function NotasListaPage() {
         return false;
       if (corte && new Date(n.emitidaEm).getTime() < corte) return false;
       if (q) {
-        const hay = `${n.numero} ${n.chave} ${n.contraparte.nome} ${n.contraparte.documento}`.toLowerCase();
+        const hay =
+          `${n.numero} ${n.chave} ${n.contraparte.nome} ${n.contraparte.documento}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -100,7 +112,8 @@ export default function NotasListaPage() {
         cell: ({ row }) => (
           <Link
             href={`/notas/${row.original.chave}`}
-            className="mono text-sm font-bold text-[var(--color-txt)] hover:text-[var(--color-lime)] transition-colors"
+            className="mono text-sm font-bold text-[var(--color-ink)] hover:text-[var(--color-green)] transition-colors"
+            style={{ fontVariantNumeric: "tabular-nums" }}
           >
             {row.original.numero}
           </Link>
@@ -112,10 +125,13 @@ export default function NotasListaPage() {
         header: "Contraparte",
         cell: ({ row }) => (
           <div className="flex flex-col min-w-0">
-            <span className="text-sm text-[var(--color-txt)] truncate">
+            <span className="text-sm text-[var(--color-ink)] truncate">
               {row.original.contraparte.nome}
             </span>
-            <span className="mono text-[11px] text-[var(--color-txt-3)]">
+            <span
+              className="mono text-[11px] text-[var(--color-ink-2)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
               {row.original.contraparte.tipo === "pj"
                 ? formatarCNPJ(row.original.contraparte.documento)
                 : formatarCPF(row.original.contraparte.documento)}
@@ -127,7 +143,10 @@ export default function NotasListaPage() {
         id: "valor",
         header: "Valor",
         cell: ({ row }) => (
-          <span className="mono text-sm font-bold text-[var(--color-txt)]">
+          <span
+            className="mono text-sm font-bold text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={row.original.totais.valorNota} />
           </span>
         ),
@@ -137,7 +156,10 @@ export default function NotasListaPage() {
         id: "data",
         header: "Emissão",
         cell: ({ row }) => (
-          <span className="mono text-xs text-[var(--color-txt-2)]">
+          <span
+            className="mono text-xs text-[var(--color-ink-2)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {formatarDataBR(row.original.emitidaEm)}
           </span>
         ),
@@ -147,7 +169,7 @@ export default function NotasListaPage() {
         id: "status",
         header: "Status",
         cell: ({ row }) => (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <StatusNotaPill status={row.original.status} />
             {row.original.tipo === "entrada" && row.original.manifesto ? (
               <ManifestoPill manifesto={row.original.manifesto} />
@@ -211,27 +233,57 @@ export default function NotasListaPage() {
   });
 
   const limparFiltros = () =>
-    setFiltros({ q: "", tipo: "todos", status: "todos", periodo: "90d", page: 0 });
+    setFiltros({
+      q: "",
+      tipo: "todos",
+      status: "todos",
+      periodo: "90d",
+      page: 0,
+    });
+
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
-          Módulo notas
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.span
+          variants={itemVariants}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
+          Módulo · Notas
+        </motion.span>
+        <motion.h1
+          variants={itemVariants}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
           Notas fiscais
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-xl mt-1">
+        </motion.h1>
+        <motion.p
+          variants={itemVariants}
+          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+        >
           Tudo que entra e sai da sua empresa em um só lugar.
-        </p>
-      </header>
+        </motion.p>
+      </motion.header>
 
       <NotasSubnav />
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col md:flex-row md:items-center gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-ink-3)]" />
           <Input
             value={filtros.q}
             onChange={(e) => void setFiltros({ q: e.target.value, page: 0 })}
@@ -290,8 +342,9 @@ export default function NotasListaPage() {
             <X className="size-3.5" /> Limpar
           </Button>
         )}
-      </Card>
+      </Framed>
 
+      {/* ── conteúdo principal ── */}
       {isLoading ? (
         <LoadingState titulo="Carregando notas..." />
       ) : isError ? (
@@ -300,19 +353,28 @@ export default function NotasListaPage() {
         <EmptyState
           titulo="Nenhuma nota encontrada"
           descricao="Ajuste os filtros ou emita uma nova nota fiscal."
+          icone={FileText}
         />
       ) : (
-        <Card className="overflow-hidden">
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          {/* Fig. 01 — Registro de notas */}
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Registro de notas" size="sm" />
+          </div>
+          <Ruler />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr
-                  className="text-left border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono"
-                  style={{ borderColor: "var(--color-line)" }}
+                  className="text-left border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono"
+                  style={{ borderColor: "var(--color-rule)" }}
                 >
                   {table.getHeaderGroups()[0]?.headers.map((h) => (
                     <th key={h.id} className="px-4 py-3 font-bold">
-                      {flexRender(h.column.columnDef.header, h.getContext())}
+                      {flexRender(
+                        h.column.columnDef.header,
+                        h.getContext()
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -321,8 +383,8 @@ export default function NotasListaPage() {
                 {table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b transition-colors hover:bg-[var(--color-card-2)]"
-                    style={{ borderColor: "var(--color-line)" }}
+                    className="border-b transition-colors hover:bg-[var(--color-paper-2)]"
+                    style={{ borderColor: "var(--color-rule)" }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3 align-middle">
@@ -337,11 +399,12 @@ export default function NotasListaPage() {
               </tbody>
             </table>
           </div>
-          <div
-            className="flex items-center justify-between gap-3 px-4 py-3 border-t"
-            style={{ borderColor: "var(--color-line)" }}
-          >
-            <span className="text-xs text-[var(--color-txt-3)] mono">
+          <Ruler />
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span
+              className="text-xs text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
               {filtradas.length} nota(s) · página{" "}
               {table.getState().pagination.pageIndex + 1} de{" "}
               {table.getPageCount()}
@@ -365,22 +428,23 @@ export default function NotasListaPage() {
               </Button>
             </div>
           </div>
-        </Card>
+        </Framed>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 function corteData(periodo: string): number | null {
-  const dias = periodo === "30d"
-    ? 30
-    : periodo === "90d"
-      ? 90
-      : periodo === "180d"
-        ? 180
-        : periodo === "365d"
-          ? 365
-          : null;
+  const dias =
+    periodo === "30d"
+      ? 30
+      : periodo === "90d"
+        ? 90
+        : periodo === "180d"
+          ? 180
+          : periodo === "365d"
+            ? 365
+            : null;
   if (dias == null) return null;
   return Date.now() - dias * 24 * 60 * 60 * 1000;
 }

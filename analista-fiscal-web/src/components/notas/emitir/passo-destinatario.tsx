@@ -3,12 +3,14 @@
 import * as React from "react";
 import { Search, UserPlus, ArrowRight, Building2, User } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/shared/loading-state";
 import { Pill } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { api } from "@/lib/api-client";
 import { ApiError } from "@/lib/api-client";
 import { mascaraCNPJ, formatarCNPJ, apenasDigitos } from "@/lib/format/cnpj";
@@ -41,7 +43,7 @@ export function PassoDestinatario() {
       if (err instanceof ApiError && err.status === 404) {
         setModoCadastro(true);
         toast.info("Não cadastrado ainda", {
-          description: "Preencha os dados pra cadastrar inline.",
+          description: "Preencha os dados para cadastrar inline.",
         });
       } else {
         toast.error("Falha na busca", {
@@ -55,14 +57,11 @@ export function PassoDestinatario() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="p-5 flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-            Quem vai receber a nota?
-          </span>
-        </div>
+      <Framed marks tone="ink" surface="card" className="flex flex-col gap-4">
+        <Fig n={1} titulo="Quem vai receber a nota?" />
+        <Ruler />
 
-        <div className="flex flex-col md:flex-row gap-2 items-end">
+        <div className="flex flex-col md:flex-row gap-2 items-end pt-1">
           <div className="flex-1 flex flex-col gap-1.5">
             <Label htmlFor="doc">CNPJ ou CPF</Label>
             <Input
@@ -71,6 +70,7 @@ export function PassoDestinatario() {
               onChange={(e) => setDoc(e.target.value)}
               placeholder="00.000.000/0000-00"
               className="mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
               autoFocus
             />
           </div>
@@ -94,7 +94,10 @@ export function PassoDestinatario() {
           />
         ) : null}
 
-        <div className="flex justify-between items-center pt-2">
+        <div
+          className="flex justify-between items-center pt-2 border-t"
+          style={{ borderColor: "var(--color-rule)" }}
+        >
           <Button
             variant="ghost"
             size="sm"
@@ -107,7 +110,7 @@ export function PassoDestinatario() {
             Continuar <ArrowRight className="size-4" />
           </Button>
         </div>
-      </Card>
+      </Framed>
     </div>
   );
 }
@@ -116,32 +119,35 @@ function ContraparteCard({ contraparte }: { contraparte: Contraparte }) {
   const Icon = contraparte.tipo === "pj" ? Building2 : User;
   return (
     <div
-      className="rounded-md border p-4 flex items-start gap-3"
+      className="rounded-[var(--radius-md)] border p-4 flex items-start gap-3"
       style={{
-        background: "var(--color-card-2)",
-        borderColor: "rgba(163,255,107,0.18)",
+        background: "var(--color-green-wash)",
+        borderColor: "var(--color-green)",
       }}
     >
-      <div
-        className="size-10 rounded-md grid place-items-center shrink-0"
-        style={{ background: "var(--color-lime-d)" }}
-      >
-        <Icon className="size-4 text-[var(--color-lime)]" />
-      </div>
+      {/* ícone em fio técnico — sem quadradinho de fundo lavado */}
+      <Icon
+        className="size-5 shrink-0 mt-0.5"
+        style={{ color: "var(--color-green)" }}
+        aria-hidden
+      />
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-[var(--color-txt)] truncate">
+          <span className="font-serif text-base text-[var(--color-ink)] truncate">
             {contraparte.nome}
           </span>
           <Pill tom="ok">encontrado</Pill>
         </div>
-        <span className="mono text-xs text-[var(--color-txt-2)]">
+        <span
+          className="mono text-xs text-[var(--color-ink-2)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {contraparte.tipo === "pj"
             ? formatarCNPJ(contraparte.documento)
             : formatarCPF(contraparte.documento)}
         </span>
         {contraparte.endereco ? (
-          <span className="text-[12px] text-[var(--color-txt-3)] leading-snug">
+          <span className="text-[12px] text-[var(--color-ink-3)] leading-snug">
             {contraparte.endereco.logradouro}, {contraparte.endereco.numero} ·{" "}
             {contraparte.endereco.municipio}/{contraparte.endereco.uf}
           </span>
@@ -171,15 +177,15 @@ function CadastrarInline({
 
   return (
     <div
-      className="rounded-md border p-4 flex flex-col gap-3"
+      className="rounded-[var(--radius-md)] border p-4 flex flex-col gap-3"
       style={{
-        background: "var(--color-card-2)",
-        borderColor: "var(--color-line-2)",
+        background: "var(--color-paper-2)",
+        borderColor: "var(--color-rule-2)",
       }}
     >
       <div className="flex items-center gap-2">
-        <UserPlus className="size-4 text-[var(--color-blue)]" />
-        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
+        <UserPlus className="size-4 text-[var(--color-ink-3)]" aria-hidden />
+        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
           Cadastro inline
         </span>
       </div>
@@ -198,7 +204,12 @@ function CadastrarInline({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>CEP</Label>
-          <Input value={cep} onChange={(e) => setCep(e.target.value)} />
+          <Input
+            value={cep}
+            onChange={(e) => setCep(e.target.value)}
+            className="mono"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          />
         </div>
         <div className="flex flex-col gap-1.5 md:col-span-2">
           <Label>Logradouro</Label>
@@ -209,7 +220,11 @@ function CadastrarInline({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Número</Label>
-          <Input value={numero} onChange={(e) => setNumero(e.target.value)} />
+          <Input
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            className="mono"
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Bairro</Label>
@@ -228,6 +243,7 @@ function CadastrarInline({
             value={uf}
             onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))}
             maxLength={2}
+            className="mono"
           />
         </div>
       </div>

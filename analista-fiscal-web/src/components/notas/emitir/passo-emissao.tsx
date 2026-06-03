@@ -5,17 +5,20 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CheckCircle2,
   Download,
   FileText,
   Loader2,
   Send,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Moeda } from "@/components/shared/moeda";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
+import { BlueprintSchematic } from "@/components/blueprint/blueprint-schematic";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { useNfWizardStore } from "@/lib/stores/nf-wizard-store";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { useSalvarNota } from "@/hooks/use-notas";
@@ -26,6 +29,15 @@ import { formatarCNPJ } from "@/lib/format/cnpj";
 import { formatarCPF } from "@/lib/format/cpf";
 import { formatarDataBR } from "@/lib/format/data";
 import { baixarDANFE, baixarXml } from "@/lib/notas/downloads";
+import {
+  reveal,
+  revealChild,
+  staggerChildren,
+  staticVariants,
+  EASE,
+  DUR,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import type { NotaFiscal } from "@/lib/schemas/nota";
 
 type Estado = "conferencia" | "enviando" | "autorizada";
@@ -35,6 +47,7 @@ export function PassoEmissao() {
   const { empresa } = useEmpresaAtual();
   const wizard = useNfWizardStore();
   const salvar = useSalvarNota();
+  const reduced = useReducedMotion();
   const [estado, setEstado] = React.useState<Estado>("conferencia");
   const [emitida, setEmitida] = React.useState<NotaFiscal | null>(null);
 
@@ -45,11 +58,11 @@ export function PassoEmissao() {
 
   if (!empresa || !wizard.contraparte) {
     return (
-      <Card className="p-6">
-        <p className="text-sm text-[var(--color-txt-2)]">
+      <Framed marks={false} tone="rule" surface="card">
+        <p className="text-sm text-[var(--color-ink-2)]">
           Volte ao passo 1 — destinatário ainda não definido.
         </p>
-      </Card>
+      </Framed>
     );
   }
 
@@ -96,124 +109,189 @@ export function PassoEmissao() {
     setEstado("autorizada");
   };
 
+  /* ── estado: enviando ── */
   if (estado === "enviando") {
     return (
-      <Card className="p-10 flex flex-col items-center justify-center gap-4 text-center">
-        <Loader2 className="size-10 animate-spin text-[var(--color-lime)]" />
-        <h2 className="text-lg font-semibold text-[var(--color-txt)]">
-          Comunicando com a SEFAZ...
-        </h2>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-md">
-          Enviando a nota, aguardando autorização e protocolo. Não feche essa
-          aba.
-        </p>
-        <ul className="text-[12px] text-[var(--color-txt-3)] mono space-y-1 mt-2">
+      <Framed marks tone="rule" surface="paper-2" className="flex flex-col items-center justify-center gap-5 text-center py-10">
+        <BlueprintSchematic width={120} figure="nota" />
+        <div className="flex flex-col items-center gap-2">
+          <Loader2
+            className="size-6 animate-spin"
+            style={{ color: "var(--color-green)" }}
+          />
+          <h2 className="font-serif text-lg text-[var(--color-ink)]">
+            Comunicando com a SEFAZ...
+          </h2>
+          <p className="text-sm text-[var(--color-ink-2)] max-w-md">
+            Enviando a nota, aguardando autorização e protocolo. Não feche essa aba.
+          </p>
+        </div>
+        <ul
+          className="text-[12px] text-[var(--color-ink-3)] mono space-y-1 mt-1 text-left"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <li>· Validando schema XSD</li>
           <li>· Assinando com certificado A1</li>
           <li>· Aguardando autorização da SEFAZ</li>
         </ul>
-      </Card>
+      </Framed>
     );
   }
 
+  /* ── estado: autorizada ── */
   if (estado === "autorizada" && emitida) {
-    return <EmissaoSucesso nota={emitida} onAbrirDetalhe={() => router.push(`/notas/${emitida.chave}`)} />;
+    return (
+      <EmissaoSucesso
+        nota={emitida}
+        onAbrirDetalhe={() => router.push(`/notas/${emitida.chave}`)}
+        reduced={reduced}
+      />
+    );
   }
+
+  /* ── estado: conferência ── */
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-4">
-      <Card className="p-5 flex flex-col gap-4">
-        <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-          Confira antes de emitir
-        </span>
+      <Framed marks tone="ink" surface="card" className="flex flex-col gap-4">
+        <Fig n={4} titulo="Conferência antes de emitir" />
+        <Ruler />
 
-        <div className="rounded-md border p-4 flex flex-col gap-3" style={{ background: "var(--color-card-2)", borderColor: "var(--color-line-2)" }}>
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
-            Destinatário
-          </span>
-          <div className="flex flex-col">
-            <span className="text-base font-semibold text-[var(--color-txt)]">
-              {cp.nome}
-            </span>
-            <span className="mono text-xs text-[var(--color-txt-2)]">
-              {cp.tipo === "pj"
-                ? formatarCNPJ(cp.documento)
-                : formatarCPF(cp.documento)}
-            </span>
-          </div>
-          {cp.endereco ? (
-            <span className="text-[12px] text-[var(--color-txt-3)] leading-snug">
-              {cp.endereco.logradouro}, {cp.endereco.numero} ·{" "}
-              {cp.endereco.municipio}/{cp.endereco.uf}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="rounded-md border p-4 flex flex-col gap-2" style={{ background: "var(--color-card-2)", borderColor: "var(--color-line-2)" }}>
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
-            Itens ({wizard.itens.length})
-          </span>
-          <ul className="flex flex-col gap-1.5">
-            {wizard.itens.map((it) => (
-              <li
-                key={it.id}
-                className="flex items-center justify-between gap-3 text-sm"
-              >
-                <span className="text-[var(--color-txt)] truncate">
-                  {it.descricao}
-                </span>
-                <span className="mono text-[var(--color-txt-2)] shrink-0">
-                  {it.quantidade.toString().replace(".", ",")} ×{" "}
-                  {formatarMoeda(it.valorUnitario)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-md border p-4 flex flex-col gap-2" style={{ background: "var(--color-card-2)", borderColor: "var(--color-line-2)" }}>
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
-            Pagamento
-          </span>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-[var(--color-txt-2)]">
-              {labelForma(wizard.pagamento.forma)}
-              {wizard.pagamento.parcelas > 1
-                ? ` em ${wizard.pagamento.parcelas}x`
-                : ""}
-            </span>
-            <span className="mono text-[var(--color-txt)]">
-              vence {formatarDataBR(wizard.pagamento.vencimento)}
-            </span>
-          </div>
-        </div>
-
-        <div
-          className="flex justify-between items-center pt-2 border-t"
-          style={{ borderColor: "var(--color-line)" }}
+        <motion.div
+          className="flex flex-col gap-3 pt-1"
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
         >
+          {/* destinatário */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-[var(--radius-md)] border p-4 flex flex-col gap-2"
+            style={{
+              background: "var(--color-paper-2)",
+              borderColor: "var(--color-rule-2)",
+            }}
+          >
+            <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+              Destinatário
+            </span>
+            <div className="flex flex-col">
+              <span className="font-serif text-base text-[var(--color-ink)]">
+                {cp.nome}
+              </span>
+              <span
+                className="mono text-xs text-[var(--color-ink-2)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {cp.tipo === "pj"
+                  ? formatarCNPJ(cp.documento)
+                  : formatarCPF(cp.documento)}
+              </span>
+            </div>
+            {cp.endereco ? (
+              <span className="text-[12px] text-[var(--color-ink-3)] leading-snug">
+                {cp.endereco.logradouro}, {cp.endereco.numero} ·{" "}
+                {cp.endereco.municipio}/{cp.endereco.uf}
+              </span>
+            ) : null}
+          </motion.div>
+
+          {/* itens */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-[var(--radius-md)] border p-4 flex flex-col gap-2"
+            style={{
+              background: "var(--color-paper-2)",
+              borderColor: "var(--color-rule-2)",
+            }}
+          >
+            <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+              Itens ({wizard.itens.length})
+            </span>
+            <ul className="flex flex-col gap-1.5">
+              {wizard.itens.map((it) => (
+                <li
+                  key={it.id}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="text-[var(--color-ink)] truncate">
+                    {it.descricao}
+                  </span>
+                  <span
+                    className="mono text-[var(--color-ink-2)] shrink-0"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {it.quantidade.toString().replace(".", ",")} ×{" "}
+                    {formatarMoeda(it.valorUnitario)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* pagamento */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-[var(--radius-md)] border p-4 flex flex-col gap-1"
+            style={{
+              background: "var(--color-paper-2)",
+              borderColor: "var(--color-rule-2)",
+            }}
+          >
+            <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+              Pagamento
+            </span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[var(--color-ink-2)]">
+                {labelForma(wizard.pagamento.forma)}
+                {wizard.pagamento.parcelas > 1
+                  ? ` em ${wizard.pagamento.parcelas}x`
+                  : ""}
+              </span>
+              <span
+                className="mono text-[var(--color-ink)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                vence {formatarDataBR(wizard.pagamento.vencimento)}
+              </span>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        <Ruler />
+        <div className="flex justify-between items-center">
           <Button variant="ghost" onClick={wizard.voltar}>
             <ArrowLeft className="size-3.5" /> Voltar
           </Button>
         </div>
-      </Card>
+      </Framed>
 
-      <Card className="p-5 flex flex-col gap-4 self-start lg:sticky lg:top-4">
-        <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-          Resumo legível
-        </span>
-        <p className="text-[15px] text-[var(--color-txt)] leading-relaxed">
+      {/* ── painel de emissão ── */}
+      <Framed marks={false} tone="rule" surface="paper-2" className="flex flex-col gap-4 self-start lg:sticky lg:top-4">
+        <Fig n={5} titulo="Resumo legível" />
+        <Ruler />
+        <p className="text-[15px] text-[var(--color-ink)] leading-relaxed pt-1">
           Você está vendendo{" "}
-          <strong className="text-[var(--color-lime)] mono">
+          <strong
+            className="mono"
+            style={{ color: "var(--color-green)", fontVariantNumeric: "tabular-nums" }}
+          >
             {formatarMoeda(totais.valorNota)}
           </strong>{" "}
-          em {wizard.itens.some((i) => i.aliquotaIcms) ? "produtos" : "serviços"}{" "}
-          para <strong className="text-[var(--color-txt)]">{cp.nome}</strong>.
+          em{" "}
+          {wizard.itens.some((i) => i.aliquotaIcms) ? "produtos" : "serviços"}{" "}
+          para{" "}
+          <strong className="text-[var(--color-ink)]">{cp.nome}</strong>.
           {totais.totalImpostos > 0 ? (
             <>
               {" "}
               Imposto incluso (estimado):{" "}
-              <span className="mono text-[var(--color-txt-2)]">
+              <span
+                className="mono text-[var(--color-ink-2)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {formatarMoeda(totais.totalImpostos)}
               </span>
               .
@@ -226,71 +304,88 @@ export function PassoEmissao() {
           Emitir nota fiscal
         </Button>
 
-        <p className="text-[11px] text-[var(--color-txt-3)] leading-snug text-center">
-          A nota é enviada pra SEFAZ assinada digitalmente. Você recebe o
+        <p className="text-[11px] text-[var(--color-ink-3)] leading-snug text-center">
+          A nota é enviada à SEFAZ assinada digitalmente. Você recebe o
           protocolo em alguns segundos.
         </p>
-      </Card>
+      </Framed>
     </div>
   );
 }
 
+/* ── sucesso de emissão ── */
 function EmissaoSucesso({
   nota,
   onAbrirDetalhe,
+  reduced,
 }: {
   nota: NotaFiscal;
   onAbrirDetalhe: () => void;
+  reduced: boolean;
 }) {
   return (
-    <Card className="p-8 md:p-10 flex flex-col items-center text-center gap-4 max-w-2xl mx-auto">
-      <motion.div
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", duration: 0.5 }}
-        className="size-16 rounded-full grid place-items-center"
-        style={{ background: "var(--color-lime-d)" }}
-      >
-        <CheckCircle2 className="size-8 text-[var(--color-lime)]" />
-      </motion.div>
+    <Framed marks tone="ink" surface="card" className="flex flex-col items-center text-center gap-5 max-w-2xl mx-auto py-10">
+      {/* BlueprintSchematic como elemento de assinatura — a nota desenhada */}
+      <BlueprintSchematic width={140} figure="nota" />
 
-      <Pill tom="ok">Autorizada</Pill>
-      <h2 className="text-2xl font-extrabold text-[var(--color-txt)] tracking-tight">
-        Nota fiscal emitida com sucesso
-      </h2>
-      <p className="text-sm text-[var(--color-txt-2)] max-w-md leading-relaxed">
-        A SEFAZ autorizou a NF-e nº{" "}
-        <span className="mono text-[var(--color-txt)]">{nota.numero}</span> sob
-        o protocolo{" "}
-        <span className="mono text-[var(--color-txt)]">
-          {nota.protocoloAutorizacao}
-        </span>
-        .
-      </p>
+      {/* Carimbo "Autorizada" — signature motion */}
+      <Carimbo tom="green" sub={formatarDataBR(nota.emitidaEm)}>
+        Autorizada
+      </Carimbo>
 
+      <div className="flex flex-col gap-1">
+        <Pill tom="ok" semIcone>Protocolo recebido</Pill>
+        <h2 className="font-serif text-2xl text-[var(--color-ink)] tracking-tight mt-2">
+          Nota fiscal emitida
+        </h2>
+        <p className="text-sm text-[var(--color-ink-2)] max-w-md leading-relaxed">
+          A SEFAZ autorizou a NF-e nº{" "}
+          <span
+            className="mono text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {nota.numero}
+          </span>{" "}
+          sob o protocolo{" "}
+          <span
+            className="mono text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {nota.protocoloAutorizacao}
+          </span>
+          .
+        </p>
+      </div>
+
+      {/* chave de acesso */}
       <div
-        className="rounded-md border p-3 w-full max-w-md flex flex-col gap-1.5 text-left"
+        className="rounded-[var(--radius-md)] border p-3 w-full max-w-md flex flex-col gap-1.5 text-left"
         style={{
-          background: "var(--color-card-2)",
-          borderColor: "var(--color-line-2)",
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule-2)",
         }}
       >
-        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
+        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
           Chave de acesso
         </span>
-        <span className="mono text-[12px] text-[var(--color-txt)] break-all leading-relaxed">
+        <span
+          className="mono text-[12px] text-[var(--color-ink)] break-all leading-relaxed"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarChave(nota.chave)}
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-        <Button onClick={() => baixarDANFE(nota)} variant="outline">
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button onClick={() => baixarDANFE(nota)} variant="outline" size="sm">
           <FileText className="size-3.5" /> Baixar DANFE (PDF)
         </Button>
-        <Button onClick={() => baixarXml(nota)} variant="outline">
+        <Button onClick={() => baixarXml(nota)} variant="outline" size="sm">
           <Download className="size-3.5" /> Baixar XML
         </Button>
-        <Button onClick={onAbrirDetalhe}>Ver nota emitida</Button>
+        <Button onClick={onAbrirDetalhe} size="sm">
+          Ver nota emitida
+        </Button>
       </div>
 
       <Link
@@ -299,17 +394,24 @@ function EmissaoSucesso({
           e.preventDefault();
           useNfWizardStore.getState().resetar();
         }}
-        className="text-xs text-[var(--color-txt-3)] hover:text-[var(--color-txt)] transition-colors mt-2"
+        className="text-xs text-[var(--color-ink-3)] hover:text-[var(--color-ink)] transition-colors"
       >
         Emitir outra nota
       </Link>
 
+      {/* preservado por invariante — componente funcional */}
       <Moeda valor={nota.totais.valorNota} className="hidden" />
-    </Card>
+    </Framed>
   );
 }
 
-function labelForma(f: NotaFiscal["pagamento"] extends infer P ? P extends { forma: infer F } ? F : never : never): string {
+function labelForma(
+  f: NotaFiscal["pagamento"] extends infer P
+    ? P extends { forma: infer F }
+      ? F
+      : never
+    : never
+): string {
   const map: Record<string, string> = {
     pix: "PIX",
     boleto: "Boleto",
