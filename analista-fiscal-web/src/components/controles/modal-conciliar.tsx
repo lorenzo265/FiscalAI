@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Moeda } from "@/components/shared/moeda";
+import { Fig } from "@/components/blueprint/fig";
 import { useConciliarTransacao } from "@/hooks/use-controles";
 import { useLancamentos } from "@/hooks/use-contabil";
 import { buscarConta } from "@/lib/mocks/seeds/plano-contas";
@@ -49,18 +50,19 @@ export function ModalConciliar({ transacao, aberto, onAbertoChange }: Props) {
     <Dialog open={aberto} onOpenChange={onAbertoChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Conciliar transação</DialogTitle>
+          <DialogTitle>Vincular transação ao livro contábil</DialogTitle>
           <DialogDescription>
-            Vincule esta movimentação bancária a um lançamento contábil. Listamos
-            sugestões com valor compatível (± 1%) próximas da data.
+            Selecione o lançamento correspondente. Sugestões com valor compatível
+            (variação máxima 1%) e próximas da data.
           </DialogDescription>
         </DialogHeader>
 
+        {/* Transação bancária — card Arkan */}
         <div
-          className="rounded-md border p-3 flex items-start justify-between gap-3"
+          className="rounded-[var(--radius-sm)] border p-3 flex items-start justify-between gap-3"
           style={{
-            background: "var(--color-card-2)",
-            borderColor: "var(--color-line-2)",
+            background: "var(--color-paper-2)",
+            borderColor: "var(--color-rule)",
           }}
         >
           <div className="flex flex-col gap-1 min-w-0">
@@ -68,29 +70,37 @@ export function ModalConciliar({ transacao, aberto, onAbertoChange }: Props) {
               <Pill tom={transacao.tipo === "credito" ? "ok" : "warn"}>
                 {transacao.tipo === "credito" ? "entrada" : "saída"}
               </Pill>
-              <span className="mono text-xs text-[var(--color-txt-3)]">
+              <span
+                className="mono text-xs text-[var(--color-ink-2)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {formatarDataBR(transacao.data)}
               </span>
             </div>
-            <p className="text-sm font-semibold text-[var(--color-txt)] truncate">
+            <p className="text-sm font-semibold text-[var(--color-ink)] truncate">
               {transacao.descricao}
             </p>
             {transacao.contraparte ? (
-              <p className="text-xs text-[var(--color-txt-3)] truncate">
+              <p className="text-xs text-[var(--color-ink-2)] truncate">
                 {transacao.contraparte}
               </p>
             ) : null}
           </div>
-          <span className="mono text-lg font-bold text-[var(--color-txt)]">
+          <span
+            className="mono text-lg font-bold text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={transacao.valor} />
           </span>
         </div>
 
+        {/* Lista de sugestões */}
+        <Fig n={1} titulo="Lançamentos sugeridos" size="sm" />
         <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
           {sugestoes.length === 0 ? (
-            <p className="text-sm text-[var(--color-txt-2)] text-center py-6">
-              Nenhuma sugestão encontrada. Você pode marcar como conciliada
-              manualmente ou criar um lançamento manual no Livro Diário.
+            <p className="text-sm text-[var(--color-ink-2)] text-center py-6">
+              Nenhuma sugestão encontrada. Ajuste o período ou crie um
+              lançamento manual no Livro Diário.
             </p>
           ) : (
             sugestoes.map((l) => (
@@ -122,7 +132,7 @@ export function ModalConciliar({ transacao, aberto, onAbertoChange }: Props) {
               onAbertoChange(false);
             }}
           >
-            <Link2 className="size-4" /> Conciliar selecionado
+            <Link2 className="size-4" /> Vincular selecionado
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -146,32 +156,52 @@ function Sugestao({
       type="button"
       onClick={onSelecionar}
       className={cn(
-        "rounded-md border p-3 text-left transition-colors flex items-start justify-between gap-3",
+        "rounded-[var(--radius-sm)] border p-3 text-left transition-colors flex items-start justify-between gap-3",
         selecionado
-          ? "border-[var(--color-lime)] bg-[var(--color-lime-d)]"
-          : "border-[var(--color-line-2)] bg-[var(--color-card-2)] hover:bg-[var(--color-card-3)]"
+          ? "border-[var(--color-green)] bg-[var(--color-paper-2)]"
+          : "border-[var(--color-rule)] bg-[var(--color-paper-2)] hover:bg-[var(--color-paper)]"
       )}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[var(--color-txt)] truncate">
+        <p className="text-sm font-semibold text-[var(--color-ink)] truncate">
           {lancamento.historico}
         </p>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-txt-3)] mono mt-1 flex-wrap">
-          <span className="text-[var(--color-amber)] font-bold">D</span>
-          <span>{lancamento.contaDebito} {cD?.nome ?? ""}</span>
-          <span className="text-[var(--color-lime)] font-bold">C</span>
-          <span>{lancamento.contaCredito} {cC?.nome ?? ""}</span>
+        {/* Débito/crédito — cor+palavra, nunca só cor */}
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono mt-1 flex-wrap"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          <span>
+            <abbr title={`Débito: conta ${lancamento.contaDebito}`} className="no-underline">
+              <span className="text-[var(--color-ochre)] font-bold">D</span>{" "}
+              <span className="text-[var(--color-ink-2)]">{lancamento.contaDebito}</span>
+            </abbr>{" "}
+            {cD?.nome ?? ""}
+          </span>
+          <span aria-hidden className="text-[var(--color-ink-3)]">/</span>
+          <span>
+            <abbr title={`Crédito: conta ${lancamento.contaCredito}`} className="no-underline">
+              <span className="text-[var(--color-green)] font-bold">C</span>{" "}
+              <span className="text-[var(--color-ink-2)]">{lancamento.contaCredito}</span>
+            </abbr>{" "}
+            {cC?.nome ?? ""}
+          </span>
         </div>
-        <span className="mono text-[11px] text-[var(--color-txt-3)] mt-1 block">
+        <span
+          className="mono text-[11px] text-[var(--color-ink-3)] mt-1 block"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarDataBR(lancamento.data)}
         </span>
       </div>
-      <div className="flex flex-col items-end gap-2">
-        <span className="mono text-sm font-bold text-[var(--color-txt)]">
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <span
+          className="mono text-sm font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={lancamento.valor} />
         </span>
         {selecionado ? (
-          <Check className="size-4 text-[var(--color-lime)]" />
+          <Check className="size-4 text-[var(--color-green)]" />
         ) : null}
       </div>
     </button>

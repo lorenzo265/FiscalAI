@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pill } from "@/components/shared/pill";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { cn } from "@/lib/utils";
 
@@ -41,11 +42,12 @@ export function PassoCertificado() {
   }
 
   const validade = "08/05/2027";
-  const subjectMock = dados?.razaoSocial ?? "FiscalAI Demo Ltda";
+  const subjectMock = dados?.razaoSocial ?? "Arkan Demo Ltda";
   const certificadoCompleto = !!fileName;
 
   return (
     <div className="flex flex-col gap-5">
+      {/* dropzone com crop marks no hover */}
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
@@ -61,10 +63,10 @@ export function PassoCertificado() {
           handleFile(f ?? null);
         }}
         className={cn(
-          "flex flex-col items-center gap-3 p-8 rounded-md border-2 border-dashed transition-colors text-left w-full",
+          "flex flex-col items-center gap-3 p-8 rounded-[var(--radius-md)] border-2 border-dashed transition-colors text-left w-full",
           arrastando
-            ? "border-[var(--color-lime)] bg-[var(--color-lime-d)]"
-            : "border-[var(--color-line-2)] bg-[var(--color-card-2)] hover:bg-[var(--color-card-3)]"
+            ? "border-[var(--color-green)] bg-[var(--color-green-wash)]"
+            : "border-[var(--color-rule-2)] bg-[var(--color-paper-2)] hover:bg-[var(--color-rule)]"
         )}
       >
         <input
@@ -75,24 +77,35 @@ export function PassoCertificado() {
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
         <div
-          className="size-12 rounded-md grid place-items-center"
-          style={{ background: "var(--color-card-3)" }}
+          className="size-12 rounded-[var(--radius-sm)] grid place-items-center border"
+          style={{
+            background: "var(--color-green-wash)",
+            borderColor: "var(--color-green)",
+          }}
         >
-          <Upload className="size-5 text-[var(--color-lime)]" />
+          <Upload className="size-5" style={{ color: "var(--color-green)" }} />
         </div>
         <div className="text-center">
-          <p className="text-sm font-semibold text-[var(--color-txt)]">
-            {fileName ? fileName : "Arraste seu certificado aqui ou clique para selecionar"}
+          <p className="text-sm font-semibold text-[var(--color-ink)]">
+            {fileName
+              ? fileName
+              : "Arraste o certificado aqui ou clique para selecionar"}
           </p>
-          <p className="text-xs text-[var(--color-txt-3)] mt-1">
+          <p className="text-xs text-[var(--color-ink-3)] mt-1 mono">
             Aceitamos arquivos .pfx ou .p12 (certificado A1).
           </p>
         </div>
       </button>
 
+      {/* senha */}
       {fileName ? (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="senha-cert">Senha do certificado</Label>
+          <Label
+            htmlFor="senha-cert"
+            className="text-[11px] mono uppercase tracking-[0.12em] font-bold text-[var(--color-ink-3)]"
+          >
+            Senha do certificado
+          </Label>
           <Input
             id="senha-cert"
             type="password"
@@ -103,47 +116,59 @@ export function PassoCertificado() {
         </div>
       ) : null}
 
+      {/* confirmação com Carimbo */}
       {certificadoCompleto ? (
         <div
-          className="rounded-md border p-4 flex items-start gap-3"
+          className="rounded-[var(--radius-md)] border p-4 flex items-start gap-3"
           style={{
-            background: "var(--color-lime-d)",
-            borderColor: "rgba(163, 255, 107, 0.32)",
+            background: "var(--color-green-wash)",
+            borderColor: "var(--color-green)",
           }}
         >
-          <ShieldCheck className="size-5 text-[var(--color-lime)] mt-0.5" />
+          <ShieldCheck
+            className="size-5 mt-0.5 shrink-0"
+            style={{ color: "var(--color-green)" }}
+          />
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[var(--color-txt)]">
-                Certificado válido
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-bold text-[var(--color-ink)]">
+                Certificado carregado
               </span>
-              <Pill tom="ok">a1</Pill>
+              <Pill tom="ok">A1</Pill>
             </div>
-            <p className="text-xs text-[var(--color-txt-2)] mt-0.5">
-              {subjectMock} · válido até <span className="mono">{validade}</span>
+            <p className="text-xs text-[var(--color-ink-2)] mt-0.5">
+              {subjectMock} · válido até{" "}
+              <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {validade}
+              </span>
             </p>
           </div>
+          <Carimbo tom="green" sub="válido">A1</Carimbo>
         </div>
       ) : null}
 
+      {/* nota de segurança */}
       <div
-        className="rounded-md border p-3 flex items-start gap-2.5"
+        className="rounded-[var(--radius-md)] border p-3 flex items-start gap-2.5"
         style={{
-          background: "var(--color-card-2)",
-          borderColor: "var(--color-line-2)",
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule-2)",
         }}
       >
-        <FileLock2 className="size-4 text-[var(--color-blue)] mt-0.5" />
-        <p className="text-xs text-[var(--color-txt-2)] leading-relaxed">
-          Sem certificado, você ainda usa todos os relatórios e o assistente. Só
-          não consegue emitir nota fiscal por aqui — pode pular agora e adicionar
-          depois.
+        <FileLock2
+          className="size-4 mt-0.5 shrink-0"
+          style={{ color: "var(--color-ink-2)" }}
+        />
+        <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
+          Sem certificado, você continua usando relatórios e o assistente. A
+          emissão de NF-e fica indisponível — pode pular agora e adicionar
+          depois em Configurações.
         </p>
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <Button variant="ghost" onClick={pular}>
-          {pulado ? "Já vou pular" : "Pular por enquanto"}
+        <Button variant="ghost" onClick={pular} className="text-xs text-[var(--color-ink-3)]">
+          {pulado ? "Pulando..." : "Pular por enquanto"}
         </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={voltar}>

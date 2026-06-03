@@ -39,22 +39,23 @@ export function Sparkline({ serie, cor, formato }: Props) {
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor={cor} stopOpacity={0.4} />
+              <stop offset="0%" stopColor={cor} stopOpacity={0.35} />
               <stop offset="100%" stopColor={cor} stopOpacity={0} />
             </linearGradient>
           </defs>
           <Tooltip
             contentStyle={{
-              background: "var(--color-card-2)",
-              border: "1px solid var(--color-line-2)",
-              borderRadius: 6,
+              background: "var(--color-card)",
+              border: "1px solid var(--color-rule-2)",
+              borderRadius: 2,
               fontSize: 11,
               padding: "4px 8px",
-              color: "var(--color-txt)",
+              color: "var(--color-ink)",
+              fontFamily: "var(--font-mono)",
             }}
-            labelStyle={{ color: "var(--color-txt-3)", fontSize: 10 }}
+            labelStyle={{ color: "var(--color-ink-3)", fontSize: 10 }}
             formatter={(value: number) => [formatar(formato, value), ""]}
-            cursor={{ stroke: "var(--color-line-2)", strokeDasharray: 2 }}
+            cursor={{ stroke: "var(--color-rule-2)", strokeDasharray: 2 }}
           />
           <Area
             type="monotone"

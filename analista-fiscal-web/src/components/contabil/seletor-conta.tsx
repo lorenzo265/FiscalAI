@@ -12,6 +12,15 @@ import {
 } from "@/components/ui/select";
 import { PLANO_CONTAS } from "@/lib/mocks/seeds/plano-contas";
 
+const NATUREZA_LABEL: Record<string, string> = {
+  ativo: "Ativo",
+  passivo: "Passivo",
+  patrimonio_liquido: "Patrimônio Líquido",
+  receita: "Receita",
+  despesa: "Despesa",
+  resultado: "Resultado",
+};
+
 interface Props {
   valor: string;
   onSelecionar: (codigo: string) => void;
@@ -49,14 +58,18 @@ export function SeletorConta({
       <SelectContent className="max-h-[320px]">
         {grupos.map(([natureza, contas]) => (
           <SelectGroup key={natureza}>
-            <SelectLabel className="capitalize">
-              {natureza.replace("_", " ")}
+            <SelectLabel className="capitalize mono text-[10px] tracking-[0.14em] uppercase text-[var(--color-ink-3)]">
+              {NATUREZA_LABEL[natureza] ?? natureza.replace("_", " ")}
             </SelectLabel>
             {contas.map((c) => (
               <SelectItem key={c.codigo} value={c.codigo}>
-                <span className="mono text-[11px] text-[var(--color-txt-3)] mr-2">
+                <abbr
+                  title={`Código: ${c.codigo}`}
+                  className="no-underline mono text-[11px] text-[var(--color-ink-2)] mr-2"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
                   {c.codigo}
-                </span>
+                </abbr>
                 {c.nome}
               </SelectItem>
             ))}

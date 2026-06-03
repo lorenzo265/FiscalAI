@@ -38,72 +38,72 @@ export function GraficoFluxoCaixa({ pontos, isLoading }: Props) {
         >
           <defs>
             <linearGradient id="grad-saldo-positivo" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-lime)" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="var(--color-lime)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--color-green)" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="var(--color-green)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="grad-saldo-projecao" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-blue)" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="var(--color-blue)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--color-ink-2)" stopOpacity={0.16} />
+              <stop offset="100%" stopColor="var(--color-ink-2)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <CartesianGrid stroke="var(--color-rule)" vertical={false} />
           <XAxis
             dataKey="data"
             tickFormatter={(v) => formatarDiaMesBR(v)}
-            tick={{ fill: "var(--color-txt-3)", fontSize: 11 }}
-            stroke="var(--color-line-2)"
+            tick={{ fill: "var(--color-ink-3)", fontSize: 11, fontFamily: "var(--font-mono)" }}
+            stroke="var(--color-rule-2)"
             interval="preserveStartEnd"
             minTickGap={24}
           />
           <YAxis
             tickFormatter={(v) => formatarMoedaCompacta(Number(v))}
-            tick={{ fill: "var(--color-txt-3)", fontSize: 11 }}
-            stroke="var(--color-line-2)"
+            tick={{ fill: "var(--color-ink-3)", fontSize: 11, fontFamily: "var(--font-mono)" }}
+            stroke="var(--color-rule-2)"
             width={70}
           />
           <Tooltip
             contentStyle={{
-              background: "var(--color-card-2)",
-              border: "1px solid var(--color-line-2)",
-              borderRadius: 8,
+              background: "var(--color-paper-2)",
+              border: "1px solid var(--color-rule)",
+              borderRadius: "var(--radius-sm)",
               fontSize: 12,
-              color: "var(--color-txt)",
+              color: "var(--color-ink)",
+              fontFamily: "var(--font-mono)",
             }}
-            labelStyle={{ color: "var(--color-txt-3)" }}
+            labelStyle={{ color: "var(--color-ink-2)" }}
             labelFormatter={(v) => formatarDataBR(String(v))}
-            formatter={(value: number) => [
-              formatarMoeda(value),
-              "Saldo",
-            ]}
+            formatter={(value: number) => [formatarMoeda(value), "Saldo"]}
           />
-          <ReferenceLine y={0} stroke="var(--color-red)" strokeDasharray="3 3" />
+          <ReferenceLine y={0} stroke="var(--color-danger)" strokeDasharray="3 3" />
           {hojeData ? (
             <ReferenceLine
               x={hojeData}
-              stroke="var(--color-lime)"
+              stroke="var(--color-green)"
               strokeDasharray="3 3"
               label={{
                 value: "hoje",
-                fill: "var(--color-lime)",
+                fill: "var(--color-green)",
                 fontSize: 10,
                 position: "top",
               }}
             />
           ) : null}
+          {/* Série histórica — verde (entradas = saúde fiscal) */}
           <Area
             type="monotone"
             dataKey={(p: FluxoCaixaPonto) => (p.projecao ? null : p.saldo)}
-            stroke="var(--color-lime)"
+            stroke="var(--color-green)"
             strokeWidth={2}
             fill="url(#grad-saldo-positivo)"
             isAnimationActive={false}
             connectNulls={false}
-            name="Saldo"
+            name="Saldo histórico"
           />
+          {/* Série de projeção — traço, tinta neutra */}
           <Area
             type="monotone"
             dataKey={(p: FluxoCaixaPonto) => (p.projecao ? p.saldo : null)}
-            stroke="var(--color-blue)"
+            stroke="var(--color-ink-2)"
             strokeWidth={2}
             strokeDasharray="4 4"
             fill="url(#grad-saldo-projecao)"

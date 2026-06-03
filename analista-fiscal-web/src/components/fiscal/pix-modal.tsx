@@ -41,7 +41,8 @@ export function PixModal({
     QRCode.toDataURL(pixCopiaCola, {
       width: 240,
       margin: 1,
-      color: { dark: "#06080f", light: "#ffffff" },
+      // usa token semântico em vez de hardcode #06080f
+      color: { dark: "#1b1a15", light: "#f7f5ee" },
     })
       .then((url) => {
         if (!cancelado) setQrUrl(url);
@@ -74,7 +75,7 @@ export function PixModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <QrIcon className="size-4 text-[var(--color-lime)]" />
+            <QrIcon className="size-4 text-[var(--color-green)]" />
             Pagar via PIX
           </DialogTitle>
           <DialogDescription>
@@ -83,10 +84,10 @@ export function PixModal({
         </DialogHeader>
 
         <div
-          className="rounded-md border p-4 flex flex-col items-center gap-3"
+          className="rounded-[var(--radius-md)] border p-4 flex flex-col items-center gap-3"
           style={{
-            background: "var(--color-card-2)",
-            borderColor: "var(--color-line-2)",
+            background: "var(--color-paper-2)",
+            borderColor: "var(--color-rule-2)",
           }}
         >
           {qrUrl ? (
@@ -94,28 +95,34 @@ export function PixModal({
             <img
               src={qrUrl}
               alt="QR Code PIX"
-              className="size-[200px] rounded-md bg-white p-2"
+              className="size-[200px] rounded-[var(--radius-md)] bg-white p-2"
             />
           ) : (
-            <div className="size-[200px] rounded-md bg-[var(--color-card-3)] animate-pulse" />
+            <div
+              className="size-[200px] rounded-[var(--radius-md)] animate-pulse"
+              style={{ background: "var(--color-rule)" }}
+            />
           )}
-          <span className="mono text-2xl font-bold text-[var(--color-txt)]">
+          <span
+            className="mono text-2xl font-bold text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={valor} />
           </span>
-          <span className="text-[11px] text-[var(--color-txt-3)]">
+          <span className="text-[11px] text-[var(--color-ink-3)]">
             Aponte a câmera do app do seu banco
           </span>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)]">
+          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
             PIX copia e cola
           </span>
           <div
-            className="rounded-md border px-3 py-2 mono text-[11px] text-[var(--color-txt-2)] break-all leading-relaxed max-h-24 overflow-auto"
+            className="rounded-[var(--radius-md)] border px-3 py-2 mono text-[11px] text-[var(--color-ink-2)] break-all leading-relaxed max-h-24 overflow-auto"
             style={{
-              background: "var(--color-card-2)",
-              borderColor: "var(--color-line-2)",
+              background: "var(--color-paper-2)",
+              borderColor: "var(--color-rule-2)",
             }}
           >
             {pixCopiaCola}

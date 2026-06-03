@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, Mail, Send, X } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +17,9 @@ import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ComplianceSubnav } from "@/components/compliance/compliance-subnav";
 import {
   useEnviarIntimacaoAoContador,
@@ -29,41 +32,69 @@ import {
   type StatusIntimacao,
 } from "@/lib/schemas/compliance";
 import { formatarDataBR, formatarDataHoraBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 const STATUS_TOM: Record<StatusIntimacao, "warn" | "info" | "ok" | "neutral"> = {
-  nova: "warn",
-  lida: "info",
+  nova:        "warn",
+  lida:        "info",
   em_resposta: "info",
-  respondida: "ok",
-  encerrada: "neutral",
+  respondida:  "ok",
+  encerrada:   "neutral",
 };
 
 const STATUS_LABEL: Record<StatusIntimacao, string> = {
-  nova: "nova",
-  lida: "lida",
+  nova:        "nova",
+  lida:        "lida",
   em_resposta: "em resposta",
-  respondida: "respondida",
-  encerrada: "encerrada",
+  respondida:  "respondida",
+  encerrada:   "encerrada",
 };
 
 export default function IntimacoesPage() {
   const { data, isLoading, isError, refetch } = useIntimacoes();
   const [selecionada, setSelecionada] = React.useState<Intimacao | null>(null);
+  const reduced = useReducedMotion();
+
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header variants={containerVariants} initial="hidden" animate="show">
+        <motion.span
+          variants={itemVariants}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
           Compliance · Intimações
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+        </motion.span>
+        <motion.h1
+          variants={itemVariants}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
           Intimações fiscais
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-          Mensagens da Receita, PGFN, INSS, Sefaz, Prefeitura e Ministério do
-          Trabalho. A gente busca todo dia no e-CAC e nos portais oficiais.
-        </p>
-      </header>
+        </motion.h1>
+        <motion.p
+          variants={itemVariants}
+          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
+        >
+          Mensagens da Receita Federal, PGFN, INSS, Sefaz, Prefeitura e
+          Ministério do Trabalho. Buscamos todos os dias no e-CAC e portais
+          oficiais.
+        </motion.p>
+      </motion.header>
 
       <ComplianceSubnav />
 
@@ -74,12 +105,16 @@ export default function IntimacoesPage() {
       ) : !data || data.length === 0 ? (
         <EmptyState
           titulo="Nenhuma intimação"
-          descricao="Sua caixa postal eletrônica está vazia. Você pode dormir tranquilo."
+          descricao="Sua caixa postal eletrônica está vazia."
           icone={Mail}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <ul className="divide-y" style={{ borderColor: "var(--color-line)" }}>
+        <Framed marks={false} tone="rule" surface="card" padded={false}>
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Intimações recebidas" size="sm" />
+          </div>
+          <Ruler />
+          <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {data.map((i) => (
               <LinhaIntimacao
                 key={i.id}
@@ -88,14 +123,14 @@ export default function IntimacoesPage() {
               />
             ))}
           </ul>
-        </Card>
+        </Framed>
       )}
 
       <DetalheIntimacaoDialog
         intimacao={selecionada}
         onClose={() => setSelecionada(null)}
       />
-    </div>
+    </motion.div>
   );
 }
 
@@ -113,7 +148,7 @@ function LinhaIntimacao({
 
   return (
     <li
-      className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors cursor-pointer"
+      className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors cursor-pointer"
       onClick={onAbrir}
       role="button"
       tabIndex={0}
@@ -124,8 +159,8 @@ function LinhaIntimacao({
         }
       }}
     >
-      <div className="flex flex-col shrink-0 w-32">
-        <span className="mono text-xs font-bold text-[var(--color-txt)]">
+      <div className="flex flex-col shrink-0 w-36 gap-1">
+        <span className="mono text-xs font-bold text-[var(--color-ink)]">
           {ORGAO_LABEL[intimacao.orgao]}
         </span>
         <Pill tom={STATUS_TOM[intimacao.status]}>
@@ -133,24 +168,19 @@ function LinhaIntimacao({
         </Pill>
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm font-semibold text-[var(--color-txt)] truncate">
+        <span className="text-sm font-semibold text-[var(--color-ink)] truncate">
           {intimacao.assunto}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-txt-3)] mono flex-wrap">
-          <span>Protocolo {intimacao.protocolo}</span>
-          <span className="size-1 rounded-full bg-[var(--color-line-2)]" />
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-3)] mono flex-wrap"
+             style={{ fontVariantNumeric: "tabular-nums" }}>
+          <span><abbr title="Número do protocolo">Protocolo</abbr> {intimacao.protocolo}</span>
+          <span className="size-1 rounded-full bg-[var(--color-rule-2)]" aria-hidden />
           <span>Recebida {formatarDataHoraBR(intimacao.recebidoEm)}</span>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
         <Pill
-          tom={
-            dias < 0
-              ? "error"
-              : dias <= 7
-                ? "warn"
-                : "neutral"
-          }
+          tom={dias < 0 ? "error" : dias <= 7 ? "warn" : "neutral"}
         >
           {dias < 0
             ? `prazo vencido há ${Math.abs(dias)}d`
@@ -190,18 +220,19 @@ function DetalheIntimacaoDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <div className="flex items-center justify-between gap-3">
-            <DialogTitle>{intimacao.assunto}</DialogTitle>
+            <DialogTitle className="font-serif">{intimacao.assunto}</DialogTitle>
             <button
               type="button"
               onClick={onClose}
-              className="text-[var(--color-txt-3)] hover:text-[var(--color-txt)]"
+              className="text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
               aria-label="Fechar"
             >
               <X className="size-4" />
             </button>
           </div>
-          <DialogDescription>
-            {ORGAO_LABEL[intimacao.orgao]} · Protocolo {intimacao.protocolo} ·
+          <DialogDescription className="mono text-[11px]"
+                              style={{ fontVariantNumeric: "tabular-nums" }}>
+            {ORGAO_LABEL[intimacao.orgao]} · <abbr title="Número do protocolo">Protocolo</abbr> {intimacao.protocolo} ·
             Recebida {formatarDataHoraBR(intimacao.recebidoEm)}
           </DialogDescription>
         </DialogHeader>
@@ -219,11 +250,11 @@ function DetalheIntimacaoDialog({
         </div>
 
         <div
-          className="rounded-md border p-4 max-h-[320px] overflow-y-auto whitespace-pre-line text-sm leading-relaxed"
+          className="rounded-[var(--radius-md)] border p-4 max-h-[320px] overflow-y-auto whitespace-pre-line text-sm leading-relaxed"
           style={{
-            background: "var(--color-card-2)",
-            borderColor: "var(--color-line-2)",
-            color: "var(--color-txt)",
+            background: "var(--color-paper-2)",
+            borderColor: "var(--color-rule-2)",
+            color: "var(--color-ink)",
           }}
         >
           {intimacao.texto}
@@ -263,7 +294,7 @@ function DetalheIntimacaoDialog({
             )}
             {intimacao.enviadoContador
               ? "Já enviada ao contador"
-              : "Enviar pra meu contador"}
+              : "Enviar ao meu contador"}
           </Button>
         </DialogFooter>
       </DialogContent>

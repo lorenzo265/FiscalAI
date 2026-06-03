@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { ArrowRight, FileSignature } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
 import { useFiscalSaude } from "@/hooks/use-fiscal-saude";
 import { formatarDataBR } from "@/lib/format/data";
 
@@ -14,12 +15,10 @@ export function ProximaObrigacaoCard() {
   const obrig = data?.proximaObrigacao;
 
   return (
-    <Card className="p-5 flex flex-col gap-3">
+    <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <FileSignature className="size-4 text-[var(--color-amber)]" />
-        <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-          Próxima obrigação
-        </span>
+        <FileSignature className="size-4 text-[var(--color-ochre)]" aria-hidden />
+        <Fig n={2} titulo="Próxima obrigação" size="sm" />
         <Pill tom="warn">declaração</Pill>
       </div>
       {isLoading || !obrig ? (
@@ -29,13 +28,16 @@ export function ProximaObrigacaoCard() {
         </>
       ) : (
         <>
-          <p className="text-lg font-bold text-[var(--color-txt)] leading-tight">
+          <p className="text-lg font-semibold text-[var(--color-ink)] leading-tight">
             {obrig.titulo}
           </p>
-          <p className="text-sm text-[var(--color-txt-2)] leading-relaxed">
+          <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
             {obrig.descricao}
           </p>
-          <p className="text-xs text-[var(--color-txt-3)] mono">
+          <p
+            className="text-xs text-[var(--color-ink-3)] mono"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             até {formatarDataBR(obrig.vencimento)}
           </p>
         </>
@@ -48,6 +50,6 @@ export function ProximaObrigacaoCard() {
           </Link>
         </Button>
       ) : null}
-    </Card>
+    </Framed>
   );
 }

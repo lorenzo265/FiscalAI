@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,7 +12,6 @@ import {
 } from "lucide-react";
 import { useQueryStates, parseAsString } from "nuqs";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,11 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatCard } from "@/components/shared/stat-card";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { StatusEventoPill } from "@/components/pessoal/status-evento-pill";
 import {
@@ -37,10 +39,18 @@ import {
   type EventoEsocial,
 } from "@/lib/schemas/pessoal";
 import { formatarDataHoraBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 export default function EsocialPage() {
   const { data, isLoading, isError, refetch } = useEventosEsocial();
   const reenviar = useReenviarEvento();
+  const reduced = useReducedMotion();
 
   const [filtros, setFiltros] = useQueryStates(
     {
@@ -58,7 +68,8 @@ export default function EsocialPage() {
       if (filtros.status !== "todos" && e.status !== filtros.status) return false;
       if (filtros.tipo !== "todos" && e.tipo !== filtros.tipo) return false;
       if (q) {
-        const alvo = `${e.funcionarioNome ?? ""} ${e.tipo} ${e.competencia} ${e.recibo ?? ""}`.toLowerCase();
+        const alvo =
+          `${e.funcionarioNome ?? ""} ${e.tipo} ${e.competencia} ${e.recibo ?? ""}`.toLowerCase();
         if (!alvo.includes(q)) return false;
       }
       return true;
@@ -78,40 +89,71 @@ export default function EsocialPage() {
 
   const erros = (data ?? []).filter((e) => e.status === "erro");
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
         <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
             Pessoal · eSocial
-          </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          >
             Eventos do eSocial
-          </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-            Cada admissão, demissão ou folha gera um evento. Aqui você vê o
-            que foi transmitido, o que pode falhar e o que precisa de
-            correção.
-          </p>
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Cada admissão, demissão ou folha gera um evento aqui. Veja o que
+            foi transmitido e o que precisa de correção.
+          </motion.p>
         </div>
-      </header>
+      </motion.header>
 
       <PessoalSubnav />
 
+      {/* ── alerta de erros ── */}
       {erros.length > 0 ? (
-        <Alert variant="warn" className="flex flex-col md:flex-row md:items-center gap-3">
+        <Framed
+          marks={false}
+          tone="rule"
+          surface="paper-2"
+          className="flex flex-col md:flex-row md:items-center gap-3"
+          style={{ borderColor: "var(--color-danger)" }}
+        >
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+            <AlertTriangle className="size-4 mt-0.5 shrink-0 text-[var(--color-danger)]" />
             <div>
-              <AlertTitle>
+              <p className="text-sm font-semibold text-[var(--color-ink)]">
                 {erros.length} evento{erros.length > 1 ? "s" : ""} com erro
-              </AlertTitle>
-              <AlertDescription>
+              </p>
+              <p className="text-xs text-[var(--color-ink-2)] mt-0.5">
                 Reenvie agora para evitar pendências no fechamento da folha.
-              </AlertDescription>
+              </p>
             </div>
           </div>
           <Button
+            size="sm"
             className="shrink-0"
             disabled={reenviar.isPending}
             onClick={async () => {
@@ -130,9 +172,10 @@ export default function EsocialPage() {
             )}
             Reenviar todos
           </Button>
-        </Alert>
+        </Framed>
       ) : null}
 
+      {/* ── totais ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           label="Transmitidos"
@@ -162,9 +205,15 @@ export default function EsocialPage() {
         />
       </div>
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed
+        marks={false}
+        tone="rule"
+        surface="card"
+        className="flex flex-col md:flex-row md:items-center gap-3"
+      >
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-ink-3)]" />
           <Input
             value={filtros.q}
             onChange={(e) => void setFiltros({ q: e.target.value })}
@@ -191,20 +240,28 @@ export default function EsocialPage() {
           value={filtros.tipo}
           onValueChange={(v) => void setFiltros({ tipo: v })}
         >
-          <SelectTrigger className="w-full md:w-[180px]">
+          <SelectTrigger className="w-full md:w-[200px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os tipos</SelectItem>
             {Object.entries(TIPO_EVENTO_ESOCIAL_LABEL).map(([cod, label]) => (
               <SelectItem key={cod} value={cod}>
-                {cod} — {label}
+                <abbr
+                  title={`Código eSocial: ${cod}`}
+                  className="no-underline mono text-[11px] text-[var(--color-ink-2)]"
+                >
+                  {cod}
+                </abbr>
+                {" — "}
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </Card>
+      </Framed>
 
+      {/* ── conteúdo principal ── */}
       {isLoading ? (
         <LoadingState titulo="Carregando eventos..." />
       ) : isError ? (
@@ -215,11 +272,12 @@ export default function EsocialPage() {
           descricao="Ajuste os filtros ou aguarde a próxima folha."
         />
       ) : (
-        <Card className="overflow-hidden">
-          <ul
-            className="divide-y"
-            style={{ borderColor: "var(--color-line)" }}
-          >
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Registro de eventos eSocial" size="sm" />
+          </div>
+          <Ruler />
+          <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {lista.map((e) => (
               <LinhaEvento
                 key={e.id}
@@ -230,13 +288,15 @@ export default function EsocialPage() {
                     description: "eSocial confirmou o recebimento.",
                   });
                 }}
-                reenviando={reenviar.isPending && reenviar.variables?.id === e.id}
+                reenviando={
+                  reenviar.isPending && reenviar.variables?.id === e.id
+                }
               />
             ))}
           </ul>
-        </Card>
+        </Framed>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -250,37 +310,56 @@ function LinhaEvento({
   reenviando?: boolean;
 }) {
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-32">
-        <span className="mono text-xs font-bold text-[var(--color-txt)]">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
+      <div className="flex flex-col shrink-0 w-36 gap-1">
+        <abbr
+          title={`Código eSocial: ${evento.tipo} — ${TIPO_EVENTO_ESOCIAL_LABEL[evento.tipo]}`}
+          className="no-underline mono text-xs font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {evento.tipo}
-        </span>
+        </abbr>
         <StatusEventoPill status={evento.status} />
       </div>
 
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-txt)] truncate">
+        <span className="text-sm text-[var(--color-ink)] truncate">
           {TIPO_EVENTO_ESOCIAL_LABEL[evento.tipo]}
           {evento.funcionarioNome ? ` · ${evento.funcionarioNome}` : ""}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-txt-3)] mono flex-wrap">
-          <span>Competência {evento.competencia}</span>
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-3)] mono flex-wrap">
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            Competência {evento.competencia}
+          </span>
           {evento.recibo ? (
             <>
-              <span className="size-1 rounded-full bg-[var(--color-line-2)]" />
-              <span>Recibo {evento.recibo}</span>
+              <span
+                className="size-1 rounded-[var(--radius-sm)]"
+                style={{ background: "var(--color-rule-2)" }}
+              />
+              <span>
+                Recibo{" "}
+                <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {evento.recibo}
+                </span>
+              </span>
             </>
           ) : null}
           {evento.transmitidoEm ? (
             <>
-              <span className="size-1 rounded-full bg-[var(--color-line-2)]" />
-              <span>{formatarDataHoraBR(evento.transmitidoEm)}</span>
+              <span
+                className="size-1 rounded-[var(--radius-sm)]"
+                style={{ background: "var(--color-rule-2)" }}
+              />
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatarDataHoraBR(evento.transmitidoEm)}
+              </span>
             </>
           ) : null}
         </div>
         {evento.motivoErro ? (
-          <span className="text-[11px] text-[var(--color-red)] mt-0.5 flex items-center gap-1">
-            <AlertTriangle className="size-3" />
+          <span className="text-[11px] text-[var(--color-danger)] mt-0.5 flex items-center gap-1">
+            <AlertTriangle className="size-3 shrink-0" />
             {evento.motivoErro}
           </span>
         ) : null}
@@ -288,13 +367,14 @@ function LinhaEvento({
 
       <div className="flex items-center gap-2 shrink-0">
         {evento.status === "transmitido" ? (
-          <span className="flex items-center gap-1 text-[11px] mono text-[var(--color-lime)]">
+          <span className="flex items-center gap-1 text-[11px] mono text-[var(--color-green)]">
             <CheckCircle2 className="size-3.5" /> ok
           </span>
         ) : null}
         {evento.status === "erro" || evento.status === "pendente" ? (
           <Button
             variant="outline"
+            size="sm"
             onClick={() => void aoReenviar()}
             disabled={reenviando}
           >

@@ -7,9 +7,9 @@ import {
   Plus,
   Search,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useQueryStates, parseAsString } from "nuqs";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,9 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pill } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ContabilSubnav } from "@/components/contabil/contabil-subnav";
 import { OrigemPill } from "@/components/contabil/origem-pill";
 import { SeletorConta } from "@/components/contabil/seletor-conta";
@@ -42,6 +45,13 @@ import {
 import { buscarConta, PLANO_CONTAS } from "@/lib/mocks/seeds/plano-contas";
 import { formatarMoeda } from "@/lib/format/moeda";
 import { formatarDataBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import type {
   LancamentoContabil,
   OrigemLancamento,
@@ -60,6 +70,7 @@ const ORIGENS: Array<{ id: string; label: string }> = [
 export default function LivroDiarioPage() {
   const { data, isLoading, isError, refetch } = useLancamentos();
   const adicionar = useAdicionarLancamento();
+  const reduced = useReducedMotion();
 
   const [filtros, setFiltros] = useQueryStates(
     {
@@ -92,31 +103,58 @@ export default function LivroDiarioPage() {
     });
   }, [data, filtros]);
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
         <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
             Módulo contábil
-          </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          >
             Livro Diário
-          </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-xl mt-1">
-            Cada movimento da empresa virou partida dobrada. Sistema preenche
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Cada movimento da empresa virou partida dobrada. O sistema preenche
             automaticamente — você ajusta só o que é incomum.
-          </p>
+          </motion.p>
         </div>
-        <Button onClick={() => setAberto(true)}>
-          <Plus className="size-4" /> Novo lançamento manual
-        </Button>
-      </header>
+        <motion.div variants={itemV}>
+          <Button onClick={() => setAberto(true)}>
+            <Plus className="size-4" /> Novo lançamento manual
+          </Button>
+        </motion.div>
+      </motion.header>
 
       <ContabilSubnav />
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col md:flex-row md:items-center gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-ink-3)]" />
           <Input
             value={filtros.q}
             onChange={(e) => void setFiltros({ q: e.target.value })}
@@ -150,9 +188,13 @@ export default function LivroDiarioPage() {
             <SelectItem value="todas">Todas as contas</SelectItem>
             {PLANO_CONTAS.filter((c) => c.analitica).map((c) => (
               <SelectItem key={c.codigo} value={c.codigo}>
-                <span className="mono text-[11px] text-[var(--color-txt-3)] mr-2">
+                <abbr
+                  title={`Código: ${c.codigo}`}
+                  className="no-underline mono text-[11px] text-[var(--color-ink-2)] mr-2"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
                   {c.codigo}
-                </span>
+                </abbr>
                 {c.nome}
               </SelectItem>
             ))}
@@ -173,8 +215,9 @@ export default function LivroDiarioPage() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-      </Card>
+      </Framed>
 
+      {/* ── lista ── */}
       {isLoading ? (
         <LoadingState titulo="Carregando lançamentos..." />
       ) : isError ? (
@@ -183,17 +226,35 @@ export default function LivroDiarioPage() {
         <EmptyState
           titulo="Nenhum lançamento"
           descricao="Ajuste os filtros ou crie um lançamento manual."
+          acao={
+            <Button onClick={() => setAberto(true)}>
+              <Plus className="size-4" /> Novo lançamento manual
+            </Button>
+          }
         />
       ) : (
-        <Card className="overflow-hidden">
-          <ul className="divide-y" style={{ borderColor: "var(--color-line)" }}>
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Livro Diário" size="sm" />
+          </div>
+          <Ruler />
+          <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {[...filtrados]
               .sort((a, b) => b.data.localeCompare(a.data))
               .map((l) => (
                 <LinhaLancamento key={l.id} lancamento={l} />
               ))}
           </ul>
-        </Card>
+          <Ruler />
+          <div className="px-5 py-2.5">
+            <span
+              className="text-xs text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {filtrados.length} lançamento(s)
+            </span>
+          </div>
+        </Framed>
       )}
 
       <NovoLancamentoDialog
@@ -206,7 +267,7 @@ export default function LivroDiarioPage() {
         }}
         salvando={adicionar.isPending}
       />
-    </div>
+    </motion.div>
   );
 }
 
@@ -215,27 +276,40 @@ function LinhaLancamento({ lancamento }: { lancamento: LancamentoContabil }) {
   const cC = buscarConta(lancamento.contaCredito);
   const baixa = lancamento.confianca < 0.7;
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-24">
-        <span className="mono text-xs font-bold text-[var(--color-txt)]">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
+      <div className="flex flex-col shrink-0 w-28 gap-1">
+        <span
+          className="mono text-xs font-bold text-[var(--color-ink-2)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarDataBR(lancamento.data)}
         </span>
         <OrigemPill origem={lancamento.origem} />
       </div>
 
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-txt)] truncate">
+        <span className="text-sm text-[var(--color-ink)] truncate">
           {lancamento.historico}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-txt-3)] mono flex-wrap">
+        {/* D/C — cor+palavra, nunca só cor */}
+        <div
+          className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <span>
-            <strong className="text-[var(--color-amber)]">D</strong>{" "}
-            {lancamento.contaDebito} {cD?.nome ?? ""}
+            <abbr title={`Débito: conta ${lancamento.contaDebito}`} className="no-underline">
+              <span className="text-[var(--color-ochre)] font-bold">D</span>
+            </abbr>{" "}
+            <span className="text-[var(--color-ink-2)]">{lancamento.contaDebito}</span>{" "}
+            {cD?.nome ?? ""}
           </span>
-          <ArrowLeftRight className="size-3" />
+          <ArrowLeftRight className="size-3 shrink-0 text-[var(--color-ink-3)]" />
           <span>
-            <strong className="text-[var(--color-lime)]">C</strong>{" "}
-            {lancamento.contaCredito} {cC?.nome ?? ""}
+            <abbr title={`Crédito: conta ${lancamento.contaCredito}`} className="no-underline">
+              <span className="text-[var(--color-green)] font-bold">C</span>
+            </abbr>{" "}
+            <span className="text-[var(--color-ink-2)]">{lancamento.contaCredito}</span>{" "}
+            {cC?.nome ?? ""}
           </span>
         </div>
       </div>
@@ -243,14 +317,17 @@ function LinhaLancamento({ lancamento }: { lancamento: LancamentoContabil }) {
       <div className="flex items-center gap-2 shrink-0">
         {baixa ? (
           <span
-            title={`Confiança ${Math.round(lancamento.confianca * 100)}%`}
-            className="flex items-center gap-1 text-[11px] mono text-[var(--color-amber)]"
+            title={`Confiança da classificação: ${Math.round(lancamento.confianca * 100)}%`}
+            className="flex items-center gap-1 text-[11px] mono text-[var(--color-ochre)]"
           >
             <AlertTriangle className="size-3.5" />
             {Math.round(lancamento.confianca * 100)}%
           </span>
         ) : null}
-        <span className="mono text-base font-bold text-[var(--color-txt)]">
+        <span
+          className="mono text-base font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarMoeda(lancamento.valor)}
         </span>
       </div>
@@ -298,6 +375,7 @@ function NovoLancamentoDialog({
               value={data}
               onChange={(e) => setData(e.target.value)}
               className="mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -309,14 +387,21 @@ function NovoLancamentoDialog({
               value={valor}
               onChange={(e) => setValor(e.target.value)}
               className="mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             />
           </div>
           <div className="flex flex-col gap-1.5 md:col-span-2">
-            <Label>Conta débito</Label>
+            <Label>
+              <span className="text-[var(--color-ochre)] font-bold mr-1">D</span>
+              Conta débito
+            </Label>
             <SeletorConta valor={debito} onSelecionar={setDebito} />
           </div>
           <div className="flex flex-col gap-1.5 md:col-span-2">
-            <Label>Conta crédito</Label>
+            <Label>
+              <span className="text-[var(--color-green)] font-bold mr-1">C</span>
+              Conta crédito
+            </Label>
             <SeletorConta valor={credito} onSelecionar={setCredito} />
           </div>
           <div className="flex flex-col gap-1.5 md:col-span-2">

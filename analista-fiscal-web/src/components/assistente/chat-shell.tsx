@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Send, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Send, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/loading-state";
@@ -50,31 +50,37 @@ export function ChatShell({ compacto }: Props) {
     <div
       className={cn(
         "flex flex-col h-full min-h-0",
-        compacto ? "" : "rounded-lg border bg-[var(--color-card)] overflow-hidden"
+        compacto
+          ? ""
+          : "rounded-[var(--radius-md)] border bg-[var(--color-card)] overflow-hidden"
       )}
-      style={!compacto ? { borderColor: "var(--color-line-2)" } : undefined}
+      style={!compacto ? { borderColor: "var(--color-rule-2)" } : undefined}
     >
+      {/* ── cabeçalho (somente modo não-compacto) ── */}
       {!compacto ? (
         <div
           className="flex items-center justify-between gap-2 px-4 py-3 border-b"
-          style={{ borderColor: "var(--color-line)" }}
+          style={{ borderColor: "var(--color-rule)" }}
         >
           <div className="flex items-center gap-2">
+            {/* quadrado técnico Arkan */}
             <div
-              className="size-7 rounded-full grid place-items-center border"
+              className="size-7 rounded-[var(--radius-sm)] grid place-items-center border shrink-0"
               style={{
-                background: "var(--color-lime-d)",
-                borderColor: "rgba(163,255,107,0.32)",
-                color: "var(--color-lime)",
+                background: "var(--color-green-wash)",
+                borderColor: "var(--color-green)",
+                color: "var(--color-green)",
               }}
             >
-              <Sparkles className="size-3.5" />
+              <span className="mono text-[9px] font-bold uppercase leading-none">
+                AR
+              </span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-[var(--color-txt)]">
-                Analista FiscalAI
+              <p className="text-sm font-semibold text-[var(--color-ink)]">
+                Arkan Assistente
               </p>
-              <p className="text-[10px] mono uppercase tracking-[0.16em] text-[var(--color-txt-3)]">
+              <p className="text-[10px] mono uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
                 Online · responde em tempo real
               </p>
             </div>
@@ -86,13 +92,14 @@ export function ChatShell({ compacto }: Props) {
             }}
             disabled={limpar.isPending}
             aria-label="Limpar histórico"
-            className="text-xs text-[var(--color-txt-3)] hover:text-[var(--color-txt)]"
+            className="text-xs text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
           >
             <Trash2 className="size-3.5" /> Limpar
           </Button>
         </div>
       ) : null}
 
+      {/* ── área de mensagens ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 min-h-0">
         {isLoading ? (
           <LoadingState titulo="Carregando conversa..." />
@@ -114,6 +121,7 @@ export function ChatShell({ compacto }: Props) {
         <div ref={fimRef} />
       </div>
 
+      {/* ── sugestões iniciais (só quando histórico está vazio) ── */}
       {(mensagens?.length ?? 0) <= 1 && !enviar.isPending ? (
         <div
           className="flex flex-wrap gap-1.5 px-4 pb-3 pt-1"
@@ -124,10 +132,10 @@ export function ChatShell({ compacto }: Props) {
               key={s.texto}
               type="button"
               onClick={() => aoEnviarSugestao(s)}
-              className="text-[11px] mono uppercase tracking-[0.12em] font-bold px-2.5 py-1 rounded-full border transition-colors hover:bg-[var(--color-card-2)]"
+              className="text-[10px] mono uppercase tracking-[0.12em] font-bold px-2.5 py-1 rounded-[var(--radius-sm)] border transition-colors hover:bg-[var(--color-paper-2)]"
               style={{
-                borderColor: "var(--color-line-2)",
-                color: "var(--color-txt-2)",
+                borderColor: "var(--color-rule-2)",
+                color: "var(--color-ink-2)",
               }}
             >
               {s.texto}
@@ -136,13 +144,14 @@ export function ChatShell({ compacto }: Props) {
         </div>
       ) : null}
 
+      {/* ── campo de entrada ── */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void enviarMensagem(texto);
         }}
         className="flex items-center gap-2 px-3 py-3 border-t"
-        style={{ borderColor: "var(--color-line)" }}
+        style={{ borderColor: "var(--color-rule)" }}
       >
         <Input
           value={texto}

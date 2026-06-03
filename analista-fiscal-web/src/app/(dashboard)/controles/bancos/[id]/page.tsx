@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useParams } from "next/navigation";
 import {
   ArrowDownLeft,
@@ -15,7 +16,6 @@ import { toast } from "sonner";
 import { useQueryStates, parseAsString } from "nuqs";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,6 +30,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pill } from "@/components/shared/pill";
 import { StatCard } from "@/components/shared/stat-card";
 import { Moeda } from "@/components/shared/moeda";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { BancoLogo } from "@/components/controles/banco-logo";
 import { ModalConciliar } from "@/components/controles/modal-conciliar";
@@ -44,11 +47,19 @@ import {
   type TransacaoBancaria,
 } from "@/lib/schemas/controles";
 import { formatarDataBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import { cn } from "@/lib/utils";
 
 export default function ExtratoBancoPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
+  const reduced = useReducedMotion();
 
   const {
     data: conta,
@@ -94,6 +105,10 @@ export default function ExtratoBancoPage() {
   const totalConciliadas = (transacoes ?? []).filter((t) => t.conciliada).length;
   const totalPendentes = (transacoes ?? []).length - totalConciliadas;
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   if (contaLoading) return <LoadingState titulo="Carregando conta..." />;
   if (contaErr || !conta) {
     return (
@@ -106,13 +121,26 @@ export default function ExtratoBancoPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <Button asChild variant="ghost" className="self-start -ml-2">
-          <Link href="/controles/bancos">
-            <ArrowLeft className="size-4" /> Voltar para bancos
-          </Link>
-        </Button>
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex flex-col gap-3"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={itemV}>
+          <Button asChild variant="ghost" className="self-start -ml-2">
+            <Link href="/controles/bancos">
+              <ArrowLeft className="size-4" /> Voltar para bancos
+            </Link>
+          </Button>
+        </motion.div>
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <BancoLogo
@@ -122,38 +150,52 @@ export default function ExtratoBancoPage() {
               size="lg"
             />
             <div className="min-w-0">
-              <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+              <motion.span
+                variants={itemV}
+                className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+              >
                 Controles · Extrato
-              </span>
-              <h1 className="text-[24px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+              </motion.span>
+              <motion.h1
+                variants={itemV}
+                className="font-serif text-[24px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+              >
                 {conta.apelido}
-              </h1>
-              <p className="mono text-xs text-[var(--color-txt-3)]">
-                Ag {conta.agencia} · CC {conta.numero}
-              </p>
+              </motion.h1>
+              <motion.p
+                variants={itemV}
+                className="mono text-xs text-[var(--color-ink-2)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                <abbr title="Agência">Ag</abbr> {conta.agencia} ·{" "}
+                <abbr title="Conta Corrente">CC</abbr> {conta.numero}
+              </motion.p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            disabled={sincronizar.isPending}
-            onClick={async () => {
-              await sincronizar.mutateAsync(conta.id);
-              toast.success("Saldo atualizado");
-            }}
-          >
-            <RefreshCw
-              className={cn(
-                "size-4",
-                sincronizar.isPending && "animate-spin"
-              )}
-            />
-            Sincronizar
-          </Button>
+          <motion.div variants={itemV}>
+            <Button
+              variant="outline"
+              disabled={sincronizar.isPending}
+              onClick={async () => {
+                await sincronizar.mutateAsync(conta.id);
+                toast.success("Saldo atualizado");
+              }}
+            >
+              <RefreshCw
+                className={cn(
+                  "size-4",
+                  sincronizar.isPending && "animate-spin"
+                )}
+              />
+              Sincronizar
+            </Button>
+          </motion.div>
         </div>
-      </header>
+      </motion.header>
 
       <ControlesSubnav />
 
+      {/* ── stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard
           label="Saldo atual"
@@ -164,9 +206,9 @@ export default function ExtratoBancoPage() {
         <StatCard
           label="Conciliadas"
           valor={
-            <span className="text-2xl">
+            <span className="text-2xl mono" style={{ fontVariantNumeric: "tabular-nums" }}>
               {totalConciliadas}
-              <span className="text-base text-[var(--color-txt-3)]">
+              <span className="text-base text-[var(--color-ink-3)]">
                 {" / "}
                 {(transacoes ?? []).length}
               </span>
@@ -176,7 +218,11 @@ export default function ExtratoBancoPage() {
         />
         <StatCard
           label="Pendentes"
-          valor={<span className="text-2xl">{totalPendentes}</span>}
+          valor={
+            <span className="text-2xl mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {totalPendentes}
+            </span>
+          }
           pill={{
             tom: totalPendentes > 0 ? "warn" : "neutral",
             texto: totalPendentes > 0 ? "revisar" : "sem pendência",
@@ -185,7 +231,8 @@ export default function ExtratoBancoPage() {
         />
       </div>
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col md:flex-row md:items-center gap-3">
         <Select
           value={filtros.tipo}
           onValueChange={(v) => void setFiltros({ tipo: v })}
@@ -226,8 +273,9 @@ export default function ExtratoBancoPage() {
             <SelectItem value="todos">Tudo</SelectItem>
           </SelectContent>
         </Select>
-      </Card>
+      </Framed>
 
+      {/* ── extrato ── */}
       {txLoading ? (
         <LoadingState titulo="Carregando extrato..." />
       ) : txErr ? (
@@ -238,10 +286,14 @@ export default function ExtratoBancoPage() {
           descricao="Ajuste o período ou os filtros."
         />
       ) : (
-        <Card className="overflow-hidden">
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Extrato de movimentações" size="sm" />
+          </div>
+          <Ruler />
           <ul
             className="divide-y"
-            style={{ borderColor: "var(--color-line)" }}
+            style={{ borderColor: "var(--color-rule)" }}
           >
             {filtradas.map((tx) => (
               <LinhaTransacao
@@ -253,12 +305,21 @@ export default function ExtratoBancoPage() {
                     transacaoId: tx.id,
                     lancamentoId: null,
                   });
-                  toast.success("Conciliação removida");
+                  toast.success("Vínculo contábil removido");
                 }}
               />
             ))}
           </ul>
-        </Card>
+          <Ruler />
+          <div className="px-5 py-2.5">
+            <span
+              className="text-xs text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {filtradas.length} transação(ões) exibida(s)
+            </span>
+          </div>
+        </Framed>
       )}
 
       <ModalConciliar
@@ -268,7 +329,7 @@ export default function ExtratoBancoPage() {
           if (!v) setConciliando(null);
         }}
       />
-    </div>
+    </motion.div>
   );
 }
 
@@ -283,21 +344,24 @@ function LinhaTransacao({
 }) {
   const credito = transacao.tipo === "credito";
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-24">
-        <span className="mono text-xs font-bold text-[var(--color-txt)]">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
+      <div className="flex flex-col shrink-0 w-28">
+        <span
+          className="mono text-xs font-bold text-[var(--color-ink-2)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarDataBR(transacao.data)}
         </span>
-        <span className="mono text-[10px] text-[var(--color-txt-3)] uppercase tracking-[0.12em]">
+        <span className="mono text-[10px] text-[var(--color-ink-3)] uppercase tracking-[0.12em]">
           {CATEGORIA_LABEL[transacao.categoria]}
         </span>
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-txt)] truncate">
+        <span className="text-sm text-[var(--color-ink)] truncate">
           {transacao.descricao}
         </span>
         {transacao.contraparte ? (
-          <span className="text-[11px] text-[var(--color-txt-3)] truncate">
+          <span className="text-[11px] text-[var(--color-ink-2)] truncate">
             {transacao.contraparte}
           </span>
         ) : null}
@@ -305,10 +369,10 @@ function LinhaTransacao({
       <div className="flex items-center gap-3 shrink-0">
         {transacao.conciliada ? (
           <span
-            className="flex items-center gap-1 text-[11px] mono text-[var(--color-lime)]"
-            title="Conciliada"
+            className="flex items-center gap-1 text-[11px] mono text-[var(--color-green)]"
+            title="Vinculada ao lançamento contábil"
           >
-            <Check className="size-3.5" /> conciliada
+            <Check className="size-3.5" /> vinculada
           </span>
         ) : (
           <Pill tom="warn">pendente</Pill>
@@ -317,14 +381,16 @@ function LinhaTransacao({
         <span
           className={cn(
             "mono text-base font-bold flex items-center gap-1",
-            credito ? "text-[var(--color-lime)]" : "text-[var(--color-red)]"
+            credito ? "text-[var(--color-green)]" : "text-[var(--color-danger)]"
           )}
+          style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {credito ? (
-            <ArrowDownLeft className="size-3.5" />
+            <ArrowDownLeft className="size-3.5" aria-label="Entrada" />
           ) : (
-            <ArrowUpRight className="size-3.5" />
+            <ArrowUpRight className="size-3.5" aria-label="Saída" />
           )}
+          {credito ? "+" : "-"}
           <Moeda valor={transacao.valor} />
         </span>
 
@@ -333,13 +399,13 @@ function LinhaTransacao({
             variant="ghost"
             onClick={() => void onDesconciliar()}
             className="px-2"
-            aria-label="Desfazer conciliação"
+            aria-label="Desfazer vínculo contábil"
           >
-            Desfazer
+            Desvincular
           </Button>
         ) : (
           <Button variant="outline" onClick={onConciliar}>
-            <Link2 className="size-4" /> Conciliar
+            <Link2 className="size-4" /> Vincular
           </Button>
         )}
       </div>

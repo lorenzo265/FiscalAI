@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Avatar de funcionário: iniciais sobre fundo colorido derivado do seed.
+ * Paleta usa tokens canônicos Arkan — sem hardcodes cromáticos externos.
+ */
 const PALETA = [
-  { bg: "rgba(163,255,107,0.18)", fg: "var(--color-lime)" },
-  { bg: "rgba(77,142,255,0.18)", fg: "var(--color-blue)" },
-  { bg: "rgba(255,184,77,0.18)", fg: "var(--color-amber)" },
-  { bg: "rgba(255,85,102,0.18)", fg: "var(--color-red)" },
-  { bg: "rgba(168,140,255,0.18)", fg: "#a88cff" },
-  { bg: "rgba(255,140,200,0.18)", fg: "#ff8cc8" },
+  { bg: "var(--color-green-wash)", fg: "var(--color-green)" },
+  { bg: "var(--color-paper-2)", fg: "var(--color-ink-2)" },
+  { bg: "var(--color-paper-2)", fg: "var(--color-ochre)" },
+  { bg: "var(--color-paper-2)", fg: "var(--color-danger)" },
+  { bg: "var(--color-paper-2)", fg: "var(--color-ink)" },
+  { bg: "var(--color-green-wash)", fg: "var(--color-green-deep)" },
 ];
 
 interface Props {
@@ -24,13 +28,12 @@ const TAMANHOS = {
 
 export function AvatarFuncionario({ nome, seed, size = "md", className }: Props) {
   const iniciais = pegarIniciais(nome);
-  const cor =
-    PALETA[hash(seed) % PALETA.length] ?? PALETA[0]!;
+  const cor = PALETA[hash(seed) % PALETA.length] ?? PALETA[0]!;
 
   return (
     <div
       className={cn(
-        "rounded-full grid place-items-center font-bold shrink-0 select-none",
+        "rounded-[var(--radius-sm)] grid place-items-center font-bold shrink-0 select-none mono",
         TAMANHOS[size],
         className
       )}

@@ -42,7 +42,7 @@ export function ResetDemoButton() {
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="text-[11px] text-[var(--color-txt-3)] hover:text-[var(--color-red)] transition-colors flex items-center gap-1.5"
+        className="text-[11px] text-[var(--color-ink-3)] hover:text-[var(--color-danger)] transition-colors flex items-center gap-1.5"
       >
         <Trash2 className="size-3" />
         Limpar dados de demonstração
@@ -53,10 +53,10 @@ export function ResetDemoButton() {
           <DialogHeader>
             <div className="flex items-start gap-3">
               <div
-                className="size-9 rounded-md grid place-items-center mt-0.5"
-                style={{ background: "var(--color-red-d)" }}
+                className="size-9 rounded-[var(--radius-sm)] grid place-items-center mt-0.5 border"
+                style={{ borderColor: "var(--color-danger)" }}
               >
-                <AlertTriangle className="size-4 text-[var(--color-red)]" />
+                <AlertTriangle className="size-4 text-[var(--color-danger)]" />
               </div>
               <div className="flex-1">
                 <DialogTitle>Apagar todos os dados de demonstração?</DialogTitle>
@@ -78,9 +78,9 @@ export function ResetDemoButton() {
               Cancelar
             </Button>
             <Button
+              variant="destructive"
               onClick={() => void confirmar()}
               disabled={resetando}
-              className="bg-[var(--color-red-d)] text-[var(--color-red)] border border-[rgba(255,85,102,0.32)] hover:bg-[var(--color-red)] hover:text-[var(--color-bg)]"
             >
               {resetando ? "Apagando..." : "Sim, apagar tudo"}
             </Button>

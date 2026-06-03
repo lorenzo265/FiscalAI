@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,7 +13,6 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -27,6 +27,10 @@ import { StatCard } from "@/components/shared/stat-card";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
 import {
@@ -42,6 +46,13 @@ import {
   type Holerite,
 } from "@/lib/schemas/pessoal";
 import { formatarMesAnoBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 export default function FolhaMensalPage() {
   const params = useParams<{ ano: string; mes: string }>();
@@ -49,6 +60,7 @@ export default function FolhaMensalPage() {
   const ano = Number(params?.ano ?? new Date().getFullYear());
   const mes = Number(params?.mes ?? new Date().getMonth() + 1);
   const competencia = `${ano}-${String(mes).padStart(2, "0")}-01`;
+  const reduced = useReducedMotion();
 
   const { empresa } = useEmpresaAtual();
   const {
@@ -62,6 +74,10 @@ export default function FolhaMensalPage() {
   const transmitir = useTransmitirEventosDoMes();
 
   const [transmitindo, setTransmitindo] = React.useState(false);
+  const folhaFechada =
+    holerites &&
+    holerites.length > 0 &&
+    holerites.every((h) => h.status === "pago");
 
   const totais = React.useMemo(() => {
     const lista = holerites ?? [];
@@ -102,9 +118,10 @@ export default function FolhaMensalPage() {
         console.error("Erro ao gerar holerite:", e);
       }
     }
-    toast.success(`${ok} holerite${ok === 1 ? "" : "s"} gerado${ok === 1 ? "" : "s"}`, {
-      id: toastId,
-    });
+    toast.success(
+      `${ok} holerite${ok === 1 ? "" : "s"} gerado${ok === 1 ? "" : "s"}`,
+      { id: toastId }
+    );
   }
 
   async function transmitirEsocial() {
@@ -117,7 +134,8 @@ export default function FolhaMensalPage() {
         toast.success(
           `${transmitidos} evento${transmitidos === 1 ? "" : "s"} transmitido${transmitidos === 1 ? "" : "s"}`,
           {
-            description: "eSocial confirmou o recebimento de todos os recibos.",
+            description:
+              "eSocial confirmou o recebimento de todos os recibos.",
           }
         );
       }
@@ -126,24 +144,47 @@ export default function FolhaMensalPage() {
     }
   }
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <Button asChild variant="ghost" className="self-start -ml-2">
-          <Link href="/pessoal">
-            <ArrowLeft className="size-4" /> Voltar para resumo
-          </Link>
-        </Button>
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex flex-col gap-2"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={itemV}>
+          <Button asChild variant="ghost" className="self-start -ml-2" size="sm">
+            <Link href="/pessoal">
+              <ArrowLeft className="size-4" /> Voltar para resumo
+            </Link>
+          </Button>
+        </motion.div>
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
               Pessoal · Folha do mês
-            </span>
-            <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+            >
               {formatarMesAnoBR(competencia)}
-            </h1>
+            </motion.h1>
           </div>
-          <div className="flex items-center gap-2">
+          <motion.div variants={itemV} className="flex items-center gap-2">
             <Select value={String(mes)} onValueChange={trocarMes}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
@@ -151,7 +192,9 @@ export default function FolhaMensalPage() {
               <SelectContent>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <SelectItem key={m} value={String(m)}>
-                    {formatarMesAnoBR(`${ano}-${String(m).padStart(2, "0")}-01`)}
+                    {formatarMesAnoBR(
+                      `${ano}-${String(m).padStart(2, "0")}-01`
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -163,14 +206,16 @@ export default function FolhaMensalPage() {
               <SelectContent>
                 {[ano - 1, ano, ano + 1].map((a) => (
                   <SelectItem key={a} value={String(a)}>
-                    {a}
+                    <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {a}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </motion.div>
         </div>
-      </header>
+      </motion.header>
 
       <PessoalSubnav />
 
@@ -225,12 +270,14 @@ export default function FolhaMensalPage() {
             />
           </div>
 
+          {/* ── ações ── */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Button onClick={gerarTodosPDFs}>
+            <Button onClick={gerarTodosPDFs} size="sm">
               <Download className="size-4" /> Gerar holerites em PDF
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={transmitirEsocial}
               disabled={transmitindo || transmitir.isPending}
             >
@@ -243,6 +290,7 @@ export default function FolhaMensalPage() {
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={async () => {
                 await gerar.mutateAsync({ ano, mes });
                 toast.success("Folha recalculada");
@@ -253,16 +301,25 @@ export default function FolhaMensalPage() {
             </Button>
           </div>
 
-          <Card className="overflow-hidden">
-            <ul
-              className="divide-y"
-              style={{ borderColor: "var(--color-line)" }}
-            >
+          {/* ── tabela de holerites ── */}
+          <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+            <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
+              <Fig n={1} titulo="Holerites do mês" size="sm" />
+              {folhaFechada ? (
+                <Carimbo tom="green" sub="folha paga">
+                  fechado
+                </Carimbo>
+              ) : null}
+            </div>
+            <Ruler />
+            <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
               {holerites.map((h) => (
                 <LinhaHolerite
                   key={h.id}
                   holerite={h}
-                  funcionario={funcionarios?.find((f) => f.id === h.funcionarioId)}
+                  funcionario={funcionarios?.find(
+                    (f) => f.id === h.funcionarioId
+                  )}
                   onBaixar={async () => {
                     if (!empresa) return;
                     const funcionario = funcionarios?.find(
@@ -271,16 +328,20 @@ export default function FolhaMensalPage() {
                     if (!funcionario) return;
                     const { gerarPdfHolerite, nomeArquivoHolerite } =
                       await import("@/lib/pdf/holerite");
-                    const pdf = gerarPdfHolerite({ empresa, funcionario, holerite: h });
+                    const pdf = gerarPdfHolerite({
+                      empresa,
+                      funcionario,
+                      holerite: h,
+                    });
                     pdf.save(nomeArquivoHolerite(h));
                   }}
                 />
               ))}
             </ul>
-          </Card>
+          </Framed>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -294,16 +355,19 @@ function LinhaHolerite({
   onBaixar: () => void;
 }) {
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {funcionario ? (
-          <AvatarFuncionario nome={funcionario.nome} seed={funcionario.avatarSeed} />
+          <AvatarFuncionario
+            nome={funcionario.nome}
+            seed={funcionario.avatarSeed}
+          />
         ) : null}
         <div className="min-w-0">
-          <span className="text-sm font-semibold text-[var(--color-txt)] truncate block">
+          <span className="text-sm font-semibold text-[var(--color-ink)] truncate block">
             {holerite.funcionarioNome}
           </span>
-          <span className="text-[11px] text-[var(--color-txt-3)] truncate block">
+          <span className="text-[11px] text-[var(--color-ink-3)] truncate block">
             {holerite.cargo}
             {funcionario
               ? ` · ${TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}`
@@ -311,16 +375,22 @@ function LinhaHolerite({
           </span>
         </div>
       </div>
-      <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--color-txt-3)] mono">
+      <div className="hidden md:flex items-center gap-3 text-[11px] text-[var(--color-ink-3)] mono">
         <span>
-          P{" "}
-          <span className="text-[var(--color-lime)]">
+          Prov{" "}
+          <span
+            className="text-[var(--color-green)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={holerite.totalProventos} />
           </span>
         </span>
         <span>
-          D{" "}
-          <span className="text-[var(--color-red)]">
+          Desc{" "}
+          <span
+            className="text-[var(--color-danger)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={holerite.totalDescontos} />
           </span>
         </span>
@@ -335,10 +405,19 @@ function LinhaHolerite({
             "gerado"
           )}
         </Pill>
-        <span className="mono text-base font-bold text-[var(--color-txt)]">
+        <span
+          className="mono text-base font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={holerite.totalLiquido} />
         </span>
-        <Button variant="ghost" onClick={onBaixar} className="px-2" aria-label="Baixar holerite">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onBaixar}
+          className="size-8"
+          aria-label="Baixar holerite"
+        >
           <Download className="size-4" />
         </Button>
       </div>

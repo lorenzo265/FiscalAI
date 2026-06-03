@@ -2,10 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, PartyPopper } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
+import { Carimbo } from "@/components/blueprint/carimbo";
+import { Framed } from "@/components/blueprint/framed";
+import { Ruler } from "@/components/blueprint/ruler";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { Moeda } from "@/components/shared/moeda";
@@ -83,7 +86,7 @@ export function PassoConclusao() {
 
       await salvarEmpresa(empresa);
       reset();
-      toast.success("Empresa cadastrada — bem-vindo ao FiscalAI.");
+      toast.success("Empresa cadastrada — bem-vindo ao Arkan.");
       router.push("/home");
     } catch (err) {
       console.error(err);
@@ -95,30 +98,35 @@ export function PassoConclusao() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div
-        className="rounded-md border p-5 flex items-start gap-3"
-        style={{
-          background: "var(--color-lime-d)",
-          borderColor: "rgba(163, 255, 107, 0.32)",
-        }}
-      >
-        <PartyPopper className="size-5 text-[var(--color-lime)] mt-0.5" />
-        <div>
-          <p className="text-sm font-bold text-[var(--color-txt)]">
-            Quase lá, {dados?.razaoSocial ?? "—"}!
-          </p>
-          <p className="text-xs text-[var(--color-txt-2)] mt-1 leading-relaxed">
+      {/* estado resolvido com Carimbo — signature do lote E */}
+      <div className="flex items-start gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle2 className="size-4 text-[var(--color-green)]" />
+            <span className="text-sm font-bold text-[var(--color-ink)]">
+              {dados?.razaoSocial ?? "Empresa"} — dados confirmados
+            </span>
+          </div>
+          <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
             {regime === "SIMPLES_NACIONAL" && anexo
-              ? `Você é Simples Nacional Anexo ${anexo}, faturando aproximadamente ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(fatEstimado)} no ano. O FiscalAI já calculou seu próximo DAS.`
-              : `Você é tributado por ${nomeRegime(regime)}. O FiscalAI vai acompanhar suas obrigações.`}
+              ? `Simples Nacional Anexo ${anexo} — faturamento estimado em ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(fatEstimado)}/ano. Próximo DAS calculado.`
+              : `Tributado por ${nomeRegime(regime)}. Arkan vai acompanhar suas obrigações automaticamente.`}
           </p>
         </div>
+        {/* Carimbo verde — estado resolvido */}
+        <Carimbo tom="green" sub="cadastro ok">
+          Arkan
+        </Carimbo>
       </div>
 
+      <Ruler />
+
+      {/* resumo dos dados confirmados */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <ResumoCard
           label="CNPJ"
           conteudo={cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5")}
+          mono
         />
         <ResumoCard
           label="Regime"
@@ -134,37 +142,34 @@ export function PassoConclusao() {
         />
       </div>
 
+      {/* DAS estimado se Simples Nacional */}
       {calculo ? (
-        <div
-          className="rounded-md border p-4 flex flex-col gap-3"
-          style={{
-            background: "var(--color-card-2)",
-            borderColor: "var(--color-line-2)",
-          }}
-        >
-          <div className="flex items-center gap-2">
+        <Framed marks={false} tone="rule" surface="paper-2" padded>
+          <div className="flex items-center gap-2 mb-3">
             <Pill tom="info">próximo DAS estimado</Pill>
-            <span className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-txt-3)]">
+            <span className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]"
+                  style={{ fontVariantNumeric: "tabular-nums" }}>
               vence em {formatarDataBR(vencimento)}
             </span>
           </div>
           <div className="flex items-end gap-3">
-            <span className="mono text-3xl font-bold text-[var(--color-txt)]">
+            <span className="mono text-3xl font-bold text-[var(--color-ink)]"
+                  style={{ fontVariantNumeric: "tabular-nums" }}>
               <Moeda valor={calculo.valorDAS} />
             </span>
-            <span className="mono text-xs text-[var(--color-txt-2)] mb-1.5">
+            <span className="mono text-xs text-[var(--color-ink-2)] mb-1.5">
               alíquota efetiva {formatarPercentual(calculo.aliquotaEfetiva)}
             </span>
           </div>
-          <p className="text-xs text-[var(--color-txt-3)]">
+          <p className="text-xs text-[var(--color-ink-3)] mt-2">
             Estimativa baseada em receita mensal média. O cálculo final usa o
             faturamento real do mês.
           </p>
-        </div>
+        </Framed>
       ) : null}
 
       {bancosWizard.length > 0 ? (
-        <p className="text-xs text-[var(--color-txt-2)]">
+        <p className="text-xs text-[var(--color-ink-2)] mono">
           {bancosWizard.length} conta{bancosWizard.length === 1 ? "" : "s"} conectada
           {bancosWizard.length === 1 ? "" : "s"} via Open Finance.
         </p>
@@ -175,7 +180,7 @@ export function PassoConclusao() {
           <ArrowLeft className="size-4" /> Voltar
         </Button>
         <Button onClick={finalizar} disabled={submetendo}>
-          {submetendo ? "Finalizando..." : "Ir pro meu painel"}
+          {submetendo ? "Finalizando..." : "Entrar no painel"}
           <ArrowRight className="size-4" />
         </Button>
       </div>
@@ -183,19 +188,22 @@ export function PassoConclusao() {
   );
 }
 
-function ResumoCard({ label, conteudo }: { label: string; conteudo: string }) {
+function ResumoCard({ label, conteudo, mono }: { label: string; conteudo: string; mono?: boolean }) {
   return (
     <div
-      className="rounded-md border p-3"
+      className="rounded-[var(--radius-md)] border p-3"
       style={{
-        background: "var(--color-card-2)",
-        borderColor: "var(--color-line-2)",
+        background: "var(--color-paper-2)",
+        borderColor: "var(--color-rule-2)",
       }}
     >
-      <p className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)]">
+      <p className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)]">
         {label}
       </p>
-      <p className="text-sm text-[var(--color-txt)] mt-0.5">{conteudo}</p>
+      <p className={`text-sm text-[var(--color-ink)] mt-0.5 ${mono ? "mono" : ""}`}
+         style={mono ? { fontVariantNumeric: "tabular-nums" } : undefined}>
+        {conteudo}
+      </p>
     </div>
   );
 }

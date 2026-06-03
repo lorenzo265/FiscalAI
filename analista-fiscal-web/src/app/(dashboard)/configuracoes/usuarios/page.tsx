@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +16,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Pill } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { emailLogado } from "@/lib/auth";
 
@@ -54,89 +56,94 @@ export default function ConfiguracoesUsuariosPage() {
       <header>
         <Link
           href="/configuracoes"
-          className="text-[11px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold inline-flex items-center gap-1 hover:text-[var(--color-txt-2)] transition-colors"
+          className="text-[11px] mono uppercase tracking-[0.12em] text-[var(--color-ink-3)] font-bold inline-flex items-center gap-1 hover:text-[var(--color-ink-2)] transition-colors"
         >
           <ArrowLeft className="size-3" />
           Configurações
         </Link>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)] mt-1">
+        <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1">
           Usuários e acessos
         </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
+        <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
           Convide seu contador, sócio ou time financeiro. Cada pessoa entra com
-          o próprio e-mail e tem trilha de auditoria separada.
+          e-mail próprio e tem trilha de auditoria separada.
         </p>
       </header>
 
       <ConfiguracoesSubnav />
 
-      <Card className="overflow-hidden">
-        <div
-          className="flex items-center justify-between px-5 py-3 border-b"
-          style={{ borderColor: "var(--color-line)" }}
-        >
-          <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-            1 usuário com acesso
-          </span>
-          <Button onClick={() => setConvidando(true)}>
+      {/* Fig. 01 — usuários ativos */}
+      <Framed marks={false} tone="rule" surface="card" padded={false}>
+        <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
+          <Fig n={1} titulo="Usuários com acesso" size="sm" />
+          <Button onClick={() => setConvidando(true)} size="sm">
             <UserPlus className="size-4" />
-            Convidar usuário
+            Convidar
           </Button>
         </div>
-
+        <Ruler />
         <ul>
           <li className="flex items-center gap-4 px-5 py-4">
+            {/* avatar em quadrado técnico */}
             <div
-              className="size-10 rounded-full grid place-items-center font-bold text-sm"
+              className="size-10 rounded-[var(--radius-sm)] grid place-items-center font-bold mono text-sm shrink-0 border"
               style={{
-                background: "var(--color-lime-d)",
-                color: "var(--color-lime)",
+                background: "var(--color-green-wash)",
+                color: "var(--color-green)",
+                borderColor: "var(--color-green)",
               }}
             >
               {inicial}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-[var(--color-txt)] truncate">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-[var(--color-ink)] truncate">
                   {email ?? "Você"}
                 </span>
-                <Pill tom="ok">você</Pill>
+                <Pill tom="ok">
+                  <span className="flex items-center gap-1">você</span>
+                </Pill>
               </div>
-              <p className="text-xs text-[var(--color-txt-3)] mono mt-0.5">
+              <p className="text-xs text-[var(--color-ink-3)] mono mt-0.5">
                 Administrador · acesso total
               </p>
             </div>
-            <span className="text-[11px] text-[var(--color-txt-3)] mono hidden md:block">
-              Último acesso agora
+            <span className="text-[11px] text-[var(--color-ink-3)] mono hidden md:block"
+                  style={{ fontVariantNumeric: "tabular-nums" }}>
+              Último acesso: agora
             </span>
           </li>
         </ul>
-      </Card>
+      </Framed>
 
-      <Card
-        className="p-5 flex items-start gap-3 text-sm"
-        style={{ borderColor: "var(--color-line-2)" }}
-      >
-        <Mail className="size-4 text-[var(--color-blue)] mt-0.5" />
-        <p className="text-[var(--color-txt-2)] leading-relaxed">
-          Os convidados recebem por e-mail um link mágico de acesso. Você pode
-          revogar o acesso a qualquer momento sem precisar trocar senhas.
+      {/* nota sobre link mágico */}
+      <Framed marks={false} tone="rule" surface="paper-2" className="flex items-start gap-3">
+        <Mail className="size-4 text-[var(--color-ink-2)] mt-0.5 shrink-0" />
+        <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
+          Os convidados recebem por e-mail um link de acesso seguro. Você pode
+          revogar o acesso a qualquer momento sem trocar senhas.
         </p>
-      </Card>
+      </Framed>
 
+      {/* modal de convite */}
       <Dialog open={convidando} onOpenChange={setConvidando}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Convidar novo usuário</DialogTitle>
+            <DialogTitle className="font-serif">Convidar novo usuário</DialogTitle>
             <DialogDescription>
-              Informe o e-mail. Quem aceitar entra como contador (acesso de
-              leitura + lançamentos).
+              Informe o e-mail. O convidado entra como contador — acesso de
+              leitura e lançamentos.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={enviarConvite} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email-convidado">E-mail</Label>
+              <Label
+                htmlFor="email-convidado"
+                className="text-[11px] mono uppercase tracking-[0.12em] font-bold text-[var(--color-ink-3)]"
+              >
+                E-mail do convidado
+              </Label>
               <Input
                 id="email-convidado"
                 type="email"

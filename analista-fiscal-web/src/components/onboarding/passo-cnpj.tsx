@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pill } from "@/components/shared/pill";
+import { Ruler } from "@/components/blueprint/ruler";
 import { mascaraCNPJ, validarCNPJ, apenasDigitos, formatarCNPJ } from "@/lib/format/cnpj";
 import { api, ApiError } from "@/lib/api-client";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
@@ -46,13 +47,19 @@ export function PassoCnpj() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="cnpj">CNPJ da empresa</Label>
+        <Label
+          htmlFor="cnpj"
+          className="text-[11px] mono uppercase tracking-[0.12em] font-bold text-[var(--color-ink-3)]"
+        >
+          CNPJ da empresa
+        </Label>
         <div className="flex gap-2">
           <Input
             id="cnpj"
             inputMode="numeric"
             placeholder="00.000.000/0000-00"
             className="mono text-base"
+            style={{ fontVariantNumeric: "tabular-nums" }}
             value={mascaraCNPJ(cnpj)}
             onChange={(e) => {
               setCnpj(apenasDigitos(e.target.value));
@@ -62,61 +69,72 @@ export function PassoCnpj() {
           />
           <Button onClick={buscar} disabled={!valido || carregando}>
             <Search className="size-4" />
-            {carregando ? "Buscando..." : "Buscar dados"}
+            {carregando ? "Buscando..." : "Buscar"}
           </Button>
         </div>
         {erro ? (
-          <p className="text-xs text-[var(--color-red)]">{erro}</p>
+          <p className="text-xs text-[var(--color-danger)]">{erro}</p>
         ) : null}
-        <p className="text-xs text-[var(--color-txt-3)]">
-          Não compartilhamos esse CNPJ com ninguém. Tudo é processado localmente
-          na demonstração.
+        <p className="text-[11px] text-[var(--color-ink-3)]">
+          O CNPJ é consultado na Receita Federal. Não armazenamos dados fora
+          deste navegador nesta demonstração.
         </p>
       </div>
 
+      {/* resultado encontrado */}
       {dados ? (
         <div
-          className="rounded-md border p-5 flex flex-col gap-4"
+          className="rounded-[var(--radius-md)] border flex flex-col gap-4 overflow-hidden"
           style={{
-            background: "var(--color-lime-d)",
-            borderColor: "rgba(163, 255, 107, 0.32)",
+            background: "var(--color-green-wash)",
+            borderColor: "var(--color-green)",
           }}
         >
-          <div className="flex items-start gap-3">
+          <div className="px-5 pt-4 pb-2 flex items-start gap-3">
             <div
-              className="size-9 rounded-md grid place-items-center mt-0.5"
-              style={{ background: "rgba(163, 255, 107, 0.18)" }}
+              className="size-9 rounded-[var(--radius-sm)] grid place-items-center mt-0.5 border shrink-0"
+              style={{
+                background: "var(--color-green-wash)",
+                borderColor: "var(--color-green)",
+              }}
             >
-              <CheckCircle2 className="size-5 text-[var(--color-lime)]" />
+              <CheckCircle2
+                className="size-5"
+                style={{ color: "var(--color-green)" }}
+              />
             </div>
             <div className="flex-1">
-              <p className="text-[11px] uppercase tracking-[0.14em] font-bold text-[var(--color-lime)] mono">
+              <p className="text-[11px] uppercase tracking-[0.14em] font-bold mono"
+                 style={{ color: "var(--color-green)" }}>
                 empresa encontrada
               </p>
-              <h3 className="text-lg font-bold text-[var(--color-txt)] mt-1">
+              <h3 className="font-serif text-lg text-[var(--color-ink)] mt-1">
                 {dados.razaoSocial}
               </h3>
-              <p className="mono text-xs text-[var(--color-txt-2)] mt-0.5">
-                {formatarCNPJ(dados.cnpj)} · {dados.porte}
+              <p className="mono text-xs text-[var(--color-ink-2)] mt-0.5"
+                 style={{ fontVariantNumeric: "tabular-nums" }}>
+                <abbr title="Cadastro Nacional de Pessoas Jurídicas">{formatarCNPJ(dados.cnpj)}</abbr> · {dados.porte}
               </p>
             </div>
             <Pill tom="ok">{dados.situacao}</Pill>
           </div>
 
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <Item icone={<Building2 className="size-3.5" />} label="Atividade principal">
-              <span className="text-[var(--color-txt)]">{dados.cnaePrincipal.descricao}</span>
-            </Item>
-            <Item icone={<MapPin className="size-3.5" />} label="Endereço">
-              <span className="text-[var(--color-txt)]">
+          <Ruler />
+
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm px-5 pb-2">
+            <ItemDl icone={<Building2 className="size-3.5" />} label="Atividade principal">
+              <span className="text-[var(--color-ink)]">{dados.cnaePrincipal.descricao}</span>
+            </ItemDl>
+            <ItemDl icone={<MapPin className="size-3.5" />} label="Endereço">
+              <span className="text-[var(--color-ink)]">
                 {dados.endereco.logradouro}, {dados.endereco.numero} ·{" "}
                 {dados.endereco.municipio}/{dados.endereco.uf}
               </span>
-            </Item>
+            </ItemDl>
           </dl>
 
-          <div className="flex justify-end">
-            <Button onClick={proximo}>Confirmar dados e continuar</Button>
+          <div className="flex justify-end px-5 pb-5">
+            <Button onClick={proximo}>Confirmar e continuar</Button>
           </div>
         </div>
       ) : null}
@@ -124,7 +142,7 @@ export function PassoCnpj() {
   );
 }
 
-function Item({
+function ItemDl({
   icone,
   label,
   children,
@@ -135,7 +153,7 @@ function Item({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)]">
+      <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] font-bold mono text-[var(--color-ink-3)]">
         {icone}
         {label}
       </span>

@@ -3,8 +3,8 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,9 +13,19 @@ import { Moeda } from "@/components/shared/moeda";
 import { StatCard } from "@/components/shared/stat-card";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { useFluxoCaixa, useContasPagarReceber } from "@/hooks/use-controles";
 import { formatarDataBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 const GraficoFluxoCaixa = dynamic(
   () =>
@@ -28,22 +38,46 @@ const GraficoFluxoCaixa = dynamic(
 export default function ControlesPage() {
   const { data: fluxo, isLoading, isError, refetch } = useFluxoCaixa(90);
   const { data: contas } = useContasPagarReceber();
+  const reduced = useReducedMotion();
+
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.span
+          variants={itemV}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
           Controles · Fluxo de caixa
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+        </motion.span>
+        <motion.h1
+          variants={itemV}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
           Como o caixa vai estar nos próximos 90 dias
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
+        </motion.h1>
+        <motion.p
+          variants={itemV}
+          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
+        >
           Combinamos saldo atual + contas a pagar + contas a receber. A linha
           tracejada é projeção. Toda parcela paga ou recebida atualiza o
           gráfico em tempo real.
-        </p>
-      </header>
+        </motion.p>
+      </motion.header>
 
       <ControlesSubnav />
 
@@ -71,54 +105,39 @@ export default function ControlesPage() {
               label="Em 30 dias"
               valor={<Moeda valor={fluxo.saldo30d} />}
               tom={fluxo.saldo30d > 0 ? "ok" : "error"}
-              sub={
-                <DeltaSaldo
-                  base={fluxo.saldoHoje}
-                  novo={fluxo.saldo30d}
-                />
-              }
+              sub={<DeltaSaldo base={fluxo.saldoHoje} novo={fluxo.saldo30d} />}
             />
             <StatCard
               label="Em 60 dias"
               valor={<Moeda valor={fluxo.saldo60d} />}
-              sub={
-                <DeltaSaldo
-                  base={fluxo.saldoHoje}
-                  novo={fluxo.saldo60d}
-                />
-              }
+              sub={<DeltaSaldo base={fluxo.saldoHoje} novo={fluxo.saldo60d} />}
             />
             <StatCard
               label="Em 90 dias"
               valor={<Moeda valor={fluxo.saldo90d} />}
-              sub={
-                <DeltaSaldo
-                  base={fluxo.saldoHoje}
-                  novo={fluxo.saldo90d}
-                />
-              }
+              sub={<DeltaSaldo base={fluxo.saldoHoje} novo={fluxo.saldo90d} />}
             />
           </div>
 
-          <Card className="p-5 flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-                Saldo histórico (30d) + projeção (90d)
-              </span>
-              <div className="flex items-center gap-3 text-[10px] text-[var(--color-txt-2)]">
-                <Legenda cor="var(--color-lime)" texto="Histórico" />
-                <Legenda cor="var(--color-blue)" texto="Projeção" tracejado />
+          {/* ── gráfico de fluxo ── */}
+          <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+            <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2 flex-wrap">
+              <Fig n={1} titulo="Saldo histórico (30d) + projeção (90d)" size="sm" />
+              <div className="flex items-center gap-3 text-[10px] text-[var(--color-ink-2)] mono">
+                <Legenda cor="var(--color-green)" texto="Histórico" />
+                <Legenda cor="var(--color-ink-2)" texto="Projeção" tracejado />
               </div>
             </div>
-            <GraficoFluxoCaixa pontos={fluxo.pontos} />
-          </Card>
+            <Ruler />
+            <div className="px-4 py-3">
+              <GraficoFluxoCaixa pontos={fluxo.pontos} />
+            </div>
+          </Framed>
 
-          <ResumoPagarReceber
-            contas={contas ?? []}
-          />
+          <ResumoPagarReceber contas={contas ?? []} />
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -169,9 +188,12 @@ function DeltaSaldo({ base, novo }: { base: number; novo: number }) {
   const delta = novo - base;
   const pos = delta >= 0;
   const Icon = pos ? TrendingUp : TrendingDown;
-  const cor = pos ? "var(--color-lime)" : "var(--color-red)";
+  const cor = pos ? "var(--color-green)" : "var(--color-danger)";
   return (
-    <span className="flex items-center gap-1 mono" style={{ color: cor }}>
+    <span
+      className="flex items-center gap-1 mono"
+      style={{ color: cor, fontVariantNumeric: "tabular-nums" }}
+    >
       <Icon className="size-3" />
       <Moeda valor={delta} /> vs hoje
     </span>
@@ -215,9 +237,9 @@ function ResumoPagarReceber({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <Card className="p-4 flex flex-col gap-2">
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--color-txt-3)]">
+          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
             Contas a pagar pendentes
           </span>
           {atrasadosPagar > 0 ? (
@@ -226,16 +248,19 @@ function ResumoPagarReceber({
             <Pill tom="neutral">{pagar.length} aberta{pagar.length === 1 ? "" : "s"}</Pill>
           )}
         </div>
-        <p className="mono text-2xl font-bold text-[var(--color-red)]">
+        <p
+          className="mono text-2xl font-bold text-[var(--color-danger)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={totalPagar} />
         </p>
         <Button asChild variant="outline" className="self-start">
           <Link href="/controles/pagar">Abrir contas a pagar</Link>
         </Button>
-      </Card>
-      <Card className="p-4 flex flex-col gap-2">
+      </Framed>
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--color-txt-3)]">
+          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
             Contas a receber pendentes
           </span>
           {atrasadosReceber > 0 ? (
@@ -244,13 +269,16 @@ function ResumoPagarReceber({
             <Pill tom="neutral">{receber.length} aberta{receber.length === 1 ? "" : "s"}</Pill>
           )}
         </div>
-        <p className="mono text-2xl font-bold text-[var(--color-lime)]">
+        <p
+          className="mono text-2xl font-bold text-[var(--color-green)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={totalReceber} />
         </p>
         <Button asChild variant="outline" className="self-start">
           <Link href="/controles/receber">Abrir contas a receber</Link>
         </Button>
-      </Card>
+      </Framed>
     </div>
   );
 }

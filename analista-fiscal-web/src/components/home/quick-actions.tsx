@@ -1,16 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, FileText, Sparkles, Users, Wallet, type LucideIcon } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import {
+  ArrowRight,
+  FileText,
+  Sparkles,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 
 interface Atalho {
   label: string;
   descricao: string;
   href: string;
   icon: LucideIcon;
-  cor: string;
-  fundoCor: string;
+  indice: string;
 }
 
 const ATALHOS: Atalho[] = [
@@ -19,66 +27,73 @@ const ATALHOS: Atalho[] = [
     descricao: "Em 4 passos curtos.",
     href: "/notas/saida/nova",
     icon: FileText,
-    cor: "var(--color-lime)",
-    fundoCor: "var(--color-lime-d)",
+    indice: "01",
   },
   {
     label: "Ver folha",
     descricao: "Holerites do mês.",
     href: "/pessoal",
     icon: Users,
-    cor: "var(--color-blue)",
-    fundoCor: "var(--color-blue-d)",
+    indice: "02",
   },
   {
     label: "Ver fluxo de caixa",
     descricao: "Projeção 90 dias.",
     href: "/controles",
     icon: Wallet,
-    cor: "var(--color-amber)",
-    fundoCor: "var(--color-amber-d)",
+    indice: "03",
   },
   {
     label: "Falar com o assistente",
     descricao: "Pergunte sobre seus impostos.",
     href: "/assistente",
     icon: Sparkles,
-    cor: "var(--color-lime)",
-    fundoCor: "var(--color-lime-d)",
+    indice: "04",
   },
 ];
 
 export function QuickActions() {
   return (
-    <Card className="p-5 flex flex-col gap-3">
-      <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-        Atalhos
-      </span>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+    <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+      {/* cabeçalho */}
+      <div className="px-5 pt-4 pb-2">
+        <Fig n="A" titulo="Atalhos rápidos" size="sm" />
+      </div>
+      <Ruler />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0" style={{ borderColor: "var(--color-rule)" }}>
         {ATALHOS.map((a) => (
           <Link
             key={a.href}
             href={a.href}
-            className="group rounded-md border p-3 transition-all hover:-translate-y-0.5 flex flex-col gap-2 bg-[var(--color-card-2)] border-[var(--color-line-2)] hover:bg-[var(--color-card-3)]"
+            className="group p-4 flex flex-col gap-3 transition-colors hover:bg-[var(--color-paper-2)]"
           >
+            {/* índice técnico */}
+            <span className="mono text-[10px] font-semibold text-[var(--color-ink-3)] uppercase tracking-[0.14em]">
+              {a.indice}
+            </span>
+            {/* ícone — quadrado técnico */}
             <span
-              className="size-8 rounded-md grid place-items-center"
-              style={{ background: a.fundoCor }}
+              className="size-8 rounded-[var(--radius-md)] grid place-items-center border"
+              style={{
+                background: "var(--color-paper-2)",
+                borderColor: "var(--color-rule-2)",
+              }}
             >
-              <a.icon className="size-4" style={{ color: a.cor }} />
+              <a.icon className="size-4 text-[var(--color-green)]" aria-hidden />
             </span>
             <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-bold text-[var(--color-txt)] flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-[var(--color-ink)] flex items-center gap-1.5">
                 {a.label}
-                <ArrowRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ArrowRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-green)]" />
               </span>
-              <span className="text-[11px] text-[var(--color-txt-2)] leading-snug">
+              <span className="text-[11px] text-[var(--color-ink-2)] leading-snug">
                 {a.descricao}
               </span>
             </div>
           </Link>
         ))}
       </div>
-    </Card>
+    </Framed>
   );
 }

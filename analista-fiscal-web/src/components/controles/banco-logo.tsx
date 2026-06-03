@@ -18,7 +18,7 @@ export function BancoLogo({ cor, textoCor, iniciais, size = "md", className }: P
   return (
     <div
       className={cn(
-        "rounded-md grid place-items-center font-bold shrink-0",
+        "rounded-[var(--radius-sm)] grid place-items-center font-bold mono shrink-0",
         TAMANHOS[size],
         className
       )}

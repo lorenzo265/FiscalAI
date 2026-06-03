@@ -8,9 +8,9 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useQueryStates, parseAsString } from "nuqs";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +33,9 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Moeda } from "@/components/shared/moeda";
 import { StatCard } from "@/components/shared/stat-card";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { StatusContaPill } from "@/components/controles/status-conta-pill";
 import { ContaFormDialog } from "@/components/controles/conta-form-dialog";
@@ -50,6 +53,13 @@ import {
   type TipoContaPagarReceber,
 } from "@/lib/schemas/controles";
 import { formatarDataBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 interface Props {
   tipo: TipoContaPagarReceber;
@@ -61,6 +71,7 @@ export function ContasPagarReceberTela({ tipo }: Props) {
   const atualizar = useAtualizarContaPagarReceber();
   const remover = useRemoverContaPagarReceber();
   const marcarPaga = useMarcarContaPaga();
+  const reduced = useReducedMotion();
 
   const [filtros, setFiltros] = useQueryStates(
     {
@@ -111,35 +122,62 @@ export function ContasPagarReceberTela({ tipo }: Props) {
       }, seed);
   }, [data, tipo]);
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
         <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
             Controles · {titulo}
-          </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          >
             {titulo}
-          </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
+          >
             Cada conta cadastrada entra automaticamente no fluxo de caixa.
             Marcar como {palavraAcao === "pagar" ? "paga" : "recebida"} já
             atualiza a projeção.
-          </p>
+          </motion.p>
         </div>
-        <Button
-          onClick={() => {
-            setEditando(null);
-            setAbertoForm(true);
-          }}
-        >
-          <Plus className="size-4" />{" "}
-          {tipo === "pagar" ? "Nova conta a pagar" : "Novo recebível"}
-        </Button>
-      </header>
+        <motion.div variants={itemV}>
+          <Button
+            onClick={() => {
+              setEditando(null);
+              setAbertoForm(true);
+            }}
+          >
+            <Plus className="size-4" />{" "}
+            {tipo === "pagar" ? "Nova conta a pagar" : "Novo recebível"}
+          </Button>
+        </motion.div>
+      </motion.header>
 
       <ControlesSubnav />
 
+      {/* ── stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard
           label="Pendentes"
@@ -161,9 +199,10 @@ export function ContasPagarReceberTela({ tipo }: Props) {
         />
       </div>
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col md:flex-row md:items-center gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-ink-3)]" />
           <Input
             value={filtros.q}
             onChange={(e) => void setFiltros({ q: e.target.value })}
@@ -201,8 +240,9 @@ export function ContasPagarReceberTela({ tipo }: Props) {
             <SelectItem value="todos">Todas</SelectItem>
           </SelectContent>
         </Select>
-      </Card>
+      </Framed>
 
+      {/* ── conteúdo ── */}
       {isLoading ? (
         <LoadingState titulo="Carregando..." />
       ) : isError ? (
@@ -227,10 +267,14 @@ export function ContasPagarReceberTela({ tipo }: Props) {
           }
         />
       ) : (
-        <Card className="overflow-hidden">
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo={titulo} size="sm" />
+          </div>
+          <Ruler />
           <ul
             className="divide-y"
-            style={{ borderColor: "var(--color-line)" }}
+            style={{ borderColor: "var(--color-rule)" }}
           >
             {lista.map((conta) => (
               <LinhaConta
@@ -255,7 +299,16 @@ export function ContasPagarReceberTela({ tipo }: Props) {
               />
             ))}
           </ul>
-        </Card>
+          <Ruler />
+          <div className="px-5 py-2.5">
+            <span
+              className="text-xs text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {lista.length} {tipo === "pagar" ? "conta(s) a pagar" : "conta(s) a receber"}
+            </span>
+          </div>
+        </Framed>
       )}
 
       <ContaFormDialog
@@ -293,7 +346,7 @@ export function ContasPagarReceberTela({ tipo }: Props) {
             <DialogTitle>Excluir conta?</DialogTitle>
             <DialogDescription>
               {confirmandoRemocao
-                ? `“${confirmandoRemocao.descricao}” será removida do fluxo de caixa.`
+                ? `"${confirmandoRemocao.descricao}" será removida do fluxo de caixa.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -319,7 +372,7 @@ export function ContasPagarReceberTela({ tipo }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }
 
@@ -335,25 +388,31 @@ function LinhaConta({
   onRemover: () => void;
 }) {
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-28">
-        <span className="mono text-xs font-bold text-[var(--color-txt)]">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
+      <div className="flex flex-col shrink-0 w-28 gap-1">
+        <span
+          className="mono text-xs font-bold text-[var(--color-ink-2)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarDataBR(conta.vencimento)}
         </span>
         <StatusContaPill status={conta.status} />
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-txt)] truncate">
+        <span className="text-sm text-[var(--color-ink)] truncate">
           {conta.descricao}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-txt-3)] flex-wrap">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] flex-wrap">
           <span className="truncate">{conta.contraparte}</span>
-          <span className="size-1 rounded-full bg-[var(--color-line-2)]" />
+          <span className="size-1 rounded-full bg-[var(--color-rule-2)]" />
           <span>{CATEGORIA_CONTA_LABEL[conta.categoria]}</span>
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
-        <span className="mono text-base font-bold text-[var(--color-txt)]">
+        <span
+          className="mono text-base font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={conta.valor} />
         </span>
         {conta.status !== "pago" ? (
@@ -382,7 +441,7 @@ function LinhaConta({
           variant="ghost"
           onClick={onRemover}
           aria-label="Excluir"
-          className="px-2 text-[var(--color-red)] hover:text-[var(--color-red)]"
+          className="px-2 text-[var(--color-danger)] hover:text-[var(--color-danger)]"
         >
           <Trash2 className="size-4" />
         </Button>

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Plus, RefreshCw, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -14,43 +14,80 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pill } from "@/components/shared/pill";
 import { Moeda } from "@/components/shared/moeda";
 import { StatCard } from "@/components/shared/stat-card";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { BancoLogo } from "@/components/controles/banco-logo";
 import {
   useBancos,
   useSincronizarBanco,
 } from "@/hooks/use-controles";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import type { ContaBancaria } from "@/lib/schemas/controles";
 
 export default function BancosPage() {
   const { data, isLoading, isError, refetch } = useBancos();
+  const reduced = useReducedMotion();
 
   const saldoTotal = React.useMemo(
     () => (data ?? []).reduce((acc, c) => acc + c.saldo, 0),
     [data]
   );
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
         <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
             Controles · Bancos
-          </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          >
             Suas contas bancárias
-          </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-xl mt-1">
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
             Saldos sincronizados via Open Finance. Tudo o que entra e sai
             aparece aqui automaticamente.
-          </p>
+          </motion.p>
         </div>
-        <Button asChild>
-          <Link href="/controles/bancos/conectar">
-            <Plus className="size-4" /> Conectar nova conta
-          </Link>
-        </Button>
-      </header>
+        <motion.div variants={itemV}>
+          <Button asChild>
+            <Link href="/controles/bancos/conectar">
+              <Plus className="size-4" /> Conectar nova conta
+            </Link>
+          </Button>
+        </motion.div>
+      </motion.header>
 
       <ControlesSubnav />
 
@@ -61,7 +98,7 @@ export default function BancosPage() {
       ) : !data || data.length === 0 ? (
         <EmptyState
           titulo="Nenhuma conta conectada"
-          descricao="Conecte seu primeiro banco via Open Finance e o FiscalAI traz saldo e transações automaticamente."
+          descricao="Conecte seu primeiro banco via Open Finance e o Arkan traz saldo e transações automaticamente."
           icone={Wallet}
           acao={
             <Button asChild>
@@ -83,9 +120,7 @@ export default function BancosPage() {
             <StatCard
               label="Maior saldo"
               valor={
-                <Moeda
-                  valor={Math.max(...data.map((c) => c.saldo))}
-                />
+                <Moeda valor={Math.max(...data.map((c) => c.saldo))} />
               }
               sub={
                 data.find(
@@ -97,7 +132,7 @@ export default function BancosPage() {
               label="Última sincronização"
               valor={
                 ultimoSyncMaisRecente(data) ? (
-                  <span className="text-base">
+                  <span className="text-base mono">
                     {formatarSync(ultimoSyncMaisRecente(data)!)}
                   </span>
                 ) : (
@@ -115,15 +150,15 @@ export default function BancosPage() {
           </div>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 function ContaCard({ conta }: { conta: ContaBancaria }) {
   const sincronizar = useSincronizarBanco();
   return (
-    <Card className="p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
+    <Framed marks tone="ink" surface="card" padded={false} className="flex flex-col">
+      <div className="px-4 pt-4 pb-2 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <BancoLogo
             cor={conta.cor}
@@ -132,35 +167,47 @@ function ContaCard({ conta }: { conta: ContaBancaria }) {
             size="lg"
           />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--color-txt)] truncate">
+            <p className="text-sm font-semibold text-[var(--color-ink)] truncate">
               {conta.apelido}
             </p>
-            <p className="mono text-[11px] text-[var(--color-txt-3)]">
-              Ag {conta.agencia} · CC {conta.numero}
+            <p
+              className="mono text-[11px] text-[var(--color-ink-2)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              <abbr title="Agência">Ag</abbr> {conta.agencia} ·{" "}
+              <abbr title="Conta Corrente">CC</abbr> {conta.numero}
             </p>
           </div>
         </div>
         <Pill tom="ok">conectado</Pill>
       </div>
 
-      <div className="flex items-end justify-between gap-3">
+      <Ruler />
+
+      <div className="px-4 py-3 flex items-end justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--color-txt-3)]">
-            Saldo
-          </p>
-          <p className="mono text-2xl font-bold text-[var(--color-txt)]">
+          <Fig n="01" titulo="Saldo" size="sm" />
+          <p
+            className="mono text-2xl font-bold text-[var(--color-ink)] mt-1"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             <Moeda valor={conta.saldo} />
           </p>
         </div>
-        <p className="text-[11px] text-[var(--color-txt-3)] text-right">
+        <p className="text-[11px] text-[var(--color-ink-3)] text-right">
           Última sync<br />
-          <span className="mono text-[var(--color-txt-2)]">
+          <span
+            className="mono text-[var(--color-ink-2)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {formatarSync(conta.ultimoSyncEm)}
           </span>
         </p>
       </div>
 
-      <div className="flex items-center gap-2 pt-1">
+      <Ruler />
+
+      <div className="px-4 py-3 flex items-center gap-2">
         <Button asChild variant="outline" className="flex-1">
           <Link href={`/controles/bancos/${conta.id}`}>Ver extrato</Link>
         </Button>
@@ -183,7 +230,7 @@ function ContaCard({ conta }: { conta: ContaBancaria }) {
           Sincronizar
         </Button>
       </div>
-    </Card>
+    </Framed>
   );
 }
 

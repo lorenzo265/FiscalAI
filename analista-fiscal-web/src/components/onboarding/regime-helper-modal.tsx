@@ -72,8 +72,8 @@ export function RegimeHelperModal({ open, onOpenChange, onSugerir }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <HelpCircle className="size-5 text-[var(--color-lime)]" />
+          <DialogTitle className="flex items-center gap-2 font-serif">
+            <HelpCircle className="size-5" style={{ color: "var(--color-green)" }} />
             Vamos descobrir juntos
           </DialogTitle>
           <DialogDescription>
@@ -86,7 +86,7 @@ export function RegimeHelperModal({ open, onOpenChange, onSugerir }: Props) {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="fat">Quanto sua empresa fatura por mês?</Label>
             <div className="flex items-center gap-2">
-              <span className="mono text-xs text-[var(--color-txt-3)]">R$</span>
+              <span className="mono text-xs text-[var(--color-ink-3)]">R$</span>
               <Input
                 id="fat"
                 type="number"
@@ -95,7 +95,7 @@ export function RegimeHelperModal({ open, onOpenChange, onSugerir }: Props) {
                 className="mono"
               />
             </div>
-            <p className="text-[10px] text-[var(--color-txt-3)] mono">
+            <p className="text-[10px] text-[var(--color-ink-3)] mono">
               Anualizado: {formatarMoeda(Number(faturamento) * 12)}
             </p>
           </div>
@@ -110,7 +110,7 @@ export function RegimeHelperModal({ open, onOpenChange, onSugerir }: Props) {
               {(["comercio", "servicos", "industria"] as Atividade[]).map((a) => (
                 <label
                   key={a}
-                  className="flex items-center gap-2 p-2.5 rounded-md border border-[var(--color-line-2)] cursor-pointer hover:bg-[var(--color-card-2)]"
+                  className="flex items-center gap-2 p-2.5 rounded-[var(--radius-md)] border border-[var(--color-rule-2)] cursor-pointer hover:bg-[var(--color-paper-2)]"
                 >
                   <RadioGroupItem value={a} id={`a-${a}`} />
                   <span className="text-sm capitalize">{a}</span>
@@ -137,19 +137,19 @@ export function RegimeHelperModal({ open, onOpenChange, onSugerir }: Props) {
             </Button>
           ) : (
             <div
-              className="rounded-md border p-4 flex flex-col gap-2"
+              className="rounded-[var(--radius-md)] border p-4 flex flex-col gap-2"
               style={{
-                background: "var(--color-lime-d)",
-                borderColor: "rgba(163, 255, 107, 0.32)",
+                background: "var(--color-green-wash)",
+                borderColor: "var(--color-green)",
               }}
             >
               <div className="flex items-center gap-2">
                 <Pill tom="ok">recomendação</Pill>
-                <span className="text-base font-bold text-[var(--color-txt)]">
+                <span className="text-base font-bold text-[var(--color-ink)]">
                   {nomeRegime(resultado.regime)}
                 </span>
               </div>
-              <p className="text-sm text-[var(--color-txt-2)] leading-relaxed">
+              <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
                 {resultado.explicacao}
               </p>
               <div className="flex gap-2 mt-1">

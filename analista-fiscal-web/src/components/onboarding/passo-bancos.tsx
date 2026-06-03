@@ -49,35 +49,36 @@ export function PassoBancos() {
                 }
               }}
               className={cn(
-                "rounded-md border p-3 transition-all text-left flex flex-col gap-2.5",
+                "rounded-[var(--radius-md)] border p-3 transition-all text-left flex flex-col gap-2.5",
                 ativo
-                  ? "border-[var(--color-lime)] bg-[var(--color-lime-d)]"
-                  : "border-[var(--color-line-2)] bg-[var(--color-card-2)] hover:bg-[var(--color-card-3)]"
+                  ? "border-[var(--color-green)] bg-[var(--color-green-wash)]"
+                  : "border-[var(--color-rule-2)] bg-[var(--color-paper-2)] hover:bg-[var(--color-rule)]"
               )}
             >
               <div className="flex items-center justify-between gap-2">
                 <div
-                  className="px-2.5 py-1.5 rounded-md font-bold text-xs"
+                  className="px-2.5 py-1.5 rounded-[var(--radius-sm)] font-bold mono text-xs"
                   style={{ background: b.cor, color: b.textoCor }}
                 >
                   {b.iniciais}
                 </div>
                 {ativo ? (
-                  <Check className="size-4 text-[var(--color-lime)]" />
+                  <Check className="size-4 shrink-0" style={{ color: "var(--color-green)" }} />
                 ) : (
-                  <Plus className="size-4 text-[var(--color-txt-3)]" />
+                  <Plus className="size-4 shrink-0 text-[var(--color-ink-3)]" />
                 )}
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--color-txt)]">
+                <p className="text-sm font-semibold text-[var(--color-ink)]">
                   {b.nome}
                 </p>
                 {ativo ? (
-                  <p className="mono text-[10px] text-[var(--color-txt-2)] mt-0.5">
+                  <p className="mono text-[10px] text-[var(--color-ink-2)] mt-0.5"
+                     style={{ fontVariantNumeric: "tabular-nums" }}>
                     {formatarMoeda(ativo.saldo)}
                   </p>
                 ) : (
-                  <p className="text-[10px] text-[var(--color-txt-3)] mt-0.5">
+                  <p className="text-[10px] mono text-[var(--color-ink-3)] mt-0.5 uppercase tracking-[0.1em]">
                     Open Finance
                   </p>
                 )}
@@ -89,22 +90,26 @@ export function PassoBancos() {
 
       {conectados.length > 0 ? (
         <div
-          className="rounded-md border p-3 flex items-center gap-2.5 text-sm"
+          className="rounded-[var(--radius-md)] border p-3 flex items-center gap-2.5 text-sm"
           style={{
-            background: "var(--color-lime-d)",
-            borderColor: "rgba(163, 255, 107, 0.32)",
+            background: "var(--color-green-wash)",
+            borderColor: "var(--color-green)",
           }}
         >
-          <Pill tom="ok">{conectados.length} conta{conectados.length === 1 ? "" : "s"}</Pill>
-          <span className="text-[var(--color-txt)]">
-            Saldo total: <span className="mono font-semibold">
+          <Pill tom="ok">
+            {conectados.length} conta{conectados.length === 1 ? "" : "s"}
+          </Pill>
+          <span className="text-[var(--color-ink)]">
+            Saldo total:{" "}
+            <span className="mono font-semibold"
+                  style={{ fontVariantNumeric: "tabular-nums" }}>
               {formatarMoeda(conectados.reduce((acc, b) => acc + b.saldo, 0))}
             </span>
           </span>
         </div>
       ) : (
-        <p className="text-xs text-[var(--color-txt-2)]">
-          Você pode pular essa etapa e conectar bancos depois pelo menu Controles.
+        <p className="text-xs text-[var(--color-ink-2)]">
+          Pode pular e conectar os bancos depois em Controles → Bancos.
         </p>
       )}
 

@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Calendar, List } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Moeda } from "@/components/shared/moeda";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { CalendarioMes } from "@/components/agenda/calendario-mes";
 import {
   COR_STATUS_AGENDA,
@@ -17,6 +20,13 @@ import {
 import { useAgendaAno, useAgendaMes } from "@/hooks/use-agenda";
 import { formatarDataBR, formatarMesAnoBR } from "@/lib/format/data";
 import type { EventoAgenda } from "@/lib/schemas/agenda";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import { cn } from "@/lib/utils";
 
 export default function AgendaPage() {
@@ -24,6 +34,7 @@ export default function AgendaPage() {
   const [ano, setAno] = React.useState(hoje.getFullYear());
   const [mes, setMes] = React.useState(hoje.getMonth() + 1);
   const [modo, setModo] = React.useState<"mes" | "ano">("mes");
+  const reduced = useReducedMotion();
 
   const {
     data: eventosMes,
@@ -55,42 +66,56 @@ export default function AgendaPage() {
   function trocarMes(delta: number) {
     let novoMes = mes + delta;
     let novoAno = ano;
-    if (novoMes > 12) {
-      novoMes = 1;
-      novoAno += 1;
-    }
-    if (novoMes < 1) {
-      novoMes = 12;
-      novoAno -= 1;
-    }
+    if (novoMes > 12) { novoMes = 1; novoAno += 1; }
+    if (novoMes < 1)  { novoMes = 12; novoAno -= 1; }
     setMes(novoMes);
     setAno(novoAno);
   }
 
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={itemVariants}>
+          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block">
             Agenda
           </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight">
             Calendário fiscal
           </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-            Tudo que vence: DAS, INSS, FGTS, DCTFWeb, eSocial. Customizado
-            pelo perfil da sua empresa.
+          <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
+            Tudo que vence: DAS, INSS, FGTS, DCTFWeb, eSocial — personalizado
+            para o perfil da sua empresa.
           </p>
-        </div>
-        <div className="flex items-center gap-1 p-1 rounded-md border" style={{ borderColor: "var(--color-line-2)" }}>
+        </motion.div>
+        {/* toggle de modo — quadrados técnicos, não pílulas */}
+        <motion.div
+          variants={itemVariants}
+          className="flex items-center gap-1 p-1 rounded-[var(--radius-sm)] border"
+          style={{ borderColor: "var(--color-rule-2)" }}
+        >
           <button
             type="button"
             onClick={() => setModo("mes")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 mono text-[10px] uppercase tracking-[0.12em] font-bold rounded-[var(--radius-sm)] transition-colors",
               modo === "mes"
-                ? "bg-[var(--color-card-2)] text-[var(--color-txt)]"
-                : "text-[var(--color-txt-2)] hover:text-[var(--color-txt)]"
+                ? "bg-[var(--color-paper-2)] text-[var(--color-ink)]"
+                : "text-[var(--color-ink-3)] hover:text-[var(--color-ink-2)]"
             )}
           >
             <Calendar className="size-3.5" /> Mês
@@ -99,62 +124,68 @@ export default function AgendaPage() {
             type="button"
             onClick={() => setModo("ano")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 mono text-[10px] uppercase tracking-[0.12em] font-bold rounded-[var(--radius-sm)] transition-colors",
               modo === "ano"
-                ? "bg-[var(--color-card-2)] text-[var(--color-txt)]"
-                : "text-[var(--color-txt-2)] hover:text-[var(--color-txt)]"
+                ? "bg-[var(--color-paper-2)] text-[var(--color-ink)]"
+                : "text-[var(--color-ink-3)] hover:text-[var(--color-ink-2)]"
             )}
           >
-            <List className="size-3.5" /> Lista anual
+            <List className="size-3.5" /> Anual
           </button>
-        </div>
-      </header>
+        </motion.div>
+      </motion.header>
 
+      {/* ── controles de navegação + legenda ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {modo === "mes" ? (
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => trocarMes(-1)} aria-label="Mês anterior">
+            <Button variant="outline" size="sm" onClick={() => trocarMes(-1)} aria-label="Mês anterior">
               <ChevronLeft className="size-4" />
             </Button>
-            <h2 className="text-base font-bold text-[var(--color-txt)] min-w-[180px] text-center">
+            <h2 className="mono text-sm font-bold text-[var(--color-ink)] min-w-[180px] text-center uppercase tracking-[0.1em]"
+                style={{ fontVariantNumeric: "tabular-nums" }}>
               {formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}
             </h2>
-            <Button variant="outline" onClick={() => trocarMes(1)} aria-label="Próximo mês">
+            <Button variant="outline" size="sm" onClick={() => trocarMes(1)} aria-label="Próximo mês">
               <ChevronRight className="size-4" />
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => {
                 setAno(hoje.getFullYear());
                 setMes(hoje.getMonth() + 1);
               }}
-              className="text-xs"
+              className="mono text-[10px] uppercase tracking-[0.12em]"
             >
               Hoje
             </Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setAno(ano - 1)} aria-label="Ano anterior">
+            <Button variant="outline" size="sm" onClick={() => setAno(ano - 1)} aria-label="Ano anterior">
               <ChevronLeft className="size-4" />
             </Button>
-            <h2 className="mono text-lg font-bold text-[var(--color-txt)] min-w-[80px] text-center">
+            <h2 className="mono text-lg font-bold text-[var(--color-ink)] min-w-[80px] text-center"
+                style={{ fontVariantNumeric: "tabular-nums" }}>
               {ano}
             </h2>
-            <Button variant="outline" onClick={() => setAno(ano + 1)} aria-label="Próximo ano">
+            <Button variant="outline" size="sm" onClick={() => setAno(ano + 1)} aria-label="Próximo ano">
               <ChevronRight className="size-4" />
             </Button>
           </div>
         )}
 
-        <div className="flex items-center gap-3 text-[10px] mono text-[var(--color-txt-2)] flex-wrap">
-          <Legenda cor="var(--color-lime)" texto="Pago" />
-          <Legenda cor="var(--color-amber)" texto="Pendente" />
-          <Legenda cor="var(--color-red)" texto="Atrasado" />
-          <Legenda cor="var(--color-blue)" texto="Informativo" />
+        {/* legenda com fios técnicos, não bolinhas */}
+        <div className="flex items-center gap-4 text-[10px] mono uppercase tracking-[0.1em] text-[var(--color-ink-3)] flex-wrap">
+          <Legenda cor="var(--color-green)"  texto="Pago" />
+          <Legenda cor="var(--color-ochre)"  texto="Pendente" />
+          <Legenda cor="var(--color-danger)" texto="Atrasado" />
+          <Legenda cor="var(--color-ink-2)"  texto="Info" />
         </div>
       </div>
 
+      {/* ── grade: calendário + próximos ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
         <div>
           {isLoading ? (
@@ -162,43 +193,49 @@ export default function AgendaPage() {
           ) : isError ? (
             <ErrorState onTentarNovamente={() => void refetch()} />
           ) : modo === "mes" ? (
-            <Card className="overflow-hidden">
+            <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
               <CalendarioMes ano={ano} mes={mes} eventos={eventos ?? []} hoje={hoje} />
-            </Card>
+            </Framed>
           ) : (
             <ListaAnual eventos={eventos ?? []} />
           )}
         </div>
 
-        <Card className="p-5 flex flex-col gap-3 self-start">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-              Próximos 7 vencimentos
-            </span>
+        {/* Fig. 01 — próximos vencimentos */}
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="self-start">
+          <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
+            <Fig n={1} titulo="Próximos vencimentos" size="sm" />
           </div>
-          {proximos7.length === 0 ? (
-            <EmptyState
-              titulo="Nada pendente"
-              descricao="Sem obrigações nas próximas semanas."
-              className="py-8"
-            />
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {proximos7.map((e) => (
-                <LinhaProximo key={e.id} evento={e} />
-              ))}
-            </ul>
-          )}
-        </Card>
+          <Ruler />
+          <div className="p-4">
+            {proximos7.length === 0 ? (
+              <EmptyState
+                titulo="Nada pendente"
+                descricao="Sem obrigações nas próximas semanas."
+                className="py-6"
+              />
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {proximos7.map((e) => (
+                  <LinhaProximo key={e.id} evento={e} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </Framed>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function Legenda({ cor, texto }: { cor: string; texto: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className="size-2 rounded-full" style={{ background: cor }} />
+      <span
+        className="w-3 h-[2px] rounded-[var(--radius-sm)]"
+        style={{ background: cor }}
+        aria-hidden
+      />
       {texto}
     </span>
   );
@@ -210,33 +247,34 @@ function LinhaProximo({ evento }: { evento: EventoAgenda }) {
   );
   return (
     <li
-      className="rounded-md border p-2.5 flex items-start gap-2.5 text-sm"
+      className="rounded-[var(--radius-md)] border p-2.5 flex items-start gap-2.5 text-sm"
       style={{
-        background: "var(--color-card-2)",
-        borderColor: "var(--color-line-2)",
-        borderLeft: `3px solid ${COR_STATUS_AGENDA[evento.status]}`,
+        background: "var(--color-paper-2)",
+        borderColor: "var(--color-rule-2)",
+        borderLeft: `2px solid ${COR_STATUS_AGENDA[evento.status]}`,
       }}
     >
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="font-semibold text-[var(--color-txt)] truncate">
+        <span className="font-semibold text-[var(--color-ink)] truncate text-xs">
           {evento.titulo}
         </span>
-        <span className="text-[11px] text-[var(--color-txt-3)] mono">
+        <span className="text-[11px] text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}>
           {formatarDataBR(evento.data)} ·{" "}
           {dias === 0 ? "hoje" : dias === 1 ? "amanhã" : `em ${dias}d`}
         </span>
         {evento.valor ? (
-          <span className="mono text-xs text-[var(--color-txt-2)]">
+          <span className="mono text-xs text-[var(--color-ink-2)]">
             <Moeda valor={evento.valor} />
           </span>
         ) : null}
       </div>
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-col items-end gap-1 shrink-0">
         <StatusEventoAgendaPill status={evento.status} />
         {evento.rota ? (
           <Link
             href={evento.rota}
-            className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-lime)] hover:underline"
+            className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-green)] hover:underline"
           >
             Resolver →
           </Link>
@@ -271,37 +309,37 @@ function ListaAnual({ eventos }: { eventos: EventoAgenda[] }) {
   }
 
   return (
-    <Card className="overflow-hidden">
-      <ul className="divide-y" style={{ borderColor: "var(--color-line)" }}>
+    <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+      <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
         {porMes.map(([competencia, lista]) => (
           <li key={competencia} className="flex flex-col">
             <div
-              className="px-5 py-2.5 bg-[var(--color-card-2)] text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono"
-              style={{ borderColor: "var(--color-line)" }}
+              className="px-5 py-2.5 bg-[var(--color-paper-2)] text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-ink-3)] mono border-b"
+              style={{ borderColor: "var(--color-rule)" }}
             >
               {formatarMesAnoBR(`${competencia}-01`)}
             </div>
-            <ul
-              className="divide-y"
-              style={{ borderColor: "var(--color-line)" }}
-            >
+            <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
               {lista.map((e) => (
                 <li
                   key={e.id}
-                  className="px-5 py-2.5 flex items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors"
+                  className="px-5 py-2.5 flex items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors"
                 >
                   <div
-                    className="size-2 rounded-full shrink-0"
+                    className="w-2 h-[2px] rounded-[var(--radius-sm)] shrink-0"
                     style={{ background: COR_STATUS_AGENDA[e.status] }}
+                    aria-hidden
                   />
-                  <span className="mono text-xs font-bold text-[var(--color-txt)] w-20 shrink-0">
+                  <span className="mono text-xs font-bold text-[var(--color-ink)] w-20 shrink-0"
+                        style={{ fontVariantNumeric: "tabular-nums" }}>
                     {formatarDataBR(e.data)}
                   </span>
-                  <span className="text-sm text-[var(--color-txt)] flex-1 min-w-0 truncate">
+                  <span className="text-sm text-[var(--color-ink)] flex-1 min-w-0 truncate">
                     {e.titulo}
                   </span>
                   {e.valor ? (
-                    <span className="mono text-sm font-semibold text-[var(--color-txt)] shrink-0">
+                    <span className="mono text-sm font-semibold text-[var(--color-ink)] shrink-0"
+                          style={{ fontVariantNumeric: "tabular-nums" }}>
                       <Moeda valor={e.valor} />
                     </span>
                   ) : null}
@@ -309,7 +347,7 @@ function ListaAnual({ eventos }: { eventos: EventoAgenda[] }) {
                   {e.rota ? (
                     <Link
                       href={e.rota}
-                      className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-lime)] hover:underline shrink-0"
+                      className="text-[10px] mono uppercase tracking-[0.14em] font-bold text-[var(--color-green)] hover:underline shrink-0"
                     >
                       Abrir →
                     </Link>
@@ -320,6 +358,6 @@ function ListaAnual({ eventos }: { eventos: EventoAgenda[] }) {
           </li>
         ))}
       </ul>
-    </Card>
+    </Framed>
   );
 }

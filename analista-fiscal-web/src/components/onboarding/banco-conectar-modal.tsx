@@ -65,7 +65,7 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
           style={{ background: banco.cor, color: banco.textoCor }}
         >
           <div
-            className="size-10 rounded-md grid place-items-center font-bold"
+            className="size-10 rounded-[var(--radius-sm)] grid place-items-center font-bold"
             style={{
               background: banco.textoCor === "#ffffff" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.12)",
             }}
@@ -81,7 +81,7 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
           <button
             type="button"
             onClick={fechar}
-            className="p-1 rounded-md transition-colors"
+            className="p-1 rounded-[var(--radius-sm)] transition-colors"
             style={{ color: banco.textoCor }}
             aria-label="Fechar"
           >
@@ -91,17 +91,17 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
 
         {etapa === "intro" ? (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-[var(--color-txt)]">
+            <p className="text-sm text-[var(--color-ink)]">
               Você será redirecionado pro app do <strong>{banco.nome}</strong> para
               autorizar o FiscalAI a ler suas transações.
             </p>
-            <ul className="flex flex-col gap-2 text-xs text-[var(--color-txt-2)]">
+            <ul className="flex flex-col gap-2 text-xs text-[var(--color-ink-2)]">
               <li className="flex items-center gap-2">
-                <ShieldCheck className="size-3.5 text-[var(--color-lime)]" />
+                <ShieldCheck className="size-3.5 text-[var(--color-green)]" />
                 Conexão regulada pelo Banco Central — você pode revogar a qualquer momento.
               </li>
               <li className="flex items-center gap-2">
-                <Lock className="size-3.5 text-[var(--color-lime)]" />
+                <Lock className="size-3.5 text-[var(--color-green)]" />
                 Acesso somente leitura. O FiscalAI nunca movimenta sua conta.
               </li>
             </ul>
@@ -119,20 +119,20 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
 
         {etapa === "autorizando" ? (
           <div
-            className="rounded-md border p-5 flex flex-col gap-4"
+            className="rounded-[var(--radius-md)] border p-5 flex flex-col gap-4"
             style={{
-              background: "var(--color-card-2)",
-              borderColor: "var(--color-line-2)",
+              background: "var(--color-paper-2)",
+              borderColor: "var(--color-rule-2)",
             }}
           >
             <div className="flex flex-col items-center gap-2 text-center">
-              <span className="text-xs uppercase tracking-[0.14em] mono font-bold text-[var(--color-txt-3)]">
+              <span className="text-xs uppercase tracking-[0.14em] mono font-bold text-[var(--color-ink-3)]">
                 {banco.nome}
               </span>
-              <h3 className="text-base font-bold text-[var(--color-txt)]">
+              <h3 className="text-base font-bold text-[var(--color-ink)]">
                 Autorizar acesso ao FiscalAI?
               </h3>
-              <p className="text-xs text-[var(--color-txt-2)] leading-relaxed">
+              <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
                 O FiscalAI poderá visualizar suas transações pelos próximos 12
                 meses. Sem permissão para mover dinheiro.
               </p>
@@ -161,10 +161,10 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
         {etapa === "pronto" ? (
           <div className="flex flex-col items-center gap-2 text-center py-3">
             <Pill tom="ok">conectado</Pill>
-            <p className="text-base font-bold text-[var(--color-txt)]">
+            <p className="text-base font-bold text-[var(--color-ink)]">
               {banco.nome} · Conta principal
             </p>
-            <p className="mono text-sm text-[var(--color-txt-2)]">
+            <p className="mono text-sm text-[var(--color-ink-2)]">
               Saldo {formatarMoeda(saldo)}
             </p>
           </div>
@@ -179,9 +179,9 @@ function PassoCarregando({ mensagem }: { mensagem: string }) {
     <div className="flex flex-col items-center gap-3 py-6">
       <Loader2
         className="size-6 animate-spin"
-        style={{ color: "var(--color-lime)" }}
+        style={{ color: "var(--color-green)" }}
       />
-      <p className="text-sm text-[var(--color-txt-2)]">{mensagem}</p>
+      <p className="text-sm text-[var(--color-ink-2)]">{mensagem}</p>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   Building2,
@@ -9,13 +11,21 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Pill, type PillTom } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { ResetDemoButton } from "@/components/configuracoes/reset-demo-button";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { emailLogado } from "@/lib/auth";
-import * as React from "react";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 interface CardConfig {
   href: string;
@@ -29,6 +39,7 @@ interface CardConfig {
 export default function ConfiguracoesPage() {
   const { empresa } = useEmpresaAtual();
   const [email, setEmail] = React.useState<string | null>(null);
+  const reduced = useReducedMotion();
 
   React.useEffect(() => {
     setEmail(emailLogado());
@@ -86,38 +97,60 @@ export default function ConfiguracoesPage() {
     },
   ];
 
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header variants={containerVariants} initial="hidden" animate="show">
+        <motion.span
+          variants={itemVariants}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
           Conta · Configurações
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
-          Ajustes da sua conta
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-          Tudo o que define sua empresa por aqui: dados cadastrais, certificado
-          digital, integrações com bancos e governo, e quem mais tem acesso.
-        </p>
-      </header>
+        </motion.span>
+        <motion.h1
+          variants={itemVariants}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
+          Ajustes da conta
+        </motion.h1>
+        <motion.p
+          variants={itemVariants}
+          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
+        >
+          Dados cadastrais, certificado digital, integrações com bancos e
+          governo, e controle de acesso.
+        </motion.p>
+      </motion.header>
 
       <ConfiguracoesSubnav />
 
+      {/* grade de módulos de configuração */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {cards.map((c) => (
           <CardConfiguracao key={c.href} {...c} />
         ))}
       </div>
 
-      <div className="flex items-center justify-between border-t pt-4 mt-2"
-        style={{ borderColor: "var(--color-line)" }}
+      {/* rodapé de demo */}
+      <div
+        className="flex items-center justify-between border-t pt-4 mt-2"
+        style={{ borderColor: "var(--color-rule)" }}
       >
-        <p className="text-[11px] text-[var(--color-txt-3)]">
-          Esta é uma demonstração local. Nada é enviado para servidores externos.
+        <p className="text-[11px] text-[var(--color-ink-3)] mono">
+          Demonstração local — nenhum dado é enviado a servidores externos.
         </p>
         <ResetDemoButton />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -131,29 +164,40 @@ function CardConfiguracao({
 }: CardConfig) {
   return (
     <Link href={href} className="block group">
-      <Card interactive className="p-5 flex items-start gap-4 h-full">
+      <Framed
+        marks={false}
+        tone="rule"
+        surface="card"
+        className="flex items-start gap-4 h-full transition-colors group-hover:border-[var(--color-rule-2)]"
+      >
+        {/* ícone em quadrado técnico */}
         <div
-          className="size-10 rounded-md grid place-items-center shrink-0"
-          style={{ background: "var(--color-card-2)" }}
+          className="size-10 rounded-[var(--radius-sm)] grid place-items-center shrink-0 border"
+          style={{
+            background: "var(--color-paper-2)",
+            borderColor: "var(--color-rule)",
+          }}
         >
-          <Icon className="size-5 text-[var(--color-lime)]" />
+          <Icon className="size-5" style={{ color: "var(--color-green)" }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)]">
+            <span className="text-[10px] mono uppercase tracking-[0.16em] font-bold text-[var(--color-ink-3)]">
               {rotulo}
             </span>
             <Pill tom={pill.tom}>{pill.texto}</Pill>
           </div>
-          <p className="text-base font-bold text-[var(--color-txt)] mt-0.5">
+          <p className="text-sm font-bold text-[var(--color-ink)] mt-0.5">
             {titulo}
           </p>
-          <p className="text-xs text-[var(--color-txt-2)] mt-1 leading-relaxed line-clamp-2">
+          <p className="text-xs text-[var(--color-ink-2)] mt-1 leading-relaxed line-clamp-2">
             {descricao}
           </p>
         </div>
-        <ArrowRight className="size-4 text-[var(--color-txt-3)] group-hover:text-[var(--color-txt)] transition-colors mt-1" />
-      </Card>
+        <ArrowRight
+          className="size-4 text-[var(--color-ink-3)] group-hover:text-[var(--color-ink)] transition-colors mt-1 shrink-0"
+        />
+      </Framed>
     </Link>
   );
 }

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   FileText,
   Info,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +16,33 @@ import {
   type MensagemAssistente,
   type Sugestao,
 } from "@/lib/schemas/assistente";
+
+/* ── ícone Arkan do assistente (quadrado técnico, não bolinha neon) ── */
+function AssistenteIcone({ small }: { small?: boolean }) {
+  const s = small ? "size-6" : "size-7";
+  return (
+    <div
+      className={cn(
+        s,
+        "rounded-[var(--radius-sm)] grid place-items-center shrink-0 border"
+      )}
+      style={{
+        background: "var(--color-green-wash)",
+        borderColor: "var(--color-green)",
+        color: "var(--color-green)",
+      }}
+      aria-hidden
+    >
+      {/* "A" minimalista em mono — marca do Arkan Assistente */}
+      <span
+        className="mono text-[10px] font-bold uppercase leading-none"
+        style={{ letterSpacing: "0.04em" }}
+      >
+        AR
+      </span>
+    </div>
+  );
+}
 
 interface Props {
   mensagem: MensagemAssistente;
@@ -39,11 +65,11 @@ function BubbleUsuario({ mensagem }: { mensagem: MensagemAssistente }) {
   return (
     <div className="flex justify-end">
       <div
-        className="max-w-[78%] rounded-md px-3 py-2 text-sm leading-relaxed"
+        className="max-w-[78%] rounded-[var(--radius-md)] px-3 py-2 text-sm leading-relaxed"
         style={{
-          background: "var(--color-card-2)",
-          color: "var(--color-txt)",
-          border: "1px solid var(--color-line-2)",
+          background: "var(--color-paper-2)",
+          color: "var(--color-ink)",
+          border: "1px solid var(--color-rule-2)",
         }}
       >
         {mensagem.texto}
@@ -63,27 +89,17 @@ function BubbleAssistente({
 }) {
   return (
     <div className="flex items-start gap-2">
-      <div
-        className="size-7 rounded-full grid place-items-center shrink-0 border"
-        style={{
-          background: "var(--color-lime-d)",
-          borderColor: "rgba(163,255,107,0.32)",
-          color: "var(--color-lime)",
-        }}
-        aria-hidden
-      >
-        <Sparkles className="size-3.5" />
-      </div>
+      <AssistenteIcone />
       <div
         className={cn(
-          "rounded-md px-3.5 py-3 flex flex-col gap-2.5",
+          "rounded-[var(--radius-md)] px-3.5 py-3 flex flex-col gap-2.5",
           compacto ? "max-w-full" : "max-w-[78%]"
         )}
         style={{
           background: "var(--color-card)",
-          color: "var(--color-txt)",
-          border: "1px solid var(--color-line)",
-          borderLeft: "2px solid var(--color-lime)",
+          color: "var(--color-ink)",
+          border: "1px solid var(--color-rule)",
+          borderLeft: "2px solid var(--color-green)",
         }}
       >
         <p className="text-sm leading-relaxed whitespace-pre-line">
@@ -109,10 +125,10 @@ function BubbleAssistente({
                 key={i}
                 type="button"
                 onClick={() => onSugestaoClick?.(s)}
-                className="text-[11px] mono uppercase tracking-[0.12em] font-bold px-2.5 py-1 rounded-full border transition-colors hover:bg-[var(--color-card-2)]"
+                className="text-[10px] mono uppercase tracking-[0.12em] font-bold px-2.5 py-1 rounded-[var(--radius-sm)] border transition-colors hover:bg-[var(--color-paper-2)]"
                 style={{
-                  borderColor: "var(--color-line-2)",
-                  color: "var(--color-txt-2)",
+                  borderColor: "var(--color-rule-2)",
+                  color: "var(--color-ink-2)",
                 }}
               >
                 {s.texto}
@@ -127,33 +143,31 @@ function BubbleAssistente({
 
 function BlocoView({ bloco }: { bloco: Bloco }) {
   if (bloco.tipo === "texto") {
-    return <p className="text-sm text-[var(--color-txt-2)]">{bloco.texto}</p>;
+    return <p className="text-sm text-[var(--color-ink-2)]">{bloco.texto}</p>;
   }
   if (bloco.tipo === "stat") {
     const corValor =
       bloco.tom === "ok"
-        ? "var(--color-lime)"
+        ? "var(--color-green)"
         : bloco.tom === "warn"
-          ? "var(--color-amber)"
+          ? "var(--color-ochre)"
           : bloco.tom === "error"
-            ? "var(--color-red)"
-            : bloco.tom === "info"
-              ? "var(--color-blue)"
-              : "var(--color-txt)";
+            ? "var(--color-danger)"
+            : "var(--color-ink)";
     return (
       <div
-        className="rounded-md border p-3 flex items-center justify-between gap-3"
+        className="rounded-[var(--radius-md)] border p-3 flex items-center justify-between gap-3"
         style={{
-          background: "var(--color-card-2)",
-          borderColor: "var(--color-line-2)",
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule-2)",
         }}
       >
-        <span className="text-[11px] uppercase tracking-[0.14em] font-semibold text-[var(--color-txt-3)]">
+        <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--color-ink-3)] mono">
           {bloco.rotulo}
         </span>
         <span
           className="mono text-base font-bold"
-          style={{ color: corValor }}
+          style={{ color: corValor, fontVariantNumeric: "tabular-nums" }}
         >
           {bloco.valor}
         </span>
@@ -163,29 +177,32 @@ function BlocoView({ bloco }: { bloco: Bloco }) {
   if (bloco.tipo === "lista") {
     return (
       <div
-        className="rounded-md border"
+        className="rounded-[var(--radius-md)] border overflow-hidden"
         style={{
-          background: "var(--color-card-2)",
-          borderColor: "var(--color-line-2)",
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule-2)",
         }}
       >
         {bloco.titulo ? (
           <div
-            className="px-3 py-1.5 border-b text-[10px] uppercase tracking-[0.14em] font-bold mono text-[var(--color-txt-3)]"
-            style={{ borderColor: "var(--color-line)" }}
+            className="px-3 py-1.5 border-b text-[10px] uppercase tracking-[0.14em] font-bold mono text-[var(--color-ink-3)]"
+            style={{ borderColor: "var(--color-rule)" }}
           >
             {bloco.titulo}
           </div>
         ) : null}
-        <ul className="divide-y" style={{ borderColor: "var(--color-line)" }}>
+        <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
           {bloco.itens.map((item, i) => (
             <li
               key={i}
               className="px-3 py-1.5 flex items-center justify-between gap-3 text-xs"
             >
-              <span className="text-[var(--color-txt)]">{item.rotulo}</span>
+              <span className="text-[var(--color-ink)]">{item.rotulo}</span>
               {item.valor ? (
-                <span className="mono text-[var(--color-txt-2)] shrink-0">
+                <span
+                  className="mono text-[var(--color-ink-2)] shrink-0"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
                   {item.valor}
                 </span>
               ) : null}
@@ -204,24 +221,20 @@ function BlocoView({ bloco }: { bloco: Bloco }) {
           : Info;
     const cor =
       bloco.tom === "ok"
-        ? "var(--color-lime)"
+        ? "var(--color-green)"
         : bloco.tom === "warn"
-          ? "var(--color-amber)"
+          ? "var(--color-ochre)"
           : bloco.tom === "error"
-            ? "var(--color-red)"
-            : "var(--color-blue)";
-    const corBg =
-      bloco.tom === "ok"
-        ? "var(--color-lime-d)"
-        : bloco.tom === "warn"
-          ? "var(--color-amber-d)"
-          : bloco.tom === "error"
-            ? "var(--color-red-d)"
-            : "var(--color-blue-d)";
+            ? "var(--color-danger)"
+            : "var(--color-ink-2)";
     return (
       <div
-        className="rounded-md border p-2.5 flex items-start gap-2"
-        style={{ background: corBg, borderColor: "transparent" }}
+        className="rounded-[var(--radius-md)] border p-2.5 flex items-start gap-2"
+        style={{
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule)",
+          borderLeft: `2px solid ${cor}`,
+        }}
       >
         <Icon className="size-3.5 mt-0.5 shrink-0" style={{ color: cor }} />
         <div className="flex flex-col gap-0.5 min-w-0">
@@ -229,7 +242,7 @@ function BlocoView({ bloco }: { bloco: Bloco }) {
             {bloco.titulo}
           </p>
           {bloco.descricao ? (
-            <p className="text-[11px] text-[var(--color-txt-2)]">
+            <p className="text-[11px] text-[var(--color-ink-2)]">
               {bloco.descricao}
             </p>
           ) : null}
@@ -243,25 +256,25 @@ function BlocoView({ bloco }: { bloco: Bloco }) {
 function CitacaoChip({ citacao }: { citacao: Citacao }) {
   const conteudo = (
     <span
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] mono border transition-colors"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] text-[10px] mono border transition-colors"
       style={{
-        background: "var(--color-card-2)",
-        borderColor: "var(--color-line-2)",
-        color: "var(--color-txt-2)",
+        background: "var(--color-paper-2)",
+        borderColor: "var(--color-rule-2)",
+        color: "var(--color-ink-2)",
       }}
     >
-      <FileText className="size-3" />
-      <span className="text-[var(--color-txt-3)]">
+      <FileText className="size-3 shrink-0" />
+      <span className="text-[var(--color-ink-3)]">
         {TIPO_CITACAO_LABEL[citacao.tipo]} ·
       </span>
-      <span className="text-[var(--color-txt)]">{citacao.rotulo}</span>
+      <span className="text-[var(--color-ink)]">{citacao.rotulo}</span>
     </span>
   );
   if (citacao.rota) {
     return (
       <Link
         href={citacao.rota}
-        className="hover:[&>span]:bg-[var(--color-card-3)]"
+        className="hover:[&>span]:bg-[var(--color-rule)]"
       >
         {conteudo}
       </Link>
@@ -271,12 +284,11 @@ function CitacaoChip({ citacao }: { citacao: Citacao }) {
 }
 
 function renderTextoFormatado(texto: string): React.ReactNode {
-  // Suporte a **negrito**
   const partes = texto.split(/(\*\*[^*]+\*\*)/g);
   return partes.map((parte, i) => {
     if (parte.startsWith("**") && parte.endsWith("**")) {
       return (
-        <strong key={i} className="font-semibold text-[var(--color-txt)]">
+        <strong key={i} className="font-semibold text-[var(--color-ink)]">
           {parte.slice(2, -2)}
         </strong>
       );
@@ -288,23 +300,13 @@ function renderTextoFormatado(texto: string): React.ReactNode {
 export function TypingIndicator() {
   return (
     <div className="flex items-start gap-2">
+      <AssistenteIcone />
       <div
-        className="size-7 rounded-full grid place-items-center shrink-0 border"
-        style={{
-          background: "var(--color-lime-d)",
-          borderColor: "rgba(163,255,107,0.32)",
-          color: "var(--color-lime)",
-        }}
-        aria-hidden
-      >
-        <Sparkles className="size-3.5" />
-      </div>
-      <div
-        className="rounded-md px-3.5 py-3 flex items-center gap-1.5 border"
+        className="rounded-[var(--radius-md)] px-3.5 py-3 flex items-center gap-1.5 border"
         style={{
           background: "var(--color-card)",
-          borderColor: "var(--color-line)",
-          borderLeft: "2px solid var(--color-lime)",
+          borderColor: "var(--color-rule)",
+          borderLeft: "2px solid var(--color-green)",
         }}
         aria-label="Assistente digitando"
       >
@@ -321,11 +323,10 @@ function Ponto({ delay }: { delay: number }) {
     <span
       className="size-1.5 rounded-full animate-pulse"
       style={{
-        background: "var(--color-lime)",
+        background: "var(--color-green)",
         animationDelay: `${delay}ms`,
         animationDuration: "1.2s",
       }}
     />
   );
 }
-

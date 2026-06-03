@@ -129,7 +129,7 @@ export function ContaFormDialog({
               {...form.register("descricao")}
             />
             {form.formState.errors.descricao ? (
-              <p className="text-xs text-[var(--color-red)]">
+              <p className="text-xs text-[var(--color-danger)]">
                 {form.formState.errors.descricao.message}
               </p>
             ) : null}
@@ -147,7 +147,7 @@ export function ContaFormDialog({
               {...form.register("contraparte")}
             />
             {form.formState.errors.contraparte ? (
-              <p className="text-xs text-[var(--color-red)]">
+              <p className="text-xs text-[var(--color-danger)]">
                 {form.formState.errors.contraparte.message}
               </p>
             ) : null}
@@ -161,10 +161,11 @@ export function ContaFormDialog({
               min="0.01"
               step="0.01"
               className="mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
               {...form.register("valor")}
             />
             {form.formState.errors.valor ? (
-              <p className="text-xs text-[var(--color-red)]">
+              <p className="text-xs text-[var(--color-danger)]">
                 {form.formState.errors.valor.message}
               </p>
             ) : null}
@@ -176,10 +177,11 @@ export function ContaFormDialog({
               id="vencimento"
               type="date"
               className="mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
               {...form.register("vencimento")}
             />
             {form.formState.errors.vencimento ? (
-              <p className="text-xs text-[var(--color-red)]">
+              <p className="text-xs text-[var(--color-danger)]">
                 {form.formState.errors.vencimento.message}
               </p>
             ) : null}

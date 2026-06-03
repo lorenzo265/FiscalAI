@@ -16,7 +16,7 @@ export function ComplianceSubnav() {
   return (
     <nav
       className="flex items-center gap-1 border-b overflow-x-auto"
-      style={{ borderColor: "var(--color-line)" }}
+      style={{ borderColor: "var(--color-rule)" }}
     >
       {ITENS.map((it) => {
         const ativo =
@@ -28,17 +28,17 @@ export function ComplianceSubnav() {
             key={it.href}
             href={it.href}
             className={cn(
-              "relative px-3 py-2.5 text-[13px] font-medium transition-colors whitespace-nowrap",
+              "relative px-3 py-2.5 mono text-[11px] uppercase tracking-[0.12em] font-medium transition-colors whitespace-nowrap",
               ativo
-                ? "text-[var(--color-txt)]"
-                : "text-[var(--color-txt-2)] hover:text-[var(--color-txt)]"
+                ? "text-[var(--color-ink)]"
+                : "text-[var(--color-ink-3)] hover:text-[var(--color-ink-2)]"
             )}
           >
             {it.label}
             {ativo ? (
               <span
-                className="absolute left-2 right-2 -bottom-px h-[2px] rounded-full"
-                style={{ background: "var(--color-lime)" }}
+                className="absolute left-2 right-2 -bottom-px h-[2px] rounded-[var(--radius-sm)]"
+                style={{ background: "var(--color-green)" }}
               />
             ) : null}
           </Link>

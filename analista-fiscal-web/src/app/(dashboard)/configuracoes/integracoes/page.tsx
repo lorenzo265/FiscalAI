@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Banknote,
@@ -10,13 +11,22 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Pill, type PillTom } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { formatarDataHoraBR } from "@/lib/format/data";
 import { toast } from "sonner";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 const STORAGE_KEY = "analista-fiscal:integracoes-toggles";
 
@@ -35,7 +45,7 @@ const INTEGRACOES: IntegracaoConfig[] = [
     id: "open-finance",
     titulo: "Open Finance",
     descricao:
-      "Sincroniza saldos e extratos dos bancos conectados, automatizando conciliação.",
+      "Sincroniza saldos e extratos dos bancos conectados, automatizando a conciliação.",
     icone: Banknote,
     conectadaPadrao: true,
   },
@@ -43,7 +53,7 @@ const INTEGRACOES: IntegracaoConfig[] = [
     id: "ecac",
     titulo: "Portal e-CAC",
     descricao:
-      "Acessa intimações, certidões e parcelamentos direto da Receita Federal.",
+      "Acessa intimações, certidões e parcelamentos diretamente na Receita Federal.",
     icone: Landmark,
     conectadaPadrao: false,
   },
@@ -51,7 +61,7 @@ const INTEGRACOES: IntegracaoConfig[] = [
     id: "esocial",
     titulo: "eSocial",
     descricao:
-      "Transmite eventos da folha (S-2200, S-1200, S-2299) sem sair daqui.",
+      "Transmite eventos da folha (S-2200, S-1200, S-2299) sem sair do painel.",
     icone: UsersRound,
     conectadaPadrao: true,
   },
@@ -93,6 +103,7 @@ export default function ConfiguracoesIntegracoesPage() {
   const [toggles, setToggles] = React.useState<Record<IntegracaoId, boolean>>(
     defaults
   );
+  const reduced = useReducedMotion();
 
   React.useEffect(() => {
     setToggles(lerToggles());
@@ -117,48 +128,73 @@ export default function ConfiguracoesIntegracoesPage() {
     );
   }
 
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <Link
-          href="/configuracoes"
-          className="text-[11px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold inline-flex items-center gap-1 hover:text-[var(--color-txt-2)] transition-colors"
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header variants={containerVariants} initial="hidden" animate="show">
+        <motion.div variants={itemVariants}>
+          <Link
+            href="/configuracoes"
+            className="text-[11px] mono uppercase tracking-[0.12em] text-[var(--color-ink-3)] font-bold inline-flex items-center gap-1 hover:text-[var(--color-ink-2)] transition-colors"
+          >
+            <ArrowLeft className="size-3" />
+            Configurações
+          </Link>
+        </motion.div>
+        <motion.h1
+          variants={itemVariants}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1"
         >
-          <ArrowLeft className="size-3" />
-          Configurações
-        </Link>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)] mt-1">
           Integrações
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-          Plug-ins que automatizam o que você teria que fazer manualmente.
-          Mantenha tudo ligado para reduzir o trabalho operacional.
-        </p>
-      </header>
+        </motion.h1>
+        <motion.p
+          variants={itemVariants}
+          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
+        >
+          Conexões que automatizam o trabalho operacional. Mantenha tudo ativo
+          para reduzir lançamentos manuais.
+        </motion.p>
+      </motion.header>
 
       <ConfiguracoesSubnav />
 
-      <div className="flex flex-col gap-3">
-        {INTEGRACOES.map((integ) => (
-          <LinhaIntegracao
-            key={integ.id}
-            integ={integ}
-            ligada={toggles[integ.id]}
-            onChange={(v) => alternar(integ.id, v)}
-            bancosConectados={
-              integ.id === "open-finance"
-                ? empresa?.bancosConectados?.length ?? 0
-                : null
-            }
-            ultimaSync={
-              integ.id === "open-finance"
-                ? empresa?.bancosConectados?.[0]?.ultimaSync ?? null
-                : null
-            }
-          />
-        ))}
-      </div>
-    </div>
+      {/* Fig. 01 — lista de integrações */}
+      <Framed marks={false} tone="rule" surface="card" padded={false}>
+        <div className="px-5 pt-4 pb-2">
+          <Fig n={1} titulo="Conexões disponíveis" size="sm" />
+        </div>
+        <Ruler />
+        <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
+          {INTEGRACOES.map((integ) => (
+            <LinhaIntegracao
+              key={integ.id}
+              integ={integ}
+              ligada={toggles[integ.id]}
+              onChange={(v) => alternar(integ.id, v)}
+              bancosConectados={
+                integ.id === "open-finance"
+                  ? empresa?.bancosConectados?.length ?? 0
+                  : null
+              }
+              ultimaSync={
+                integ.id === "open-finance"
+                  ? empresa?.bancosConectados?.[0]?.ultimaSync ?? null
+                  : null
+              }
+            />
+          ))}
+        </ul>
+      </Framed>
+    </motion.div>
   );
 }
 
@@ -177,34 +213,37 @@ function LinhaIntegracao({
 }) {
   const Icon = integ.icone;
   const tom: PillTom = ligada ? "ok" : "neutral";
-  const labelStatus = ligada ? "conectada" : "desativada";
 
   return (
-    <Card className="p-5 flex flex-col md:flex-row md:items-center gap-4">
+    <li className="px-5 py-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-[var(--color-paper-2)] transition-colors">
+      {/* ícone em quadrado técnico */}
       <div
-        className="size-10 rounded-md grid place-items-center shrink-0"
-        style={{ background: "var(--color-card-2)" }}
+        className="size-10 rounded-[var(--radius-sm)] grid place-items-center shrink-0 border"
+        style={{
+          background: "var(--color-paper-2)",
+          borderColor: "var(--color-rule)",
+        }}
       >
         <Icon
           className="size-5"
           style={{
-            color: ligada ? "var(--color-lime)" : "var(--color-txt-3)",
+            color: ligada ? "var(--color-green)" : "var(--color-ink-3)",
           }}
         />
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-base font-bold text-[var(--color-txt)]">
+          <span className="text-sm font-bold text-[var(--color-ink)]">
             {integ.titulo}
           </span>
-          <Pill tom={tom}>{labelStatus}</Pill>
+          <Pill tom={tom}>{ligada ? "conectada" : "desativada"}</Pill>
         </div>
-        <p className="text-xs text-[var(--color-txt-2)] mt-1 leading-relaxed">
+        <p className="text-xs text-[var(--color-ink-2)] mt-1 leading-relaxed">
           {integ.descricao}
         </p>
         {bancosConectados != null && ligada ? (
-          <p className="text-[11px] text-[var(--color-txt-3)] mt-1.5 mono">
+          <p className="text-[11px] text-[var(--color-ink-3)] mt-1.5 mono">
             {bancosConectados} banco{bancosConectados === 1 ? "" : "s"}{" "}
             conectado{bancosConectados === 1 ? "" : "s"}
             {ultimaSync
@@ -215,7 +254,7 @@ function LinhaIntegracao({
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        <span className="text-[11px] text-[var(--color-txt-3)] mono uppercase tracking-[0.14em] font-bold hidden md:inline">
+        <span className="text-[11px] text-[var(--color-ink-3)] mono uppercase tracking-[0.12em] font-bold hidden md:inline">
           {ligada ? "ligada" : "desligada"}
         </span>
         <Switch
@@ -224,6 +263,6 @@ function LinhaIntegracao({
           aria-label={`Alternar ${integ.titulo}`}
         />
       </div>
-    </Card>
+    </li>
   );
 }

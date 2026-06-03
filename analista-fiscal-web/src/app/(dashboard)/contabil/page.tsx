@@ -2,51 +2,86 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, BookOpen, ChevronRight, EyeOff } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { AlertTriangle, BookOpen, CheckCircle2, ChevronRight, EyeOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { ContabilSubnav } from "@/components/contabil/contabil-subnav";
 import { useLancamentos } from "@/hooks/use-contabil";
 import { montarBalancete } from "@/lib/contabil/motor";
 import { formatarMoeda } from "@/lib/format/moeda";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import type { LinhaBalancete, NaturezaConta } from "@/lib/schemas/contabil";
 
 const COR_NATUREZA: Record<NaturezaConta, string> = {
-  ativo: "var(--color-lime)",
-  passivo: "var(--color-amber)",
-  patrimonio_liquido: "var(--color-blue)",
-  receita: "var(--color-lime)",
-  despesa: "var(--color-amber)",
-  resultado: "var(--color-blue)",
+  ativo: "var(--color-green)",
+  passivo: "var(--color-ochre)",
+  patrimonio_liquido: "var(--color-ink-2)",
+  receita: "var(--color-green)",
+  despesa: "var(--color-ochre)",
+  resultado: "var(--color-ink-2)",
 };
 
 export default function ContabilBalancetePage() {
   const { data, isLoading, isError, refetch } = useLancamentos();
   const [esconderZeradas, setEsconderZeradas] = React.useState(true);
+  const reduced = useReducedMotion();
 
   const balancete = React.useMemo(
     () => (data ? montarBalancete(data) : null),
     [data]
   );
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.span
+          variants={itemV}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
           Módulo contábil
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+        </motion.span>
+        <motion.h1
+          variants={itemV}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
           Balancete
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-xl mt-1">
+        </motion.h1>
+        <motion.p
+          variants={itemV}
+          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+        >
           Saldo de cada conta consolidado a partir dos lançamentos do livro
           diário.
-        </p>
-      </header>
+        </motion.p>
+      </motion.header>
 
       <ContabilSubnav />
 
@@ -58,10 +93,11 @@ export default function ContabilBalancetePage() {
         <>
           <BannerFechamento totais={balancete.totais} />
 
-          <Card className="p-4 flex items-center justify-between gap-3">
+          {/* ── toggle zeradas ── */}
+          <Framed marks={false} tone="rule" surface="card" className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <EyeOff className="size-4 text-[var(--color-txt-3)]" />
-              <span className="text-sm text-[var(--color-txt)]">
+              <EyeOff className="size-4 text-[var(--color-ink-3)]" />
+              <span className="text-sm text-[var(--color-ink)]">
                 Esconder contas zeradas
               </span>
             </div>
@@ -69,19 +105,29 @@ export default function ContabilBalancetePage() {
               checked={esconderZeradas}
               onCheckedChange={setEsconderZeradas}
             />
-          </Card>
+          </Framed>
 
-          <Card className="overflow-hidden">
-            <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-3 border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono"
-              style={{ borderColor: "var(--color-line)" }}
+          {/* ── tabela ── */}
+          <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+            <div className="px-5 pt-4 pb-2">
+              <Fig n={1} titulo="Balancete de verificação" size="sm" />
+            </div>
+            <Ruler />
+            <div
+              className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-3 border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono"
+              style={{ borderColor: "var(--color-rule)" }}
             >
               <span>Conta</span>
               <span className="text-right">Saldo anterior</span>
-              <span className="text-right">Débitos</span>
-              <span className="text-right">Créditos</span>
+              <span className="text-right">
+                <abbr title="Lançamentos a débito">Débito</abbr>
+              </span>
+              <span className="text-right">
+                <abbr title="Lançamentos a crédito">Crédito</abbr>
+              </span>
               <span className="text-right">Saldo atual</span>
             </div>
-            <div className="divide-y" style={{ borderColor: "var(--color-line)" }}>
+            <div className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
               {balancete.raizes.map((raiz) => (
                 <Linha
                   key={raiz.conta.codigo}
@@ -90,10 +136,10 @@ export default function ContabilBalancetePage() {
                 />
               ))}
             </div>
-          </Card>
+          </Framed>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -104,53 +150,58 @@ function BannerFechamento({
 }) {
   if (totais.fechado) {
     return (
-      <Card
-        className="p-4 flex items-center gap-3"
-        style={{
-          background: "var(--color-lime-d)",
-          borderColor: "rgba(163,255,107,0.32)",
-        }}
+      <Framed
+        marks={false}
+        tone="rule"
+        surface="paper-2"
+        className="flex items-center gap-3"
+        style={{ borderColor: "var(--color-green)" }}
       >
-        <BookOpen className="size-5 text-[var(--color-lime)]" />
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-[var(--color-txt)]">
-            Balancete fechado
+        <CheckCircle2 className="size-5 text-[var(--color-green)] shrink-0" />
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className="text-sm font-semibold text-[var(--color-ink)]">
+            Balancete fechado — partidas dobradas conferindo
           </span>
-          <span className="text-[12px] text-[var(--color-txt-2)] mono">
-            ∑ débitos = ∑ créditos = {formatarMoeda(totais.totalDebitos)} ·
-            partidas dobradas conferindo.
+          <span
+            className="text-[12px] text-[var(--color-ink-2)] mono"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {"Σ"} débitos = {"Σ"} créditos = {formatarMoeda(totais.totalDebitos)}
           </span>
         </div>
-        <Pill tom="ok" className="ml-auto">
-          OK
-        </Pill>
-      </Card>
+        <Carimbo tom="green" sub="conferido">OK</Carimbo>
+      </Framed>
     );
   }
 
   return (
-    <Card
-      className="p-4 flex items-center gap-3"
-      style={{
-        background: "var(--color-red-d)",
-        borderColor: "rgba(255,85,102,0.32)",
-      }}
+    <Framed
+      marks={false}
+      tone="rule"
+      surface="paper-2"
+      className="flex items-center gap-3"
+      style={{ borderColor: "var(--color-danger)" }}
     >
-      <AlertTriangle className="size-5 text-[var(--color-red)]" />
-      <div className="flex flex-col">
-        <span className="text-sm font-semibold text-[var(--color-txt)]">
-          Balancete não fecha
+      <AlertTriangle className="size-5 text-[var(--color-danger)] shrink-0" />
+      <div className="flex flex-col flex-1 min-w-0">
+        <span className="text-sm font-semibold text-[var(--color-ink)]">
+          Balancete não fecha — diferença detectada
         </span>
-        <span className="text-[12px] text-[var(--color-txt-2)] mono">
-          débitos {formatarMoeda(totais.totalDebitos)} · créditos{" "}
+        <span
+          className="text-[12px] text-[var(--color-ink-2)] mono"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          <abbr title="Débito" className="no-underline">D</abbr>{" "}
+          {formatarMoeda(totais.totalDebitos)} ·{" "}
+          <abbr title="Crédito" className="no-underline">C</abbr>{" "}
           {formatarMoeda(totais.totalCreditos)} · diferença{" "}
           {formatarMoeda(Math.abs(totais.totalDebitos - totais.totalCreditos))}
         </span>
       </div>
-      <Pill tom="error" className="ml-auto">
-        Atenção
+      <Pill tom="error" className="ml-auto shrink-0">
+        atenção
       </Pill>
-    </Card>
+    </Framed>
   );
 }
 
@@ -187,8 +238,8 @@ function Linha({
     <>
       <div
         className={cn(
-          "grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-2.5 items-center hover:bg-[var(--color-card-2)] transition-colors",
-          ehSintetica && "bg-[var(--color-card-2)]/40"
+          "grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-2.5 items-center hover:bg-[var(--color-paper-2)] transition-colors",
+          ehSintetica && "bg-[var(--color-paper-2)]/60"
         )}
       >
         <button
@@ -201,7 +252,7 @@ function Linha({
           {temFilhos ? (
             <ChevronRight
               className={cn(
-                "size-3.5 shrink-0 text-[var(--color-txt-3)] transition-transform",
+                "size-3.5 shrink-0 text-[var(--color-ink-3)] transition-transform",
                 aberto && "rotate-90"
               )}
             />
@@ -209,20 +260,24 @@ function Linha({
             <span className="size-3.5 shrink-0" />
           )}
           <span
-            className="size-1.5 rounded-full shrink-0"
+            className="size-1.5 rounded-[var(--radius-sm)] shrink-0"
             style={{ background: cor }}
           />
-          <span className="mono text-[11px] text-[var(--color-txt-3)] shrink-0 w-16">
+          <abbr
+            title={`Código de conta: ${linha.conta.codigo}`}
+            className="no-underline mono text-[11px] text-[var(--color-ink-2)] shrink-0 w-16"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {linha.conta.codigo}
-          </span>
+          </abbr>
           {linha.conta.analitica ? (
             <Link
               href={`/contabil/razao/${encodeURIComponent(linha.conta.codigo)}`}
               className={cn(
-                "text-sm truncate hover:text-[var(--color-lime)] transition-colors text-left",
+                "text-sm truncate hover:text-[var(--color-green)] transition-colors text-left",
                 ehSintetica
-                  ? "font-bold text-[var(--color-txt)]"
-                  : "text-[var(--color-txt)]"
+                  ? "font-bold text-[var(--color-ink)]"
+                  : "text-[var(--color-ink)]"
               )}
             >
               {linha.conta.nome}
@@ -232,24 +287,28 @@ function Linha({
               className={cn(
                 "text-sm truncate text-left",
                 ehSintetica
-                  ? "font-bold text-[var(--color-txt)]"
-                  : "text-[var(--color-txt)]"
+                  ? "font-bold text-[var(--color-ink)]"
+                  : "text-[var(--color-ink)]"
               )}
             >
               {linha.conta.nome}
             </span>
           )}
         </button>
-        <span className="mono text-xs text-[var(--color-txt-3)] text-right">
+        <span
+          className="mono text-xs text-[var(--color-ink-3)] text-right"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarMoeda(linha.saldoAnterior)}
         </span>
         <span
           className={cn(
             "mono text-sm text-right",
             linha.debitos > 0
-              ? "text-[var(--color-txt)]"
-              : "text-[var(--color-txt-3)]"
+              ? "text-[var(--color-ink)]"
+              : "text-[var(--color-ink-3)]"
           )}
+          style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {formatarMoeda(linha.debitos)}
         </span>
@@ -257,15 +316,19 @@ function Linha({
           className={cn(
             "mono text-sm text-right",
             linha.creditos > 0
-              ? "text-[var(--color-txt)]"
-              : "text-[var(--color-txt-3)]"
+              ? "text-[var(--color-ink)]"
+              : "text-[var(--color-ink-3)]"
           )}
+          style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {formatarMoeda(linha.creditos)}
         </span>
         <span
           className="mono text-sm font-bold text-right"
-          style={{ color: linha.saldoAtual !== 0 ? cor : "var(--color-txt-3)" }}
+          style={{
+            color: linha.saldoAtual !== 0 ? cor : "var(--color-ink-3)",
+            fontVariantNumeric: "tabular-nums",
+          }}
         >
           {formatarMoeda(linha.saldoAtual)}
         </span>

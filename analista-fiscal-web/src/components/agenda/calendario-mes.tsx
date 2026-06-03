@@ -57,18 +57,21 @@ export function CalendarioMes({
         key={i}
         className={cn(
           "min-h-[88px] flex flex-col gap-1 p-2 border-r border-b text-xs",
-          !dentro && "bg-[var(--color-bg-2)]/50",
-          ehHoje && "bg-[var(--color-card-2)]"
+          !dentro && "opacity-30",
+          ehHoje && "bg-[var(--color-green-wash)]"
         )}
-        style={{ borderColor: "var(--color-line)" }}
+        style={{ borderColor: "var(--color-rule)" }}
       >
         {dentro ? (
           <>
             <span
               className={cn(
                 "mono text-[11px] font-bold",
-                ehHoje ? "text-[var(--color-lime)]" : "text-[var(--color-txt-2)]"
+                ehHoje
+                  ? "text-[var(--color-green)]"
+                  : "text-[var(--color-ink-2)]"
               )}
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {numeroDia}
             </span>
@@ -78,7 +81,7 @@ export function CalendarioMes({
                   <button
                     type="button"
                     onClick={() => onSelecionar?.(e)}
-                    className="w-full text-left px-1.5 py-0.5 rounded text-[10px] truncate transition-colors hover:opacity-90"
+                    className="w-full text-left px-1.5 py-0.5 rounded-[var(--radius-sm)] text-[10px] truncate transition-colors hover:opacity-80 mono"
                     style={{
                       background: corBgEvento(e.status),
                       color: COR_STATUS_AGENDA[e.status],
@@ -92,7 +95,7 @@ export function CalendarioMes({
               ))}
               {eventosDoDia.length > 3 ? (
                 <li>
-                  <span className="text-[10px] mono text-[var(--color-txt-3)]">
+                  <span className="text-[10px] mono text-[var(--color-ink-3)]">
                     +{eventosDoDia.length - 3} eventos
                   </span>
                 </li>
@@ -106,23 +109,25 @@ export function CalendarioMes({
 
   return (
     <div className="flex flex-col">
+      {/* cabecalho dos dias da semana */}
       <div
-        className="grid grid-cols-7 border-t border-l text-[10px] uppercase tracking-[0.14em] font-bold mono text-[var(--color-txt-3)]"
-        style={{ borderColor: "var(--color-line)" }}
+        className="grid grid-cols-7 border-t border-l"
+        style={{ borderColor: "var(--color-rule)" }}
       >
         {DIAS_SEMANA.map((d) => (
           <div
             key={d}
-            className="px-2 py-2 border-r border-b bg-[var(--color-card-2)]"
-            style={{ borderColor: "var(--color-line)" }}
+            className="px-2 py-2 border-r border-b bg-[var(--color-paper-2)] text-[10px] uppercase tracking-[0.14em] font-bold mono text-[var(--color-ink-3)]"
+            style={{ borderColor: "var(--color-rule)" }}
           >
             {d}
           </div>
         ))}
       </div>
+      {/* grid de células */}
       <div
         className="grid grid-cols-7 border-l"
-        style={{ borderColor: "var(--color-line)" }}
+        style={{ borderColor: "var(--color-rule)" }}
       >
         {celulas}
       </div>
@@ -132,13 +137,9 @@ export function CalendarioMes({
 
 function corBgEvento(status: EventoAgenda["status"]): string {
   switch (status) {
-    case "pago":
-      return "var(--color-lime-d)";
-    case "pendente":
-      return "var(--color-amber-d)";
-    case "atrasado":
-      return "var(--color-red-d)";
-    case "informativo":
-      return "var(--color-blue-d)";
+    case "pago":        return "var(--color-green-wash)";
+    case "pendente":    return "var(--color-paper-2)";
+    case "atrasado":    return "var(--color-paper-2)";
+    case "informativo": return "var(--color-paper-2)";
   }
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import { Calculator, Sparkles, TrendingDown } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Calculator, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pill } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { FiscalSubnav } from "@/components/fiscal/fiscal-subnav";
 import { formatarMoeda, formatarMoedaCompacta } from "@/lib/format/moeda";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
@@ -25,6 +28,13 @@ import {
   type RegimeSimulado,
 } from "@/lib/fiscal/simulador-regime";
 import { cn } from "@/lib/utils";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 const SimuladorBarChart = dynamic(
   () =>
@@ -41,14 +51,20 @@ const ATIVIDADES: Array<{ id: AtividadeSimulada; label: string }> = [
   { id: "servicos_anexo5", label: "Serviços intelectuais — Anexo V" },
 ];
 
+/**
+ * Cores canônicas para o simulador.
+ * Simples = verde (acento); Presumido = ink-2 (neutro); Real = ochre (atenção).
+ */
 const CORES_REGIME: Record<RegimeSimulado, string> = {
-  SIMPLES: "var(--color-lime)",
-  PRESUMIDO: "var(--color-blue)",
-  REAL: "var(--color-amber)",
+  SIMPLES: "var(--color-green)",
+  PRESUMIDO: "var(--color-ink-2)",
+  REAL: "var(--color-ochre)",
 };
 
 export default function FiscalSimuladorPage() {
   const { empresa } = useEmpresaAtual();
+  const reduced = useReducedMotion();
+
   const [faturamento, setFaturamento] = React.useState<number>(
     empresa?.faturamento12m ?? 850_000
   );
@@ -83,102 +99,134 @@ export default function FiscalSimuladorPage() {
     Math.max(...resultado.cenarios.map((c) => c.impostoTotal)) -
     Math.min(...resultado.cenarios.map((c) => c.impostoTotal));
 
+  const containerVariants = reduced ? staticVariants : staggerChildren;
+  const itemVariants = reduced ? staticVariants : revealChild;
+  const pageReveal = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
-          Módulo fiscal
-        </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageReveal}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.span
+          variants={itemVariants}
+          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+        >
+          Módulo · Fiscal
+        </motion.span>
+        <motion.h1
+          variants={itemVariants}
+          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+        >
           Simulador de regime tributário
-        </h1>
-        <p className="text-sm text-[var(--color-txt-2)] max-w-xl mt-1">
+        </motion.h1>
+        <motion.p
+          variants={itemVariants}
+          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+        >
           Compare quanto sua empresa pagaria em cada regime — sem ter que
           consultar tabela.
-        </p>
-      </header>
+        </motion.p>
+      </motion.header>
 
       <FiscalSubnav />
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-        <Card className="p-5 flex flex-col gap-4 self-start">
-          <div className="flex items-center gap-2">
-            <Calculator className="size-4 text-[var(--color-lime)]" />
-            <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-              Parâmetros
-            </span>
+        {/* ── painel de parâmetros ── */}
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden self-start">
+          <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+            <Calculator className="size-4 text-[var(--color-green)]" aria-hidden />
+            <Fig n={1} titulo="Parâmetros" size="sm" />
           </div>
+          <Ruler />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="fat">Faturamento anual</Label>
-            <Input
-              id="fat"
-              type="number"
-              min={0}
-              step={10000}
-              value={faturamento}
-              onChange={(e) => setFaturamento(Number(e.target.value))}
-              className="mono"
-            />
-            <span className="text-[11px] text-[var(--color-txt-3)] mono">
-              {formatarMoeda(faturamento)}
-            </span>
-          </div>
+          <div className="px-5 py-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fat">Faturamento anual</Label>
+              <Input
+                id="fat"
+                type="number"
+                min={0}
+                step={10000}
+                value={faturamento}
+                onChange={(e) => setFaturamento(Number(e.target.value))}
+                className="mono"
+              />
+              <span
+                className="text-[11px] text-[var(--color-ink-3)] mono"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {formatarMoeda(faturamento)}
+              </span>
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Atividade</Label>
-            <Select
-              value={atividade}
-              onValueChange={(v) => setAtividade(v as AtividadeSimulada)}
+            <div className="flex flex-col gap-1.5">
+              <Label>Atividade</Label>
+              <Select
+                value={atividade}
+                onValueChange={(v) => setAtividade(v as AtividadeSimulada)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ATIVIDADES.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="func">Número de funcionários</Label>
+              <Input
+                id="func"
+                type="number"
+                min={0}
+                value={funcionarios}
+                onChange={(e) => setFuncionarios(Number(e.target.value))}
+                className="mono"
+              />
+              <span className="text-[11px] text-[var(--color-ink-3)]">
+                CLT, com salário médio de R$ 4,5k.
+              </span>
+            </div>
+
+            {/* economia possível */}
+            <div
+              className="rounded-[var(--radius-md)] border p-3 flex flex-col gap-1"
+              style={{
+                background: "var(--color-green-wash)",
+                borderColor: "var(--color-green)",
+              }}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ATIVIDADES.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+                Economia possível
+              </span>
+              <span
+                className="mono text-2xl font-extrabold text-[var(--color-green)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {formatarMoedaCompacta(economia)}/ano
+              </span>
+              <span className="text-[11px] text-[var(--color-ink-3)] leading-snug">
+                Diferença entre o regime mais caro e o mais barato.
+              </span>
+            </div>
           </div>
+        </Framed>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="func">Número de funcionários</Label>
-            <Input
-              id="func"
-              type="number"
-              min={0}
-              value={funcionarios}
-              onChange={(e) => setFuncionarios(Number(e.target.value))}
-              className="mono"
-            />
-            <span className="text-[11px] text-[var(--color-txt-3)]">
-              CLT, com salário médio de R$ 4,5k.
-            </span>
-          </div>
-
-          <div
-            className="rounded-md border p-3 flex flex-col gap-1"
-            style={{
-              background: "var(--color-card-2)",
-              borderColor: "var(--color-line-2)",
-            }}
-          >
-            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
-              <Sparkles className="size-3 text-[var(--color-lime)]" />
-              Economia possível
-            </span>
-            <span className="mono text-2xl font-extrabold text-[var(--color-lime)]">
-              {formatarMoedaCompacta(economia)}/ano
-            </span>
-            <span className="text-[11px] text-[var(--color-txt-3)] leading-snug">
-              Diferença entre o regime mais caro e o mais barato.
-            </span>
-          </div>
-        </Card>
-
+        {/* ── resultados ── */}
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {resultado.cenarios.map((c) => (
@@ -190,20 +238,19 @@ export default function FiscalSimuladorPage() {
             ))}
           </div>
 
-          <Card className="p-5 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="size-4 text-[var(--color-blue)]" />
-              <span className="text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--color-txt-3)] mono">
-                Imposto anual estimado
-              </span>
+          <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+            <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+              <TrendingDown className="size-4 text-[var(--color-ink-2)]" aria-hidden />
+              <Fig n={2} titulo="Imposto anual estimado por regime" size="sm" />
             </div>
-            <div className="h-64 -ml-2">
+            <Ruler />
+            <div className="h-64 px-3 py-3 -ml-2">
               <SimuladorBarChart pontos={dadosChart} cores={CORES_REGIME} />
             </div>
-          </Card>
+          </Framed>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -222,52 +269,70 @@ function CenarioCard({
         : "error";
   const cor = CORES_REGIME[cenario.regime];
   return (
-    <Card
-      className={cn(
-        "p-5 flex flex-col gap-3 relative overflow-hidden",
-        vencedor && "ring-1 ring-[var(--color-lime)]/40"
-      )}
+    <Framed
+      marks={false}
+      tone={vencedor ? "ink" : "rule"}
+      surface={vencedor ? "card" : "paper"}
+      className={cn("flex flex-col gap-3 relative overflow-hidden", vencedor && "ring-1 ring-[var(--color-green)]")}
       style={{
-        background: vencedor ? "var(--color-lime-d)" : undefined,
+        background: vencedor ? "var(--color-green-wash)" : undefined,
       }}
     >
+      {/* fio de cor de regime no topo */}
       <div
-        className="absolute inset-x-0 top-0 h-[3px]"
+        className="absolute inset-x-0 top-0 h-[2px]"
         style={{ background: cor }}
+        aria-hidden
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-txt-3)] mono">
+        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
           {cenario.rotulo}
         </span>
-        {vencedor ? <Pill tom="ok">Mais econômico</Pill> : <Pill tom={tom}>{cenario.recomendacao}</Pill>}
+        {vencedor ? (
+          <Pill tom="ok">Mais econômico</Pill>
+        ) : (
+          <Pill tom={tom}>{cenario.recomendacao}</Pill>
+        )}
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <span className="mono text-3xl font-extrabold text-[var(--color-txt)] leading-none">
+        <span
+          className="mono text-3xl font-extrabold text-[var(--color-ink)] leading-none"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatarMoedaCompacta(cenario.impostoTotal)}
         </span>
-        <span className="text-xs text-[var(--color-txt-2)]">
+        <span className="text-xs text-[var(--color-ink-2)]">
           {(cenario.percentualSobreFaturamento * 100).toFixed(1).replace(".", ",")}% sobre o faturamento · ano
         </span>
       </div>
 
-      <ul className="flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--color-line)" }}>
+      <ul
+        className="flex flex-col gap-1 border-t pt-3"
+        style={{ borderColor: "var(--color-rule)" }}
+      >
         {cenario.detalhamento.map((d) => (
           <li
             key={d.tributo}
             className="flex items-center justify-between text-xs"
           >
-            <span className="text-[var(--color-txt-2)]">{d.tributo}</span>
-            <span className="mono text-[var(--color-txt)]">
+            <span className="text-[var(--color-ink-2)]">{d.tributo}</span>
+            <span
+              className="mono text-[var(--color-ink)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
               {formatarMoedaCompacta(d.valor)}
             </span>
           </li>
         ))}
       </ul>
 
-      <p className="text-[11px] text-[var(--color-txt-3)] leading-snug border-t pt-3" style={{ borderColor: "var(--color-line)" }}>
+      <p
+        className="text-[11px] text-[var(--color-ink-3)] leading-snug border-t pt-3"
+        style={{ borderColor: "var(--color-rule)" }}
+      >
         {cenario.observacao}
       </p>
-    </Card>
+    </Framed>
   );
 }

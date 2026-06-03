@@ -7,7 +7,6 @@ import { ArrowLeft, ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pill } from "@/components/shared/pill";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { useAdicionarFuncionario } from "@/hooks/use-pessoal";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import {
@@ -41,6 +44,7 @@ export function WizardAdmissao() {
   const { empresa } = useEmpresaAtual();
   const adicionar = useAdicionarFuncionario();
   const [passo, setPasso] = React.useState(0);
+  const [admitido, setAdmitido] = React.useState(false);
 
   const form = useForm<FuncionarioInput>({
     resolver: zodResolver(funcionarioInputSchema),
@@ -88,12 +92,13 @@ export function WizardAdmissao() {
       avatarSeed: cpfLimpo,
       pisPasep: cpfLimpo,
     });
+    setAdmitido(true);
     toast.success("Admissão registrada", {
-      description: `Evento eSocial S-2200 transmitido com sucesso (recibo: ${
+      description: `Evento eSocial S-2200 transmitido (recibo: ${
         novo.evento.recibo ?? "—"
       }).`,
     });
-    router.push("/pessoal/funcionarios");
+    setTimeout(() => router.push("/pessoal/funcionarios"), 1200);
   }
 
   async function avancar() {
@@ -124,63 +129,70 @@ export function WizardAdmissao() {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <header className="flex flex-col gap-2">
-        <Button asChild variant="ghost" className="self-start -ml-2">
+        <Button asChild variant="ghost" className="self-start -ml-2" size="sm">
           <Link href="/pessoal/funcionarios">
             <ArrowLeft className="size-4" /> Voltar para funcionários
           </Link>
         </Button>
-        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+        <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold">
           Pessoal · Admissão
         </span>
-        <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+        <h1 className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight">
           Admitir funcionário
         </h1>
-        <p className="text-sm text-[var(--color-txt-2)]">
-          3 passos. Ao final, geramos o evento <strong>S-2200</strong> e
-          mandamos pro eSocial automaticamente.
+        <p className="text-sm text-[var(--color-ink-2)]">
+          3 passos. Ao final, geramos o evento{" "}
+          <abbr
+            title="S-2200 — Cadastramento Inicial do Vínculo Trabalhista"
+            className="mono text-[11px] no-underline"
+          >
+            S-2200
+          </abbr>{" "}
+          e enviamos ao eSocial automaticamente.
         </p>
       </header>
 
       <Stepper passo={passo} />
 
-      <Card
-        className="p-7 flex flex-col gap-6 border"
-        style={{
-          background: "var(--color-card)",
-          borderColor: "var(--color-line-2)",
-        }}
-      >
-        <div>
-          <h2 className="text-lg font-bold text-[var(--color-txt)]">
-            {PASSOS[passo]?.titulo}
-          </h2>
-          <p className="text-sm text-[var(--color-txt-2)]">
-            {PASSOS[passo]?.descricao}
-          </p>
+      <Framed marks tone="ink" surface="card" className="flex flex-col gap-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Fig n={passo + 1} titulo={PASSOS[passo]?.titulo} size="sm" />
+            <p className="text-sm text-[var(--color-ink-2)] mt-1">
+              {PASSOS[passo]?.descricao}
+            </p>
+          </div>
+          {admitido ? (
+            <Carimbo tom="green" sub="admitido">OK</Carimbo>
+          ) : null}
         </div>
+
+        <Ruler />
 
         {passo === 0 ? <PassoDadosPessoais form={form} /> : null}
         {passo === 1 ? <PassoContrato form={form} /> : null}
         {passo === 2 ? <PassoVinculo form={form} /> : null}
 
+        <Ruler />
+
         <div
-          className="flex items-center gap-2 px-3 py-2.5 rounded-md text-xs"
+          className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] text-xs"
           style={{
-            background: "var(--color-card-2)",
-            color: "var(--color-txt-2)",
+            background: "var(--color-paper-2)",
+            color: "var(--color-ink-2)",
           }}
         >
-          <ShieldCheck className="size-4 text-[var(--color-lime)]" />
-          Os dados ficam só no seu navegador (mock). Em produção, criptografados
-          em repouso e em trânsito.
+          <ShieldCheck className="size-4 text-[var(--color-green)] shrink-0" />
+          Os dados ficam só no seu navegador (modo demo). Em produção,
+          criptografados em repouso e em trânsito.
         </div>
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button variant="outline" onClick={voltar}>
+          <Button variant="outline" onClick={voltar} size="sm">
             <ArrowLeft className="size-4" />{" "}
             {passo === 0 ? "Cancelar" : "Voltar"}
           </Button>
-          <Button onClick={avancar} disabled={adicionar.isPending}>
+          <Button onClick={avancar} disabled={adicionar.isPending} size="sm">
             {passo === PASSOS.length - 1 ? (
               <>
                 Concluir admissão <Check className="size-4" />
@@ -192,7 +204,7 @@ export function WizardAdmissao() {
             )}
           </Button>
         </div>
-      </Card>
+      </Framed>
     </div>
   );
 }
@@ -207,19 +219,20 @@ function Stepper({ passo }: { passo: number }) {
           <div key={p.titulo} className="flex items-center gap-2 flex-1">
             <div
               className={cn(
-                "size-7 rounded-full grid place-items-center text-[11px] mono font-bold border",
+                "size-7 rounded-[var(--radius-sm)] grid place-items-center text-[11px] mono font-bold border",
                 ativo
-                  ? "bg-[var(--color-lime-d)] text-[var(--color-lime)] border-[rgba(163,255,107,0.32)]"
-                  : "bg-[var(--color-card-2)] text-[var(--color-txt-3)] border-[var(--color-line-2)]"
+                  ? "bg-[var(--color-green-wash)] text-[var(--color-green)] border-[var(--color-green)]"
+                  : "bg-[var(--color-paper-2)] text-[var(--color-ink-3)] border-[var(--color-rule-2)]"
               )}
             >
               {i < passo ? <Check className="size-3.5" /> : i + 1}
             </div>
             <div
               className={cn(
-                "h-1 flex-1 rounded-full",
-                ativo ? "bg-[var(--color-lime)]" : "bg-[var(--color-card-3)]",
-                atual ? "shadow-[0_0_12px_rgba(163,255,107,0.4)]" : ""
+                "h-px flex-1",
+                ativo
+                  ? "bg-[var(--color-green)]"
+                  : "bg-[var(--color-rule)]"
               )}
             />
           </div>
@@ -238,7 +251,11 @@ function PassoDadosPessoais({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="flex flex-col gap-1.5 md:col-span-2">
         <Label htmlFor="nome">Nome completo</Label>
-        <Input id="nome" placeholder="Ex: Maria da Silva" {...form.register("nome")} />
+        <Input
+          id="nome"
+          placeholder="Ex: Maria da Silva"
+          {...form.register("nome")}
+        />
         <ErroCampo erro={form.formState.errors.nome?.message} />
       </div>
       <div className="flex flex-col gap-1.5">
@@ -288,7 +305,11 @@ function PassoDadosPessoais({
       </div>
       <div className="flex flex-col gap-1.5 md:col-span-2">
         <Label htmlFor="telefone">Telefone (opcional)</Label>
-        <Input id="telefone" placeholder="(11) 99999-9999" {...form.register("telefone")} />
+        <Input
+          id="telefone"
+          placeholder="(11) 99999-9999"
+          {...form.register("telefone")}
+        />
       </div>
     </div>
   );
@@ -309,20 +330,16 @@ function PassoContrato({ form }: { form: UseFormReturn<FuncionarioInput> }) {
                 type="button"
                 onClick={() => form.setValue("tipoContrato", opt)}
                 className={cn(
-                  "rounded-md border p-3 text-left transition-colors",
+                  "rounded-[var(--radius-md)] border p-3 text-left transition-colors",
                   ativo
-                    ? "border-[var(--color-lime)] bg-[var(--color-lime-d)]"
-                    : "border-[var(--color-line-2)] bg-[var(--color-card-2)] hover:bg-[var(--color-card-3)]"
+                    ? "border-[var(--color-green)] bg-[var(--color-green-wash)]"
+                    : "border-[var(--color-rule-2)] bg-[var(--color-paper-2)] hover:bg-[var(--color-paper)]"
                 )}
               >
-                <div className="text-sm font-semibold text-[var(--color-txt)]">
-                  {opt === "CLT"
-                    ? "CLT"
-                    : opt === "PJ"
-                      ? "PJ"
-                      : "Estágio"}
+                <div className="text-sm font-semibold text-[var(--color-ink)] mono">
+                  {opt === "CLT" ? "CLT" : opt === "PJ" ? "PJ" : "Estágio"}
                 </div>
-                <div className="text-[11px] text-[var(--color-txt-3)] mt-1">
+                <div className="text-[11px] text-[var(--color-ink-3)] mt-1">
                   {opt === "CLT"
                     ? "Encargos e holerite mensal"
                     : opt === "PJ"
@@ -348,27 +365,33 @@ function PassoContrato({ form }: { form: UseFormReturn<FuncionarioInput> }) {
 
       {tipo === "CLT" ? (
         <div
-          className="rounded-md border p-3 md:col-span-2 flex items-start gap-2.5 text-xs"
+          className="rounded-[var(--radius-md)] border p-3 md:col-span-2 flex items-start gap-2.5 text-xs"
           style={{
-            background: "var(--color-blue-d)",
-            borderColor: "rgba(77,142,255,0.22)",
-            color: "var(--color-txt)",
+            background: "var(--color-green-wash)",
+            borderColor: "var(--color-green)",
+            color: "var(--color-ink)",
           }}
         >
-          <Pill tom="info">CLT</Pill>
+          <Pill tom="ok">CLT</Pill>
           <span>
-            Vamos calcular INSS, IRRF, FGTS e gerar holerite todo mês.
-            Eventos S-2200, S-1200 e S-1299 vão pro eSocial automaticamente.
+            Vamos calcular INSS, IRRF, FGTS e gerar holerite todo mês. Eventos{" "}
+            <abbr
+              title="S-2200 — Cadastramento, S-1200 — Remuneração, S-1299 — Fechamento"
+              className="mono text-[11px] no-underline"
+            >
+              S-2200, S-1200 e S-1299
+            </abbr>{" "}
+            vão pro eSocial automaticamente.
           </span>
         </div>
       ) : null}
       {tipo === "PJ" ? (
         <div
-          className="rounded-md border p-3 md:col-span-2 flex items-start gap-2.5 text-xs"
+          className="rounded-[var(--radius-md)] border p-3 md:col-span-2 flex items-start gap-2.5 text-xs"
           style={{
-            background: "var(--color-amber-d)",
-            borderColor: "rgba(255,184,77,0.22)",
-            color: "var(--color-txt)",
+            background: "var(--color-paper-2)",
+            borderColor: "var(--color-ochre)",
+            color: "var(--color-ink)",
           }}
         >
           <Pill tom="warn">PJ</Pill>
@@ -390,7 +413,11 @@ function PassoVinculo({ form }: { form: UseFormReturn<FuncionarioInput> }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="flex flex-col gap-1.5 md:col-span-2">
         <Label htmlFor="cargo">Cargo</Label>
-        <Input id="cargo" placeholder="Ex: Atendente sênior" {...form.register("cargo")} />
+        <Input
+          id="cargo"
+          placeholder="Ex: Atendente sênior"
+          {...form.register("cargo")}
+        />
         <ErroCampo erro={form.formState.errors.cargo?.message} />
       </div>
       <div className="flex flex-col gap-1.5">
@@ -432,13 +459,22 @@ function PassoVinculo({ form }: { form: UseFormReturn<FuncionarioInput> }) {
         <ErroCampo erro={form.formState.errors.salario?.message} />
       </div>
       <div className="md:col-span-2">
-        <Card className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[var(--color-card-2)]">
+        <Framed
+          marks={false}
+          tone="rule"
+          surface="paper-2"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-3"
+        >
           <div>
-            <p className="text-[10px] uppercase tracking-[0.14em] mono text-[var(--color-txt-3)] font-bold">
+            <p className="text-[10px] uppercase tracking-[0.14em] mono text-[var(--color-ink-3)] font-bold">
               Resumo do vínculo
             </p>
-            <p className="text-sm text-[var(--color-txt-2)] mt-1">
-              {jornada}h/sem · {formatarMoeda(salario || 0)} ·{" "}
+            <p
+              className="text-sm text-[var(--color-ink-2)] mt-1 mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {jornada}h/sem ·{" "}
+              {formatarMoeda(salario || 0)} ·{" "}
               {tipo === "CLT"
                 ? "Holerite e encargos automáticos"
                 : tipo === "PJ"
@@ -446,7 +482,7 @@ function PassoVinculo({ form }: { form: UseFormReturn<FuncionarioInput> }) {
                   : "Bolsa-auxílio mensal"}
             </p>
           </div>
-        </Card>
+        </Framed>
       </div>
     </div>
   );
@@ -454,5 +490,7 @@ function PassoVinculo({ form }: { form: UseFormReturn<FuncionarioInput> }) {
 
 function ErroCampo({ erro }: { erro?: string }) {
   if (!erro) return null;
-  return <p className="text-xs text-[var(--color-red)]">{erro}</p>;
+  return (
+    <p className="text-xs text-[var(--color-danger)]">{erro}</p>
+  );
 }

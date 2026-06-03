@@ -78,10 +78,10 @@ export function SubstituirCertificadoModal({
         <DialogHeader>
           <div className="flex items-start gap-3">
             <div
-              className="size-9 rounded-md grid place-items-center mt-0.5"
-              style={{ background: "var(--color-card-3)" }}
+              className="size-9 rounded-[var(--radius-sm)] grid place-items-center mt-0.5 border"
+              style={{ background: "var(--color-paper-2)", borderColor: "var(--color-rule)" }}
             >
-              <ShieldCheck className="size-4 text-[var(--color-lime)]" />
+              <ShieldCheck className="size-4 text-[var(--color-green)]" />
             </div>
             <div className="flex-1">
               <DialogTitle>Substituir certificado A1</DialogTitle>
@@ -107,10 +107,10 @@ export function SubstituirCertificadoModal({
             handleFile(e.dataTransfer.files[0] ?? null);
           }}
           className={cn(
-            "flex flex-col items-center gap-3 p-6 rounded-md border-2 border-dashed transition-colors text-left w-full",
+            "flex flex-col items-center gap-3 p-6 rounded-[var(--radius-md)] border-2 border-dashed transition-colors text-left w-full",
             arrastando
-              ? "border-[var(--color-lime)] bg-[var(--color-lime-d)]"
-              : "border-[var(--color-line-2)] bg-[var(--color-card-2)] hover:bg-[var(--color-card-3)]"
+              ? "border-[var(--color-green)] bg-[var(--color-green-wash)]"
+              : "border-[var(--color-rule-2)] bg-[var(--color-paper-2)] hover:bg-[var(--color-rule)]"
           )}
         >
           <input
@@ -121,15 +121,15 @@ export function SubstituirCertificadoModal({
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
           <div
-            className="size-10 rounded-md grid place-items-center"
-            style={{ background: "var(--color-card-3)" }}
+            className="size-10 rounded-[var(--radius-sm)] grid place-items-center border"
+            style={{ background: "var(--color-paper-2)", borderColor: "var(--color-rule)" }}
           >
-            <Upload className="size-4 text-[var(--color-lime)]" />
+            <Upload className="size-4 text-[var(--color-green)]" />
           </div>
-          <p className="text-sm font-semibold text-[var(--color-txt)] text-center">
+          <p className="text-sm font-semibold text-[var(--color-ink)] text-center">
             {arquivo ? arquivo : "Arraste o certificado ou clique para selecionar"}
           </p>
-          <p className="text-[11px] text-[var(--color-txt-3)]">
+          <p className="text-[11px] text-[var(--color-ink-3)]">
             .pfx ou .p12 — certificado A1
           </p>
         </button>

@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Plus, Search, Users } from "lucide-react";
 import { useQueryStates, parseAsString } from "nuqs";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,9 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Moeda } from "@/components/shared/moeda";
+import { Framed } from "@/components/blueprint/framed";
+import { Fig } from "@/components/blueprint/fig";
+import { Ruler } from "@/components/blueprint/ruler";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
 import { StatusFuncionarioPill } from "@/components/pessoal/status-funcionario-pill";
@@ -27,9 +30,17 @@ import {
   type Funcionario,
 } from "@/lib/schemas/pessoal";
 import { formatarDataBR } from "@/lib/format/data";
+import {
+  reveal,
+  staggerChildren,
+  revealChild,
+  staticVariants,
+} from "@/lib/motion/variants";
+import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
 
 export default function FuncionariosPage() {
   const { data, isLoading, isError, refetch } = useFuncionarios();
+  const reduced = useReducedMotion();
 
   const [filtros, setFiltros] = useQueryStates(
     {
@@ -58,33 +69,72 @@ export default function FuncionariosPage() {
     });
   }, [data, filtros]);
 
+  const containerV = reduced ? staticVariants : staggerChildren;
+  const itemV = reduced ? staticVariants : revealChild;
+  const pageV = reduced ? staticVariants : reveal;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex items-end justify-between gap-3 flex-wrap">
+    <motion.div
+      className="flex flex-col gap-6"
+      variants={pageV}
+      initial="hidden"
+      animate="show"
+    >
+      {/* ── cabeçalho ── */}
+      <motion.header
+        className="flex items-end justify-between gap-3 flex-wrap"
+        variants={containerV}
+        initial="hidden"
+        animate="show"
+      >
         <div>
-          <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-txt-3)] font-bold">
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
             Pessoal · Funcionários
-          </span>
-          <h1 className="text-[26px] md:text-3xl font-extrabold tracking-tight text-[var(--color-txt)]">
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          >
             Funcionários
-          </h1>
-          <p className="text-sm text-[var(--color-txt-2)] max-w-2xl mt-1">
-            Quem está ativo, afastado ou desligado. Cadastre uma admissão e o
-            evento eSocial S-2200 é transmitido automaticamente.
-          </p>
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Quem está ativo, afastado ou desligado. Uma admissão aqui gera o
+            evento{" "}
+            <abbr
+              title="S-2200 — Cadastramento Inicial do Vínculo Trabalhista"
+              className="mono text-[11px] text-[var(--color-ink-2)] no-underline"
+            >
+              S-2200
+            </abbr>{" "}
+            no eSocial automaticamente.
+          </motion.p>
         </div>
-        <Button asChild>
-          <Link href="/pessoal/funcionarios/novo">
-            <Plus className="size-4" /> Admitir funcionário
-          </Link>
-        </Button>
-      </header>
+        <motion.div variants={itemV}>
+          <Button asChild>
+            <Link href="/pessoal/funcionarios/novo">
+              <Plus className="size-4" /> Admitir funcionário
+            </Link>
+          </Button>
+        </motion.div>
+      </motion.header>
 
       <PessoalSubnav />
 
-      <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+      {/* ── filtros ── */}
+      <Framed
+        marks={false}
+        tone="rule"
+        surface="card"
+        className="flex flex-col md:flex-row md:items-center gap-3"
+      >
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-txt-3)]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[var(--color-ink-3)]" />
           <Input
             value={filtros.q}
             onChange={(e) => void setFiltros({ q: e.target.value })}
@@ -116,12 +166,13 @@ export default function FuncionariosPage() {
           <SelectContent>
             <SelectItem value="todos">Todos os contratos</SelectItem>
             <SelectItem value="CLT">CLT</SelectItem>
-            <SelectItem value="PJ">PJ</SelectItem>
+            <SelectItem value="PJ">PJ (prestador)</SelectItem>
             <SelectItem value="ESTAGIO">Estágio</SelectItem>
           </SelectContent>
         </Select>
-      </Card>
+      </Framed>
 
+      {/* ── conteúdo principal ── */}
       {isLoading ? (
         <LoadingState titulo="Carregando funcionários..." />
       ) : isError ? (
@@ -140,24 +191,34 @@ export default function FuncionariosPage() {
           }
         />
       ) : (
-        <Card className="overflow-hidden">
-          <ul
-            className="divide-y"
-            style={{ borderColor: "var(--color-line)" }}
-          >
+        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-2">
+            <Fig n={1} titulo="Cadastro de funcionários" size="sm" />
+          </div>
+          <Ruler />
+          <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {lista.map((f) => (
               <LinhaFuncionario key={f.id} funcionario={f} />
             ))}
           </ul>
-        </Card>
+          <Ruler />
+          <div className="px-5 py-3">
+            <span
+              className="text-xs text-[var(--color-ink-3)] mono"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {lista.length} funcionário{lista.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </Framed>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 function LinhaFuncionario({ funcionario }: { funcionario: Funcionario }) {
   return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-card-2)] transition-colors">
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <AvatarFuncionario
           nome={funcionario.nome}
@@ -165,18 +226,24 @@ function LinhaFuncionario({ funcionario }: { funcionario: Funcionario }) {
           size="lg"
         />
         <div className="min-w-0">
-          <span className="text-sm font-semibold text-[var(--color-txt)] truncate block">
+          <span className="text-sm font-semibold text-[var(--color-ink)] truncate block">
             {funcionario.nome}
           </span>
-          <span className="text-[11px] text-[var(--color-txt-3)] truncate block">
+          <span className="text-[11px] text-[var(--color-ink-3)] truncate block">
             {funcionario.cargo} · {TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}{" "}
-            · admitido {formatarDataBR(funcionario.dataAdmissao)}
+            · admitido{" "}
+            <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {formatarDataBR(funcionario.dataAdmissao)}
+            </span>
           </span>
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
         <StatusFuncionarioPill status={funcionario.status} />
-        <span className="mono text-base font-bold text-[var(--color-txt)]">
+        <span
+          className="mono text-base font-bold text-[var(--color-ink)]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <Moeda valor={funcionario.salario} />
         </span>
       </div>

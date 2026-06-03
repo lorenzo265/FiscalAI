@@ -30,37 +30,38 @@ export function HistoricoBarChart({ pontos, destaque }: Props) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <CartesianGrid stroke="var(--color-rule)" vertical={false} />
         <XAxis
           dataKey="rotulo"
-          tick={{ fill: "var(--color-txt-3)", fontSize: 11 }}
-          stroke="var(--color-line-2)"
+          tick={{ fill: "var(--color-ink-3)", fontSize: 11, fontFamily: "var(--font-mono)" }}
+          stroke="var(--color-rule)"
         />
         <YAxis
           tickFormatter={(v) => formatarMoedaCompacta(Number(v))}
-          tick={{ fill: "var(--color-txt-3)", fontSize: 11 }}
-          stroke="var(--color-line-2)"
+          tick={{ fill: "var(--color-ink-3)", fontSize: 11, fontFamily: "var(--font-mono)" }}
+          stroke="var(--color-rule)"
           width={60}
         />
         <Tooltip
           contentStyle={{
-            background: "var(--color-card-2)",
-            border: "1px solid var(--color-line-2)",
-            borderRadius: 8,
+            background: "var(--color-card)",
+            border: "1px solid var(--color-rule)",
+            borderRadius: 2,
             fontSize: 12,
-            color: "var(--color-txt)",
+            color: "var(--color-ink)",
+            fontFamily: "var(--font-mono)",
           }}
-          cursor={{ fill: "rgba(163,255,107,0.06)" }}
+          cursor={{ fill: "color-mix(in srgb, var(--color-green) 8%, transparent)" }}
           formatter={(v: number) => formatarMoeda(v)}
         />
-        <Bar dataKey="Imposto" radius={[4, 4, 0, 0]}>
+        <Bar dataKey="Imposto" radius={[2, 2, 0, 0]}>
           {pontos.map((m) => (
             <Cell
               key={`${m.ano}-${m.mes}`}
               fill={
                 m.ano === destaque.ano && m.mes === destaque.mes
-                  ? "var(--color-lime)"
-                  : "var(--color-blue)"
+                  ? "var(--color-green)"
+                  : "var(--color-ink-3)"
               }
             />
           ))}
