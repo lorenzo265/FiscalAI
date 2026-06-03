@@ -29,15 +29,16 @@ export function ChatFlutuante() {
         onClick={() => setAberto(true)}
         aria-label="Abrir assistente"
         className={cn(
-          "fixed bottom-5 right-5 z-40 h-12 px-4 rounded-full shadow-lg",
+          "fixed bottom-5 right-5 z-40 h-12 px-4 rounded-[var(--radius-md)]",
+          "shadow-[0_16px_40px_-24px_rgba(27,26,21,0.5)]",
           "flex items-center gap-2"
         )}
       >
         <MessageCircle className="size-4" />
         <span className="hidden md:inline">Perguntar</span>
         <span
-          className="size-1.5 rounded-full"
-          style={{ background: "var(--color-lime)" }}
+          className="size-1.5 rounded-[1px]"
+          style={{ background: "var(--color-green)" }}
           aria-hidden
         />
       </Button>
@@ -49,15 +50,15 @@ export function ChatFlutuante() {
         >
           <SheetHeader
             className="px-4 py-3 border-b"
-            style={{ borderColor: "var(--color-line)" }}
+            style={{ borderColor: "var(--color-rule)" }}
           >
             <SheetTitle className="flex items-center gap-2 text-sm">
               <span
-                className="size-7 rounded-full grid place-items-center border"
+                className="size-7 rounded-[var(--radius-sm)] grid place-items-center border"
                 style={{
-                  background: "var(--color-lime-d)",
-                  borderColor: "rgba(163,255,107,0.32)",
-                  color: "var(--color-lime)",
+                  background: "var(--color-green-wash)",
+                  borderColor: "var(--color-green)",
+                  color: "var(--color-green)",
                 }}
                 aria-hidden
               >
@@ -76,9 +77,9 @@ export function ChatFlutuante() {
 
           <div
             className="px-4 py-2.5 border-t flex items-center justify-between"
-            style={{ borderColor: "var(--color-line)" }}
+            style={{ borderColor: "var(--color-rule)" }}
           >
-            <span className="text-[10px] mono uppercase tracking-[0.16em] text-[var(--color-txt-3)]">
+            <span className="text-[10px] mono uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
               Mock · respostas simuladas
             </span>
             <Button

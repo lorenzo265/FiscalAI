@@ -126,7 +126,7 @@ export default function ManifestoEntradasPage() {
       {/* ── alerta pendentes ── */}
       {pendentes.length > 0 ? (
         <Framed marks={false} tone="rule" surface="card" className="flex items-center gap-4"
-          style={{ borderColor: "var(--color-ochre)", background: "color-mix(in srgb, var(--color-ochre) 8%, var(--color-card))" }}
+          style={{ borderColor: "var(--color-ochre)", background: "var(--color-ochre-wash)" }}
         >
           <ShieldCheck
             className="size-5 shrink-0"

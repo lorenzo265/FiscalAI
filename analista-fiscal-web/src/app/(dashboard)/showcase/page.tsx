@@ -369,9 +369,9 @@ export default function ShowcasePage() {
             </Alert>
           </div>
           <div className="flex flex-col gap-3 max-w-md mt-2">
-            <Progress value={count} tom="lime" />
-            <Progress value={62} tom="amber" />
-            <Progress value={34} tom="red" />
+            <Progress value={count} tom="green" />
+            <Progress value={62} tom="ochre" />
+            <Progress value={34} tom="danger" />
           </div>
         </Secao>
 

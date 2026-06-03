@@ -93,7 +93,7 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
           <div className="flex flex-col gap-3">
             <p className="text-sm text-[var(--color-ink)]">
               Você será redirecionado pro app do <strong>{banco.nome}</strong> para
-              autorizar o FiscalAI a ler suas transações.
+              autorizar a Arkan a ler suas transações.
             </p>
             <ul className="flex flex-col gap-2 text-xs text-[var(--color-ink-2)]">
               <li className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
               </li>
               <li className="flex items-center gap-2">
                 <Lock className="size-3.5 text-[var(--color-green)]" />
-                Acesso somente leitura. O FiscalAI nunca movimenta sua conta.
+                Acesso somente leitura. A Arkan nunca movimenta sua conta.
               </li>
             </ul>
             <Button onClick={fluxoAutomatico} className="w-full mt-2">
@@ -130,10 +130,10 @@ export function BancoConectarModal({ banco, open, onOpenChange, onSucesso }: Pro
                 {banco.nome}
               </span>
               <h3 className="text-base font-bold text-[var(--color-ink)]">
-                Autorizar acesso ao FiscalAI?
+                Autorizar acesso à Arkan?
               </h3>
               <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
-                O FiscalAI poderá visualizar suas transações pelos próximos 12
+                A Arkan poderá visualizar suas transações pelos próximos 12
                 meses. Sem permissão para mover dinheiro.
               </p>
             </div>

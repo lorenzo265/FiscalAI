@@ -13,13 +13,13 @@ const TOM_MAP = {
   warn: {
     icon: AlertTriangle,
     color: "var(--color-ochre)",
-    bg: "color-mix(in srgb, var(--color-ochre) 8%, var(--color-card))",
+    bg: "var(--color-ochre-wash)",
     border: "color-mix(in srgb, var(--color-ochre) 25%, var(--color-rule))",
   },
   error: {
     icon: XCircle,
     color: "var(--color-danger)",
-    bg: "color-mix(in srgb, var(--color-danger) 8%, var(--color-card))",
+    bg: "var(--color-danger-wash)",
     border: "color-mix(in srgb, var(--color-danger) 25%, var(--color-rule))",
   },
   info: {

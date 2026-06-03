@@ -30,6 +30,10 @@
   /* Mundo quente: atenção (ocre) e erro (danger) — não são acentos de marca. */
   --color-ochre: #a8650f;
   --color-danger: #b23a33;
+  /* Washes do mundo quente — análogos a --color-green-wash, para fundos
+     de alerta/erro sem precisar de color-mix pontual nas telas. */
+  --color-ochre-wash: #efe4d2;
+  --color-danger-wash: #f1ddd9;
 
   /* Shape — precisão, não fofura. */
   --radius-md: 2px;
@@ -40,33 +44,71 @@
   --ease-reveal: cubic-bezier(0.62, 0.05, 0.01, 0.99);
   --ease-stamp: cubic-bezier(0.34, 1.56, 0.4, 1);
 
-  /* ─── Aliases de compatibilidade (nomes antigos → Arkan) ─────────────
-     Mantidos só para a Fase 0: 93 arquivos / 291 referências aos nomes
-     antigos seguem compilando e "viram papel/tinta/verde" de imediato.
-     REMOVER na Fase 1 (design-system). Regra-mãe: UM acento (verde) —
-     blue/amber mapeiam para NEUTRO/ocre, nunca um 2º acento cromático. */
-  --color-bg: var(--color-paper);
-  --color-bg-2: var(--color-paper-2);
-  --color-card-2: var(--color-paper-2);
-  --color-card-3: var(--color-rule);
+  /* Os aliases de compat (nomes antigos `--color-txt/bg/lime/line/...`) foram
+     REMOVIDOS na Fase 4: nenhum arquivo (fora deste `@theme`) os usa mais.
+     Toda a base consome os tokens canônicos Arkan acima. */
+}
 
-  --color-line: var(--color-rule);
-  --color-line-2: var(--color-rule-2);
+/* ─── Dark mode — RE-DERIVADO (não invertido) ────────────────────────────
+   Mantém a família Arkan: papel→tinta profunda QUENTE, tinta→clara quente,
+   UM acento verde (clareado p/ AA no escuro), ocre/danger ajustados.
+   Tema CLARO é o padrão (tokens do @theme acima). O escuro entra por:
+     (a) classe `.dark` no <html> — gancho para um futuro toggle;
+     (b) `@media (prefers-color-scheme: dark)` — preferência do SO,
+         a menos que `.light` seja forçado no <html>.
+   Contraste mirado (AA+) em ambos os temas:
+     ink/paper ~13:1, green/paper ~5:1, ink-2/paper ~7:1. */
+:root.dark,
+.dark {
+  --color-paper: #14120d;
+  --color-paper-2: #1b1812;
+  --color-card: #201d16;
+  --color-glass: rgba(20, 18, 13, 0.72);
 
-  --color-lime: var(--color-green);
-  --color-lime-d: var(--color-green-wash);
-  --color-blue: var(--color-ink-2);
-  --color-blue-d: var(--color-paper-2);
-  --color-amber: var(--color-ochre);
-  --color-amber-d: var(--color-paper-2);
-  --color-red: var(--color-danger);
-  --color-red-d: var(--color-paper-2);
+  --color-ink: #ece9dd;
+  --color-ink-2: #b6b1a1;
+  --color-ink-3: #8a8675;
+  --color-graphite: #6f6c5e;
 
-  --color-txt: var(--color-ink);
-  --color-txt-2: var(--color-ink-2);
-  --color-txt-3: var(--color-ink-3);
+  --color-rule: #38352b;
+  --color-rule-2: #4a463a;
 
-  --ease-default: var(--ease-settle);
+  --color-green: #46b27a;
+  --color-green-deep: #b9e3c8;
+  --color-green-bright: #5cc78d;
+  --color-green-wash: #1b2a22;
+
+  --color-ochre: #d8943f;
+  --color-danger: #e36c63;
+  --color-ochre-wash: #2a2114;
+  --color-danger-wash: #2c1916;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --color-paper: #14120d;
+    --color-paper-2: #1b1812;
+    --color-card: #201d16;
+    --color-glass: rgba(20, 18, 13, 0.72);
+
+    --color-ink: #ece9dd;
+    --color-ink-2: #b6b1a1;
+    --color-ink-3: #8a8675;
+    --color-graphite: #6f6c5e;
+
+    --color-rule: #38352b;
+    --color-rule-2: #4a463a;
+
+    --color-green: #46b27a;
+    --color-green-deep: #b9e3c8;
+    --color-green-bright: #5cc78d;
+    --color-green-wash: #1b2a22;
+
+    --color-ochre: #d8943f;
+    --color-danger: #e36c63;
+    --color-ochre-wash: #2a2114;
+    --color-danger-wash: #2c1916;
+  }
 }
 
 @layer base {
@@ -78,16 +120,29 @@
     font-family: var(--font-sans);
     background: var(--color-paper);
     color: var(--color-ink);
+    /* casa controles nativos (scrollbar, date picker, autofill) ao tema */
+    color-scheme: light;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  html.dark {
+    color-scheme: dark;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+  }
+}
+@layer base {
 
   body {
     background-color: var(--color-paper);
-    /* Textura sutil de pauta: fios quase-imperceptíveis em --color-rule. */
+    /* Textura sutil de pauta: fios quase-imperceptíveis (token --texture-line,
+       re-derivado no dark para não brilhar sobre a tinta profunda). */
     background-image:
-      linear-gradient(rgba(167, 164, 147, 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(167, 164, 147, 0.04) 1px, transparent 1px);
+      linear-gradient(var(--texture-line-h) 1px, transparent 1px),
+      linear-gradient(90deg, var(--texture-line-v) 1px, transparent 1px);
     background-size: 48px 48px;
     min-height: 100vh;
     color: var(--color-ink);
@@ -127,8 +182,41 @@
   /* Pauta técnica sutil (mesma textura do body). */
   .grid-pattern {
     background-image:
-      linear-gradient(rgba(167, 164, 147, 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(167, 164, 147, 0.04) 1px, transparent 1px);
+      linear-gradient(var(--texture-line-h) 1px, transparent 1px),
+      linear-gradient(90deg, var(--texture-line-v) 1px, transparent 1px);
     background-size: 48px 48px;
+  }
+}
+
+/* Texto: variáveis da textura de pauta — claro (padrão) e dark re-derivado. */
+:root {
+  --texture-line-h: rgba(167, 164, 147, 0.06);
+  --texture-line-v: rgba(167, 164, 147, 0.04);
+}
+:root.dark,
+.dark {
+  --texture-line-h: rgba(180, 176, 158, 0.05);
+  --texture-line-v: rgba(180, 176, 158, 0.035);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --texture-line-h: rgba(180, 176, 158, 0.05);
+    --texture-line-v: rgba(180, 176, 158, 0.035);
+  }
+}
+
+/* ─── Reduced-motion: rede de segurança global ───────────────────────────
+   O design-system já honra `prefers-reduced-motion` por JS (useReducedMotion
+   + staticVariants). Esta regra CSS cobre transições/animações que escapem
+   ao JS (ex.: utilitários Tailwind, libs), zerando viagem/duração sem
+   remover a visibilidade do conteúdo. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

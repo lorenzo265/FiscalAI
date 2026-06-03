@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LoginCard } from "@/components/auth/login-card";
 
 export const metadata: Metadata = {
-  title: "Entrar — FiscalAI",
+  title: "Entrar — Arkan",
 };
 
 export default function LoginPage() {

@@ -29,7 +29,7 @@ const mono = Spline_Sans_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FiscalAI — Analista Fiscal",
+  title: "Arkan — Instrumento Fiscal",
   description:
     "Você sabe o que está acontecendo no seu fiscal — sem precisar ser contador.",
 };

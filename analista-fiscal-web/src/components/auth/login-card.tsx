@@ -40,25 +40,25 @@ export function LoginCard() {
   }
 
   function preencherDemo() {
-    setEmail("demo@fiscalai.com");
+    setEmail("demo@arkan.com");
     setSenha("demo123");
   }
 
   return (
     <div
-      className="w-full max-w-[420px] rounded-[14px] border p-8 shadow-2xl"
+      className="w-full max-w-[420px] rounded-[var(--radius-md)] border p-8 shadow-[0_24px_60px_-30px_rgba(27,26,21,0.45)]"
       style={{
         background: "var(--color-card)",
-        borderColor: "var(--color-line-2)",
+        borderColor: "var(--color-rule-2)",
       }}
     >
       <div className="flex flex-col items-center gap-3 mb-6">
         <Logo size={56} />
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-[var(--color-txt)]">
-            FiscalAI
+          <h1 className="font-serif text-xl font-semibold tracking-tight text-[var(--color-ink)]">
+            Arkan
           </h1>
-          <p className="text-xs text-[var(--color-txt-2)] mt-1">
+          <p className="text-xs text-[var(--color-ink-2)] mt-1">
             Você sabe o que está acontecendo no seu fiscal — sem precisar ser contador.
           </p>
         </div>
@@ -75,7 +75,7 @@ export function LoginCard() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--color-txt-3)]" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--color-ink-3)]" />
                 <Input
                   id="email"
                   type="email"
@@ -90,7 +90,7 @@ export function LoginCard() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="senha">Senha</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--color-txt-3)]" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--color-ink-3)]" />
                 <Input
                   id="senha"
                   type="password"
@@ -104,7 +104,7 @@ export function LoginCard() {
             </div>
 
             {erro ? (
-              <p className="text-xs text-[var(--color-red)]">{erro}</p>
+              <p className="text-xs text-[var(--color-danger)]">{erro}</p>
             ) : null}
 
             <Button type="submit" disabled={submitting} className="w-full">
@@ -115,10 +115,10 @@ export function LoginCard() {
             <button
               type="button"
               onClick={preencherDemo}
-              className="mt-1 mono text-[10px] uppercase tracking-[0.16em] font-bold flex items-center justify-center gap-1.5 text-[var(--color-txt-3)] hover:text-[var(--color-lime)] transition-colors"
+              className="mt-1 mono text-[10px] uppercase tracking-[0.16em] font-bold flex items-center justify-center gap-1.5 text-[var(--color-ink-2)] hover:text-[var(--color-green)] transition-colors"
             >
               <KeyRound className="size-3" />
-              Usar demo: demo@fiscalai.com / demo123
+              Usar demo: demo@arkan.com / demo123
             </button>
           </form>
         </TabsContent>
@@ -145,8 +145,8 @@ export function LoginCard() {
                 onChange={(e) => setSenha(e.target.value)}
               />
             </div>
-            <p className="text-xs text-[var(--color-txt-2)]">
-              No próximo passo, você cadastra sua empresa e o FiscalAI já começa a
+            <p className="text-xs text-[var(--color-ink-2)]">
+              No próximo passo, você cadastra sua empresa e a Arkan já começa a
               calcular seus impostos.
             </p>
             <Button type="submit" disabled={submitting} className="w-full">
@@ -157,7 +157,7 @@ export function LoginCard() {
         </TabsContent>
       </Tabs>
 
-      <p className="mt-6 text-[10px] text-center text-[var(--color-txt-3)] uppercase tracking-[0.16em] mono">
+      <p className="mt-6 text-[10px] text-center text-[var(--color-ink-2)] uppercase tracking-[0.16em] mono">
         Demonstração — todos os dados são simulados
       </p>
     </div>

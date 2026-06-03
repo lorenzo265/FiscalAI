@@ -4,7 +4,22 @@ import * as React from "react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { cn } from "@/lib/utils";
 
-type ProgressTom = "lime" | "amber" | "red" | "blue";
+/**
+ * Tons canônicos Arkan: `green` (saúde/acento), `ochre` (atenção),
+ * `danger` (erro), `neutral` (tinta). Os nomes legados
+ * (`lime|amber|red|blue`) seguem aceitos como aliases para não quebrar
+ * callers antigos — mapeiam para os canônicos.
+ */
+type ProgressTom =
+  | "green"
+  | "ochre"
+  | "danger"
+  | "neutral"
+  // aliases legados
+  | "lime"
+  | "amber"
+  | "red"
+  | "blue";
 
 interface ProgressProps
   extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> {
@@ -12,6 +27,11 @@ interface ProgressProps
 }
 
 const tonsMap: Record<ProgressTom, string> = {
+  green: "bg-[var(--color-green)]",
+  ochre: "bg-[var(--color-ochre)]",
+  danger: "bg-[var(--color-danger)]",
+  neutral: "bg-[var(--color-ink-2)]",
+  // aliases legados → canônicos
   lime: "bg-[var(--color-green)]",
   amber: "bg-[var(--color-ochre)]",
   red: "bg-[var(--color-danger)]",
@@ -21,7 +41,7 @@ const tonsMap: Record<ProgressTom, string> = {
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
->(({ className, value, tom = "lime", ...props }, ref) => (
+>(({ className, value, tom = "green", ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
