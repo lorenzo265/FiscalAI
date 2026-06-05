@@ -25,7 +25,12 @@ Fórmulas:
   csrf_total    = pis_retido + cofins_retido + csll_retido
 
   Se csrf_total < R$10 → ZERA o CSRF (não retém PIS/Cofins/CSLL).
-  IRRF: sem limite mínimo aplicável em 2026.
+  IRRF (cód. 1708/5952): a retenção por documento é feita integralmente (sem
+  dispensa por nota). O piso de R$10 por código de receita previsto na Lei
+  9.430/1996 art. 68 §1º opera no nível de **recolhimento mensal acumulado**
+  (DARF), não na retenção por documento isolado. Portanto este módulo retém
+  o IRRF por nota normalmente; o controle do piso de acumulação deve ser feito
+  pelo módulo de DARF ao consolidar o período (fora do escopo desta função).
 
 Tomador no Simples Nacional → dispensado de toda retenção (IR + CSRF).
 Tomador em LP/LR → retém integralmente.

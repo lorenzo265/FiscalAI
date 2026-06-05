@@ -29,6 +29,30 @@ class GerarProvisaoIn(BaseModel):
         decimal_places=2,
         description="Total bruto da folha do mês (BRL).",
     )
+    rat_sat: Decimal = Field(
+        default=Decimal("0"),
+        ge=0,
+        le=Decimal("0.10"),
+        description=(
+            "Alíquota RAT/SAT (Lei 8.212/91 art.22 II), já multiplicada pelo FAP. "
+            "Aplica-se a SN Anexo IV, Lucro Presumido e Lucro Real. "
+            "Default 0%% — piso conservador até seed definitivo por CNAE/grau de risco "
+            "(ver docs/pendencias/rat-fap-terceiros-seed.md). "
+            "Exemplo: RAT 2%% × FAP 1,0 = 0,02."
+        ),
+    )
+    aliquota_terceiros: Decimal = Field(
+        default=Decimal("0"),
+        ge=0,
+        le=Decimal("0.10"),
+        description=(
+            "Alíquota Terceiros/Sistema S (SENAI, SESI, SESC, SEBRAE, etc.). "
+            "Aplica-se a SN Anexo IV, Lucro Presumido e Lucro Real. "
+            "Default 0%% — piso conservador até seed definitivo por CNAE. "
+            "Valor típico: ~5,8%% para indústria/comércio. "
+            "(ver docs/pendencias/rat-fap-terceiros-seed.md)."
+        ),
+    )
 
 
 class ProvisaoMensalOut(BaseModel):

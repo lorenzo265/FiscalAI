@@ -61,6 +61,7 @@ def _dre(
         ebitda=LinhaDre("EBITDA", Decimal(ebitda)),
         depreciacao=zero,
         ebit=zero,
+        outras_receitas=zero,  # FA6 — campo obrigatório novo (4.9.*)
         resultado_financeiro=zero,
         lair=zero,
         irpj_csll=zero,

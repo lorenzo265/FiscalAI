@@ -19,7 +19,10 @@ Fórmula:
 
   base_inss     = min(bruto, teto_previdenciario)
   inss          = base_inss × aliquota_inss        (default 11%)
-  base_irrf     = bruto − inss − (dependentes × 189,59)
+  base_irrf     = bruto − inss − (dependentes × deducao_por_dependente)
+                  [deducao_por_dependente vem da SCD FaixaIrrf.deducao_dependente
+                   — nunca hardcoded; o valor vigente é carregado pelo service
+                   ao consultar a tabela IRRF do período]
   irrf          = max(0, base_irrf × aliquota_faixa − parcela_deduzir_faixa)
   valor_liquido = bruto − inss − irrf
 

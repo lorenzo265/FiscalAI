@@ -18,8 +18,11 @@ ALIQ_FGTS_CLT = Decimal("0.0800")
 
 class TestHoleriteGolden:
     def test_funcionario_3000_sem_dep(self) -> None:
-        # INSS = 253,41; IRRF = 36,55; FGTS = 240,00
-        # Líquido = 3000 − 253,41 − 36,55 = 2710,04
+        # INSS = 253,41; FGTS = 240,00
+        # IRRF_legal: base 2746,59 × 7,5% − 169,44 = 36,55
+        # IRRF_simpl: base 2435,20 (3000−564,80) → faixa 2 → 13,20
+        # min(36,55 ; 13,20) = 13,20 → SIMPLIFICADO (FA2 M5)
+        # Líquido = 3000 − 253,41 − 13,20 = 2733,39
         r = calcular_holerite(
             salario_base=Decimal("3000.00"),
             dependentes_irrf=0,
@@ -28,9 +31,10 @@ class TestHoleriteGolden:
             aliquota_fgts=ALIQ_FGTS_CLT,
         )
         assert r.inss.inss == Decimal("253.41")
-        assert r.irrf.irrf == Decimal("36.55")
+        assert r.irrf.irrf == Decimal("13.20")
+        assert r.irrf.metodo == "simplificado"
         assert r.fgts.fgts == Decimal("240.00")
-        assert r.valor_liquido == Decimal("2710.04")
+        assert r.valor_liquido == Decimal("2733.39")
 
     def test_funcionario_5000_com_2_deps(self) -> None:
         # INSS = 509,60; IRRF base = 5000 − 509,60 − 379,18 = 4111,22 → faixa 4

@@ -118,3 +118,56 @@ class TestBordas:
             calcular_retencao_pj_pj(
                 Decimal("-1"), RegimeTomador.LUCRO_PRESUMIDO
             )
+
+
+class TestFA7IrrfPisoDarfAcumulacao:
+    """FA7-m1: Lei 9.430/1996 art. 68 §1º — piso R$10 DARF do IRRF.
+
+    O IRRF (cód. 1708/5952) tem piso de R$10 por código de receita, mas a
+    acumulação é **mensal** (todos os documentos do período somados). Logo:
+
+    - A retenção por nota deve ocorrer normalmente, sem zerar o IRRF por
+      documento isolado (seria incorreto sem o contexto de acumulação).
+    - O controle do piso de R$10 é responsabilidade do módulo de DARF ao
+      consolidar o período, não desta função pura de cálculo por documento.
+
+    Este teste documenta e blinda o comportamento correto: documentos pequenos
+    (abaixo de R$666,67 — limiar onde IR = R$10 exato) têm IRRF retido
+    normalmente, sem dispensa automática. A CSRF pode ser dispensada
+    independentemente (regra própria da IN 459/2004).
+    """
+
+    def test_nota_pequena_ir_retido_normalmente(self) -> None:
+        # Nota de R$200 → IR = 200 × 1,5% = R$3,00
+        # Apesar de R$3,00 < R$10, a retenção ocorre por nota (acumulação mensal).
+        # CSRF = 200 × 4,65% = R$9,30 → dispensado (< R$10, regra IN 459/2004).
+        r = calcular_retencao_pj_pj(
+            Decimal("200.00"), RegimeTomador.LUCRO_PRESUMIDO
+        )
+        assert r.ir_retido == Decimal("3.00"), (
+            "IRRF deve ser retido por nota independentemente do valor; "
+            "piso de R$10 é por acumulação mensal (Lei 9.430/96 art. 68 §1º)"
+        )
+        assert r.csrf_dispensado is True   # IN 459/2004: CSRF < R$10 → dispensa
+
+    def test_nota_minima_ir_acumula_mes(self) -> None:
+        # Três notas de R$200 no mês: IR acumulado = 3 × R$3 = R$9 (<R$10).
+        # A função retém R$3 por nota — o controle de piso fica no DARF.
+        # Se a função zerasse IR < R$10, empresa perderia a dedução legal.
+        notas = [Decimal("200.00")] * 3
+        total_ir = sum(
+            calcular_retencao_pj_pj(v, RegimeTomador.LUCRO_PRESUMIDO).ir_retido
+            for v in notas
+        )
+        assert total_ir == Decimal("9.00"), (
+            "Soma das retenções do mês = R$9,00 < R$10 → DARF não recolhe; "
+            "mas a retenção por nota foi feita corretamente"
+        )
+
+    def test_nota_acima_do_limiar_ir_retido(self) -> None:
+        # R$700 → IR = 700 × 1,5% = R$10,50 → claramente retido
+        r = calcular_retencao_pj_pj(
+            Decimal("700.00"), RegimeTomador.LUCRO_REAL
+        )
+        assert r.ir_retido == Decimal("10.50")
+        assert r.sujeito_a_retencao is True

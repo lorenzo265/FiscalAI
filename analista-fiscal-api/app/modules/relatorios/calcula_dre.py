@@ -9,7 +9,7 @@ Fundamento legal:
 
 Estrutura aplicada (compatível com plano referencial RFB usado na Sprint 9):
 
-  RECEITA OPERACIONAL BRUTA         = Σ saldos contas 4.*  (exceto outras)
+  RECEITA OPERACIONAL BRUTA         = Σ saldos contas 4.1.*  (apenas operacional)
   (-) Impostos sobre Receita        = saldo 5.1.05
   ───────────────────────────────────────────────────
   RECEITA LÍQUIDA
@@ -22,13 +22,17 @@ Estrutura aplicada (compatível com plano referencial RFB usado na Sprint 9):
   EBITDA
   (-) Depreciação / Amortização     = saldo 5.1.04
   ───────────────────────────────────────────────────
-  EBIT (= LAIR neste MVP — sem contas financeiras separadas)
+  EBIT (Resultado Operacional)
+  (+) Outras Receitas               = saldo 4.9.*  (Lei 6.404 art. 187 — não-operac.)
   (+/-) Resultado Financeiro        = 0 (placeholder até plano ser expandido)
   ───────────────────────────────────────────────────
   LAIR (Lucro Antes do IR/CSLL)
   (-) IRPJ + CSLL                   = input externo (vem de apuracao_fiscal)
   ───────────────────────────────────────────────────
   LUCRO LÍQUIDO DO EXERCÍCIO
+
+FA6 (2026-06-04): separação Lei 6.404 art. 187 — 4.9.* Outras Receitas NÃO compõem
+a Receita Operacional Bruta. Entram como linha própria APÓS o EBIT, antes do LAIR.
 
 Convenção de sinal: receitas são positivas (saldo natureza C);
 despesas/deduções entram positivas e o algoritmo SUBTRAI no nível certo.
@@ -46,7 +50,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "dre.estruturada.v1"
+ALGORITMO_VERSAO = "dre.estruturada.v2"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -55,7 +59,8 @@ _ZERO = Decimal("0")
 # ── Códigos de mapeamento (alinhados ao plano_referencial.py) ──────────────
 
 
-_COD_RECEITA_RAIZ = "4"
+_COD_RECEITA_OPERACIONAL = "4.1"   # Receita Operacional (ROB) — Lei 6.404 art. 187
+_COD_OUTRAS_RECEITAS = "4.9"       # Outras Receitas — entra APÓS o EBIT
 _COD_DESPESAS_RAIZ = "5"
 _COD_IMPOSTOS_RECEITA = "5.1.05"
 _COD_CMV = "5.1.01"
@@ -83,7 +88,12 @@ class LinhaDre:
 
 @dataclass(frozen=True, slots=True)
 class ResultadoDre:
-    """Snapshot persistido em ``relatorio_gerado.payload`` (tipo='dre')."""
+    """Snapshot persistido em ``relatorio_gerado.payload`` (tipo='dre').
+
+    FA6 (2026-06-04): campo ``outras_receitas`` adicionado.
+    Posição na cascata: após ``ebit``, antes de ``resultado_financeiro``.
+    Fundamento: Lei 6.404/1976 art. 187 — Outras Receitas não compõem ROB.
+    """
 
     receita_bruta: LinhaDre
     deducoes: LinhaDre
@@ -95,6 +105,7 @@ class ResultadoDre:
     ebitda: LinhaDre
     depreciacao: LinhaDre
     ebit: LinhaDre
+    outras_receitas: LinhaDre          # 4.9.* — Lei 6.404 art. 187
     resultado_financeiro: LinhaDre
     lair: LinhaDre
     irpj_csll: LinhaDre
@@ -188,7 +199,9 @@ def calcular_dre(
         )
 
     # ── Receitas ─────────────────────────────────────────────────────────
-    receita_bruta_v, receita_codigos = _somar_prefixo(saldos, _COD_RECEITA_RAIZ)
+    # FA6: ROB usa apenas 4.1.* (Receita Operacional). 4.9.* (Outras Receitas)
+    # entra em linha separada após o EBIT — Lei 6.404/1976 art. 187.
+    receita_bruta_v, receita_codigos = _somar_prefixo(saldos, _COD_RECEITA_OPERACIONAL)
     receita_bruta = LinhaDre(
         rotulo="Receita Operacional Bruta",
         valor=_quantizar(receita_bruta_v),
@@ -262,6 +275,15 @@ def calcular_dre(
         valor=_quantizar(ebitda.valor - depreciacao.valor),
     )
 
+    # ── Outras Receitas (4.9.*) — Lei 6.404 art. 187 ────────────────────
+    # Não operacionais: entram após EBIT, antes do LAIR.
+    outras_rec_v, outras_rec_codigos = _somar_prefixo(saldos, _COD_OUTRAS_RECEITAS)
+    outras_receitas = LinhaDre(
+        rotulo="(+) Outras Receitas",
+        valor=_quantizar(outras_rec_v),
+        detalhes=outras_rec_codigos,
+    )
+
     # ── LAIR + Lucro Líquido ─────────────────────────────────────────────
     rf = LinhaDre(
         rotulo="(+/-) Resultado Financeiro",
@@ -269,7 +291,7 @@ def calcular_dre(
     )
     lair = LinhaDre(
         rotulo="LAIR (Lucro Antes do IRPJ/CSLL)",
-        valor=_quantizar(ebit.valor + rf.valor),
+        valor=_quantizar(ebit.valor + outras_receitas.valor + rf.valor),
     )
     irpj_csll = LinhaDre(
         rotulo="(-) IRPJ + CSLL",
@@ -291,6 +313,7 @@ def calcular_dre(
         ebitda=ebitda,
         depreciacao=depreciacao,
         ebit=ebit,
+        outras_receitas=outras_receitas,      # FA6 — 4.9.* após EBIT
         resultado_financeiro=rf,
         lair=lair,
         irpj_csll=irpj_csll,

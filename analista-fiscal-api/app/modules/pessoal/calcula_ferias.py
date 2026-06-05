@@ -14,16 +14,22 @@ Fundamento legal:
     de férias é ISENTO de IRRF.
   * IN RFB 971/2009 art. 58 — abono pecuniário NÃO integra a base de
     contribuição previdenciária (não incide INSS).
+  * Lei 8.036/1990 art. 15 — FGTS 8% incide sobre remuneração paga em
+    férias gozadas (incluindo o terço constitucional). NÃO incide sobre
+    abono pecuniário (férias indenizadas/vendidas — STF RE 895.294).
 
 Fórmulas:
 
   remuneracao_gozados = salario × dias_gozados / 30
   terco_gozados       = remuneracao_gozados / 3
-  bruto_tributavel    = remuneracao_gozados + terco_gozados     ← INSS/IRRF
+  bruto_tributavel    = remuneracao_gozados + terco_gozados     ← INSS/IRRF/FGTS
 
   abono_dias          = salario × dias_vendidos / 30
   terco_abono         = abono_dias / 3
   abono_pecuniario    = abono_dias + terco_abono                ← isento
+
+  base_fgts           = bruto_tributavel                        ← férias gozadas + 1/3
+  fgts_empregador     = base_fgts × 8%
 
   inss   = calcular_inss_empregado(bruto_tributavel, ...)
   irrf   = calcular_irrf_mensal(bruto_tributavel, inss.inss, deps, ...)
@@ -55,12 +61,13 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "ferias.v1"
+ALGORITMO_VERSAO = "ferias.v2"
 
 _CENTAVO = Decimal("0.01")
 _TRINTA = Decimal("30")
 _TRES = Decimal("3")
 _ZERO = Decimal("0")
+_OITO_PCT = Decimal("0.0800")
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +83,10 @@ class ResultadoFerias:
     abono_pecuniario: Decimal  # parte isenta (dias vendidos + 1/3 sobre eles)
     inss: ResultadoInssEmpregado
     irrf: ResultadoIrrf
+    # FGTS do empregador — Lei 8.036/90 art.15: 8% sobre férias gozadas + 1/3.
+    # Abono pecuniário (dias_vendidos) NÃO integra base_fgts (verba indenizatória).
+    base_fgts: Decimal
+    fgts_empregador: Decimal
     valor_liquido: Decimal
     algoritmo_versao: str = ALGORITMO_VERSAO
 
@@ -138,6 +149,12 @@ def calcular_ferias(
 
     inss = calcular_inss_empregado(bruto, faixas_inss)
     irrf = calcular_irrf_mensal(bruto, inss.inss, dependentes, faixas_irrf)
+
+    # FGTS: 8% sobre bruto tributável (férias gozadas + 1/3 constitucional).
+    # Abono pecuniário NÃO integra base (verba indenizatória — STF RE 895.294).
+    base_fgts = bruto
+    fgts_empregador = _quantizar(base_fgts * _OITO_PCT)
+
     liquido = _quantizar(bruto + abono - inss.inss - irrf.irrf)
 
     return ResultadoFerias(
@@ -150,5 +167,7 @@ def calcular_ferias(
         abono_pecuniario=abono,
         inss=inss,
         irrf=irrf,
+        base_fgts=base_fgts,
+        fgts_empregador=fgts_empregador,
         valor_liquido=liquido,
     )

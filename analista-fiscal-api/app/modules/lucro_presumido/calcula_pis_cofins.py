@@ -14,12 +14,30 @@ Fundamento legal:
 
 Fórmula (idêntica para PIS e Cofins, só muda alíquota):
 
-  base = receita_bruta_mes − exclusoes_legais
-  tributo = base × aliquota
-  (0,65% PIS / 3% Cofins)
+  base_bruta = receita_bruta_mes − exclusoes_legais
+  Se base_bruta < 0 (exclusões > receita — ex.: cancelamentos de meses
+  anteriores ou exportações — art. 3º §2º):
+    base_calculo = 0  (empresa não recolhe PIS/Cofins no mês)
+    saldo_exclusao_transportar = |base_bruta|  → carryover para o próximo mês
+  Senão:
+    base_calculo = base_bruta
+    saldo_exclusao_transportar = 0
+
+  tributo = base_calculo × aliquota  (0,65% PIS / 3% Cofins)
 
 Apuração mensal — recolhimento via DARF até o 25º dia útil do mês seguinte
 ao da apuração (Lei 11.933/2009).
+
+Carryover de exclusões (FA7-m3):
+  Cenário legítimo: empresa exporta R$120k em janeiro e recebe apenas R$80k
+  de receita interna. Exclusão legítima = R$120k > R$80k. A diferença
+  (R$40k) é carreada para fevereiro como ``saldo_exclusao_transportar``
+  e deve ser somada às exclusões do próximo mês pelo caller.
+
+  Diferente do saldo credor de ICMS (originado pelo excesso de crédito
+  sobre débito na apuração), aqui o transporte é de **excesso de exclusão**
+  sobre a receita — a empresa já usou R$80k de exclusão este mês (zerou a
+  base), e tem R$40k sobrando para usar no próximo período.
 
 Quantização: ``ROUND_HALF_EVEN`` 2 casas.
 """
@@ -31,8 +49,8 @@ from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO_PIS = "lp.pis.cumulativo.v1"
-ALGORITMO_VERSAO_COFINS = "lp.cofins.cumulativo.v1"
+ALGORITMO_VERSAO_PIS = "lp.pis.cumulativo.v2"
+ALGORITMO_VERSAO_COFINS = "lp.cofins.cumulativo.v2"
 
 _CENTAVO = Decimal("0.01")
 _ALIQ_PIS = Decimal("0.0065")
@@ -42,13 +60,21 @@ _ZERO = Decimal("0")
 
 @dataclass(frozen=True, slots=True)
 class ResultadoTributoCumulativo:
-    """Snapshot persistido em ``apuracao_fiscal``."""
+    """Snapshot persistido em ``apuracao_fiscal``.
+
+    FA7-m3: campo ``saldo_exclusao_transportar`` expõe o excedente de
+    exclusões (exclusoes > receita) que deve ser somado às exclusões do
+    próximo período pelo caller (Lei 9.718/98 art. 3º §2º — carryover
+    de cancelamentos/exportações de competências anteriores).
+    Quando zero, não há excedente (caso normal).
+    """
 
     receita_bruta_mes: Decimal
     exclusoes: Decimal
     base_calculo: Decimal
     aliquota: Decimal
     tributo: Decimal
+    saldo_exclusao_transportar: Decimal  # FA7-m3: carryover; 0 quando normal
     algoritmo_versao: str
 
 
@@ -68,13 +94,20 @@ def _calcular_cumulativo(
         )
     if exclusoes < _ZERO:
         raise ValueError(f"exclusoes não pode ser negativa: {exclusoes}")
-    if exclusoes > receita_bruta_mes:
-        raise ValueError(
-            f"exclusoes ({exclusoes}) não pode exceder a receita "
-            f"({receita_bruta_mes})"
-        )
 
-    base = receita_bruta_mes - exclusoes
+    # FA7-m3: exclusoes > receita é legítimo (cancelamentos de competências
+    # anteriores, exportações — Lei 9.718/98 art. 3º §2º). Nesse caso:
+    #   base = 0 (empresa não recolhe no mês)
+    #   saldo_exclusao_transportar = excedente para o próximo período
+    # Não abortar com ValueError: seria negar uma dedução legal ao contribuinte.
+    base_bruta = receita_bruta_mes - exclusoes
+    if base_bruta >= _ZERO:
+        base = base_bruta
+        saldo_exclusao_transportar = _ZERO
+    else:
+        base = _ZERO
+        saldo_exclusao_transportar = _quantizar(-base_bruta)
+
     tributo = _quantizar(base * aliquota)
 
     return ResultadoTributoCumulativo(
@@ -83,6 +116,7 @@ def _calcular_cumulativo(
         base_calculo=_quantizar(base),
         aliquota=aliquota,
         tributo=tributo,
+        saldo_exclusao_transportar=saldo_exclusao_transportar,
         algoritmo_versao=algoritmo_versao,
     )
 

@@ -15,8 +15,15 @@ from app.modules.provisoes.service import ProvisoesService
 from app.shared.exceptions import EmpresaNaoEncontrada
 
 
-def _empresa(regime: str = "lucro_presumido") -> SimpleNamespace:
-    return SimpleNamespace(id=uuid.uuid4(), regime_tributario=regime)
+def _empresa(
+    regime: str = "lucro_presumido",
+    anexo_simples: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        regime_tributario=regime,
+        anexo_simples=anexo_simples,
+    )
 
 
 @pytest.mark.asyncio

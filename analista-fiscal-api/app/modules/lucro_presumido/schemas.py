@@ -39,6 +39,20 @@ class ApurarIrpjCsllTrimestralIn(BaseModel):
             ),
         ),
     ]
+    csll_a_compensar: Annotated[
+        Decimal,
+        Field(
+            ge=0,
+            decimal_places=2,
+            default=Decimal("0"),
+            description=(
+                "CSLL retida na fonte (Lei 9.430 art. 64 c/c Lei 10.833/2003 art. 30 "
+                "— retenção PCC 1% de CSLL em serviços PJ→PJ) deduzida da CSLL devida. "
+                "Aplica-se apenas à apuração de CSLL — ignorado para IRPJ. "
+                "Inclui saldo credor de CSLL acumulado de trimestres anteriores."
+            ),
+        ),
+    ]
 
 
 class ApurarPisCofinsMensalIn(BaseModel):
@@ -102,7 +116,12 @@ def _extrair_valor_total(tipo: str, output: dict[str, object]) -> Decimal:
             valor = output.get("irpj_total", "0")
         return Decimal(str(valor))
     if tipo == "csll":
-        return Decimal(str(output.get("csll", "0")))
+        # FA3/M3: usa csll_a_recolher (após compensação); fallback para "csll"
+        # mantém compat com apurações antigas geradas pela v1 do algoritmo.
+        valor = output.get("csll_a_recolher")
+        if valor is None:
+            valor = output.get("csll", "0")
+        return Decimal(str(valor))
     if tipo in ("pis", "cofins"):
         return Decimal(str(output.get("tributo", "0")))
     return Decimal("0")

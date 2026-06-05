@@ -18,8 +18,10 @@ TETO_2025 = Decimal("8157.41")
 class TestProlaboreAbaixoTeto:
     def test_3000_sem_dep(self) -> None:
         # INSS = 3000 × 11% = 330,00
-        # IRRF base = 3000 − 330 = 2670 → faixa 2 → 2670×7,5%−169,44 = 200,25 − 169,44 = 30,81
-        # Líquido = 3000 − 330 − 30,81 = 2639,19
+        # IRRF_legal: base = 3000 − 330 = 2670 → faixa 2 → 2670×7,5%−169,44 = 30,81
+        # IRRF_simpl: base = 2435,20 (3000−564,80) → faixa 2 → 13,20
+        # min(30,81 ; 13,20) = 13,20 → SIMPLIFICADO (FA2 M5)
+        # Líquido = 3000 − 330 − 13,20 = 2656,80
         r = calcular_prolabore(
             valor_bruto=Decimal("3000.00"),
             teto_previdenciario=TETO_2025,
@@ -29,8 +31,9 @@ class TestProlaboreAbaixoTeto:
         assert r.teto_aplicado is False
         assert r.base_inss == Decimal("3000.00")
         assert r.inss_socio == Decimal("330.00")
-        assert r.irrf.irrf == Decimal("30.81")
-        assert r.valor_liquido == Decimal("2639.19")
+        assert r.irrf.irrf == Decimal("13.20")
+        assert r.irrf.metodo == "simplificado"
+        assert r.valor_liquido == Decimal("2656.80")
         assert r.algoritmo_versao == ALGORITMO_VERSAO
 
     def test_5000_com_2_dep(self) -> None:

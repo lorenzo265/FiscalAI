@@ -394,6 +394,9 @@ def _evento_de_13o_segunda(
     ano: int,
     r: Resultado13oSegunda,
 ) -> EventoFolha:
+    # FGTS do 13º registrado integralmente aqui (2ª parcela / fechamento).
+    # A 1ª parcela é adiantamento sem tributos — fgts_empregador=_ZERO lá.
+    # Assim o total anual de FGTS do 13º = 8% × base, contado uma única vez.
     return EventoFolha(
         tenant_id=tenant_id,
         empresa_id=empresa_id,
@@ -404,7 +407,7 @@ def _evento_de_13o_segunda(
         valor_bruto=r.base_proporcional - r.primeira_parcela_paga,
         inss_empregado=r.inss.inss,
         irrf=r.irrf.irrf,
-        fgts_empregador=_ZERO,
+        fgts_empregador=r.fgts_empregador,
         multa_fgts=_ZERO,
         valor_liquido=r.valor_segunda_parcela,
         detalhes=_detalhes_jsonb(r),
@@ -420,6 +423,8 @@ def _evento_de_ferias(
     periodo_fim: date,
     r: ResultadoFerias,
 ) -> EventoFolha:
+    # FGTS do empregador: 8% sobre bruto tributável (férias gozadas + 1/3).
+    # Abono pecuniário NÃO integra base_fgts (verba indenizatória).
     return EventoFolha(
         tenant_id=tenant_id,
         empresa_id=empresa_id,
@@ -431,7 +436,7 @@ def _evento_de_ferias(
         valor_bruto=r.bruto_tributavel + r.abono_pecuniario,
         inss_empregado=r.inss.inss,
         irrf=r.irrf.irrf,
-        fgts_empregador=_ZERO,
+        fgts_empregador=r.fgts_empregador,
         multa_fgts=_ZERO,
         valor_liquido=r.valor_liquido,
         detalhes=_detalhes_jsonb(r),

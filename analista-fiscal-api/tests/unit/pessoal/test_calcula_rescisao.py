@@ -57,12 +57,12 @@ class TestSemJustaCausa:
         #   bruto = 1500 + 3900 + 3000 + 4000 + 4000 = 16400
         #
         # INSS saldo (1500): só faixa 1 = 1500×7,5% = 112,50
-        # IRRF saldo: base = 1500−112,50 = 1387,50 → faixa 1 → 0
+        # IRRF saldo: base_legal=1387,50→faixa 1→0; base_simpl=935,20→faixa 1→0; min=0
         # INSS 13º (3000): mesmo cálculo do 13º normal = 253,41
-        # IRRF 13º: base = 3000−253,41 = 2746,59 → faixa 2 → 36,55
+        # IRRF 13º: irrf_legal=36,55; irrf_simpl=13,20 → simplificado (FA2 M5)
         # FGTS rescisão = 8% × (saldo+13º+aviso) = 0,08 × (1500+3000+3900) = 0,08 × 8400 = 672
         # Multa = 40% × (8640 + 672) = 0,40 × 9312 = 3724,80
-        # Líquido = 16400 − (112,50+0+253,41+36,55) = 16400 − 402,46 = 15997,54
+        # Líquido = 16400 − (112,50+0+253,41+13,20) = 16400 − 379,11 = 16020,89
         r = calcular_rescisao(
             tipo=RescisaoTipo.SEM_JUSTA_CAUSA,
             salario=Decimal("3000.00"),
@@ -89,11 +89,12 @@ class TestSemJustaCausa:
         assert r.inss_13o is not None
         assert r.inss_13o.inss == Decimal("253.41")
         assert r.irrf_13o is not None
-        assert r.irrf_13o.irrf == Decimal("36.55")
+        assert r.irrf_13o.irrf == Decimal("13.20")  # simplificado vence (FA2 M5)
+        assert r.irrf_13o.metodo == "simplificado"
         assert r.fgts_rescisao == Decimal("672.00")
         assert r.multa_fgts == Decimal("3724.80")
         assert r.multa_fgts_pct == Decimal("0.40")
-        assert r.valor_liquido_a_pagar == Decimal("15997.54")
+        assert r.valor_liquido_a_pagar == Decimal("16020.89")
         assert r.algoritmo_versao == ALGORITMO_VERSAO
 
 
@@ -192,11 +193,11 @@ class TestMutuoAcordo:
         # FP = 4000
         # FV = 4000
         # bruto = 1500+1900+3000+4000+4000 = 14400
-        # INSS saldo (1500): 112,50; IRRF: base 1387,50 → 0
-        # INSS 13º (3000): 253,41; IRRF: 36,55
+        # INSS saldo (1500): 112,50; IRRF saldo: 0 (faixa 1, ambos métodos)
+        # INSS 13º (3000): 253,41; IRRF 13º: 13,20 (simplificado vence — FA2 M5)
         # FGTS rescisão = 8% × (1500+3000+1900) = 0,08 × 6400 = 512
         # Multa = 20% × (saldo_acum + fgts_resc) = 0,20 × (8640 + 512) = 0,20 × 9152 = 1830,40
-        # Líquido = 14400 − (112,50+0+253,41+36,55) = 14400 − 402,46 = 13997,54
+        # Líquido = 14400 − (112,50+0+253,41+13,20) = 14400 − 379,11 = 14020,89
         r = calcular_rescisao(
             tipo=RescisaoTipo.MUTUO_ACORDO,
             salario=Decimal("3000.00"),
@@ -216,7 +217,7 @@ class TestMutuoAcordo:
         assert r.fgts_rescisao == Decimal("512.00")
         assert r.multa_fgts_pct == Decimal("0.20")
         assert r.multa_fgts == Decimal("1830.40")
-        assert r.valor_liquido_a_pagar == Decimal("13997.54")
+        assert r.valor_liquido_a_pagar == Decimal("14020.89")
 
 
 class TestTerminoDeterminado:
@@ -230,11 +231,11 @@ class TestTerminoDeterminado:
         # FV = 0
         # FP = 4000
         # bruto = 2000+3000+0+4000 = 9000
-        # INSS saldo (2000) = 157,23; IRRF saldo = 0
-        # INSS 13º (3000) = 253,41; IRRF 13º = 36,55
+        # INSS saldo (2000) = 157,23; IRRF saldo = 0 (faixa 1, ambos métodos)
+        # INSS 13º (3000) = 253,41; IRRF 13º = 13,20 (simplificado vence — FA2 M5)
         # FGTS = 0,08 × (2000+3000+0) = 400
         # Multa = 0
-        # Líquido = 9000 − (157,23+0+253,41+36,55) = 9000 − 447,19 = 8552,81
+        # Líquido = 9000 − (157,23+0+253,41+13,20) = 9000 − 423,84 = 8576,16
         r = calcular_rescisao(
             tipo=RescisaoTipo.TERMINO_DETERMINADO,
             salario=Decimal("3000.00"),
@@ -251,7 +252,7 @@ class TestTerminoDeterminado:
         assert r.verbas.aviso_indenizado == Decimal("0")
         assert r.fgts_rescisao == Decimal("400.00")
         assert r.multa_fgts == Decimal("0.00")
-        assert r.valor_liquido_a_pagar == Decimal("8552.81")
+        assert r.valor_liquido_a_pagar == Decimal("8576.16")
 
 
 class TestBordas:

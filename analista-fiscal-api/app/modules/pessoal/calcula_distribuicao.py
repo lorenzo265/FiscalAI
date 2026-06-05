@@ -38,7 +38,7 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "distribuicao.v1"
+ALGORITMO_VERSAO = "distribuicao.v2"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -107,7 +107,12 @@ def calcular_distribuicao(
         raise ValueError(f"dependentes não pode ser negativo: {dependentes}")
 
     valor_isento = min(valor_distribuido, limite_isento_apurado)
-    valor_tributavel = valor_distribuido - valor_isento
+    # m6 FA8: quantizar valor_tributavel ANTES de passar ao IRRF.
+    # Se limite_isento_apurado vier com >2 casas decimais (e.g. de
+    # receita×presunção em calcula_limite_isento), a subtração produziria
+    # base com casas extras → centavo divergente no IRRF. Quantizamos aqui
+    # na fronteira, conforme ROUND_HALF_EVEN (padrão fiscal do sistema).
+    valor_tributavel = _quantizar(valor_distribuido - valor_isento)
 
     if valor_tributavel == _ZERO:
         irrf_obj: ResultadoIrrf | None = None
@@ -115,6 +120,7 @@ def calcular_distribuicao(
     else:
         # Excedente é tratado como rendimento mensal — sem dedução de INSS
         # (já paga na fonte da empresa, distinto do tributo do sócio).
+        # Valor já quantizado (2 casas) para garantir base limpa ao IRRF.
         irrf_obj = calcular_irrf_mensal(
             valor_tributavel, _ZERO, dependentes, faixas_irrf
         )

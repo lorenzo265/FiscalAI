@@ -1,13 +1,71 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-05-31
-**Agente:** claude-sonnet-4-6
+**Última atualização:** 2026-06-05
+**Agente:** claude-opus-4-8 (orquestrador) + implementadores claude-sonnet-4-6
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `main`
-**Suite atual:** **2200 testes** em `tests/unit + tests/eval` (gate canônico); 2 skipped (bcrypt >72b + eval_live)
+**Suite atual:** **2433 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros em 356 arquivos
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 concluídas (Fases 1-4)**
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅
+
+---
+
+## Sprint de Hardening — Auditoria Profunda (2026-06-04)
+
+Auditoria de recall do backend completo (34 módulos, 52 migrations, ~46k LOC) por 6 revisores de
+contexto fresco, rubrica = 12 princípios invioláveis + convenções. Achados consolidados em
+**`docs/auditoria-backend-2026-06-04/RELATORIO.md`**; handoff append-only em **`.../HANDOFF.md`**.
+Veredito: saúde forte (zero `float` em dinheiro, zero alíquota hardcoded, RLS íntegro em todos os
+caminhos autenticados). Fechados **13 defeitos reais + ~10 defense-in-depth** em 6 PRs orquestrados
+(1 agente Sonnet por PR). Suite **2200 → 2318** (+118); mypy 0 erros mantido.
+
+| PR | Tema | Principais fixes |
+|---|---|---|
+| 1 | **SPED leiaute** (risco-regulatório) | **Registro 9990 off-by-one** (esquecia o 9999 → PVA rejeitava todo arquivo dos 4 tipos) + validação 9990 no validador; M200/M600 regime cumulativo gravava em campos NC; E110 `VL_SLD_APURADO` ignorava saldo credor. `efd_contribuicoes`/`efd_icms_ipi` v3→v4. |
+| 2 | **Segurança & LGPD** (go-live) | `JWT_SECRET` placeholder agora barrado em prod (`_fail_fast_em_prod`); **processador `_redact_pii` no `logging.py`** (CPF/CNPJ/email/telefone/segredos — antes inexistente, corrigido docstring de `perf.py`); path-traversal `resolve()` no storage; rate-limit `+ip` na chave. |
+| 3 | **Folha FGTS** (risco-regulatório) | FGTS 8% passou a incidir em **férias gozadas** (+1/3, abono excluído — STF RE 895.294) e **13º** (alocado 1× na 2ª parcela); provisão de férias reconcilia `base×aliquota`. `ferias`/`13o`/`provisao` v2. |
+| 4 | **LLM citação obrigatória (§8.5)** | `LLMClient` agora **parseia `[ID]` e valida contra as fontes** (antes `citacoes=[]` hardcoded); `validar_resposta` rejeita afirmação fiscal sem ≥1 citação → fallback seguro, sem over-rejeitar saudações. |
+| 5 | **Marketplace authz & idempotência** | `avaliar` valida `empresa_id` **antes** de mutar/commit (era pós-commit → escrita same-tenant cross-empresa); **webhook de pagamento com HMAC fail-closed** (era sessão RLS-bypass sem assinatura); gate de idempotência usa `idem_key` (UNIQUE já existia em 0033). |
+| 6 | **Cálculo, robustez & defense-in-depth** | `multa_juros` ganhou `ALGORITMO_VERSAO` (único faltante) + `extra="forbid"` + catch estreito; **parcelamento reconcilia centavos** (resíduo na última); **DFC N+1** (~24→2 queries); depreciação por competência; Meta HMAC guard de vazios; download ECD checa `tipo`; `enviar_texto` com retry; ECD/ECF v2; **nota `docs/pendencias/rls-set-local-txn-scoped.md`** (risco latente `SET LOCAL`↔`commit()`). |
+
+**Pendência consciente registrada:** risco estrutural latente do `SET LOCAL` (txn-scoped) —
+benigno hoje (commits terminais), documentado em `docs/pendencias/rls-set-local-txn-scoped.md`
+com mitigação recomendada para quando surgir service multi-commit.
+
+---
+
+## Sprint de Validação Fiscal — Auditoria de Lógica (2026-06-05)
+
+Auditoria fiscal `[VERIFY]` sobre os 30 `calcula_*.py` + seeds tributários. O relatório original
+(`docs/validação-fiscal-backend/AUDITORIA_FISCAL_BACKEND.md`) anunciava 14 issues mas documentava
+só 5; 2 auditorias de completude de contexto fresco recuperaram **+12** → **17 issues** (C1 + M2–M9
++ m1–m8). Remediadas em 8 levas (FA1–FA8, 1 agente Sonnet cada) + write-back por handoff em
+`docs/validação-fiscal-backend/HANDOFF.md`. Suite **2318 → 2433** (+115); mypy 0 erros; alembic head
+único `0055` (chain linear). Migrations novas: **0053** (presunção saúde), **0054** (reforma valid_to),
+**0055** (ICMS-RJ FECP).
+
+| Leva | Issue | Correção |
+|---|---|---|
+| FA1 | **C1** 🔴 | SELIC cobrava **1% de juros indevido** em pagamento no mesmo mês do vencimento (Sicalc: juros só do mês subsequente). Golden que travava o valor errado **reescrito**. `mora.sicalc.v2`. |
+| FA2 | M4, M5 | IRRF passou a **deduzir pensão alimentícia judicial** e a aplicar o **desconto simplificado mensal** (Lei 14.848/2024) — `min(legal, simplificado)`. 13 goldens caíram legitimamente (simplificado mais benéfico p/ salários PME). `irrf.mensal.v2`. |
+| FA3 | M3, M6 | CSLL passou a **deduzir CSRF retida na fonte** (simétrico ao IRPJ); seed de presunção LP corrigido — **saúde/profissionais não-hospitalares 32%** (eram 8% por omissão; consultórios subtributados 4×). Migration 0053. `csll.v2`. |
+| FA4 | M7 | SCD CBS/IBS tinha **3 vigências `valid_to=NULL` sobrepostas** — fechadas (2026-12-31 / 2032-12-31 / ∞). Migration 0054. |
+| FA5 | M8 | Provisão de encargos era **20% fixo** (subprovisionava LP/LR, dupla contagem em SN I–III). Agora **regime-aware**; RAT/FAP/Terceiros parametrizados (seed real → pendência). `prov-2026.08`. |
+| FA6 | M9 | DRE somava **"Outras Receitas" (4.9.x) na Receita Operacional Bruta** (Lei 6.404 art.187) — ROB agora só `4.1`; linha separada abaixo do EBIT. `dre.estruturada.v2`. |
+| FA7 | m1, m2, m3 | REINF (comentário R$10 corrigido); ICMS-RJ **FECP separado** (interna 18% + FECP 2%, efetivo 20%, migration 0055); PIS/Cofins **carryover** de exclusões>receita. |
+| FA8 | m4–m8 | Adicional noturno com **hora reduzida 52'30"**; DSR documentado como valor parcial; quantização da distribuição; docstring pró-labore; **13º aceita avos=0**. |
+
+**Pendências conscientes registradas:** **M2** (tabelas INSS/IRRF 2026 — adiada, exige norma oficial)
+→ `docs/pendencias/tabelas-tributarias-2026.md`; **RAT/FAP/Terceiros** por CNAE →
+`docs/pendencias/rat-fap-terceiros-seed.md`. Follow-ups menores: acumulação mensal IRRF p/ DARF do
+REINF, propagação do carryover PIS/Cofins entre competências, DSR reflexo completo, SN Anexo IV exigir
+`anexo_simples` no cadastro.
+
+> **Correção de baseline de qualidade:** o relatório de hardening anterior dizia que o revisor do lote A
+> validara o "1% sempre incidente" como correto — **estava errado**; a metodologia Sicalc confirma que
+> juros só incidem a partir do mês subsequente (C1). Lição: divergência fiscal entre auditorias exige
+> ruling do orquestrador contra a norma, não voto majoritário.
 
 ---
 

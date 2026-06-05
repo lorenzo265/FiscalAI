@@ -161,7 +161,7 @@ def _arquivo_sped_ativo(empresa_id: uuid.UUID) -> SimpleNamespace:
         periodo_fim=date(2025, 12, 31),
         superseded_by=None,
         hash_arquivo="0" * 64,
-        algoritmo_versao="sped.ecd.v1",
+        algoritmo_versao="sped.ecd.v2",
         gerado_em=datetime(2026, 1, 5),
         status="gerado",
     )
@@ -243,6 +243,7 @@ def _bypass_balanco_dre() -> Any:
         ebitda=LinhaDre("EBITDA", zero, ()),
         depreciacao=LinhaDre("Depreciação", zero, ()),
         ebit=LinhaDre("EBIT", zero, ()),
+        outras_receitas=LinhaDre("(+) Outras Receitas", zero, ()),
         resultado_financeiro=LinhaDre("Result. Financeiro", zero, ()),
         lair=LinhaDre("LAIR", zero, ()),
         irpj_csll=LinhaDre("IRPJ+CSLL", zero, ()),
@@ -290,7 +291,7 @@ async def test_gera_ecd_feliz_persiste_arquivo_com_hash() -> None:
     assert gerada.arquivo.tipo == "ecd"
     assert gerada.arquivo.periodo_inicio == date(2025, 1, 1)
     assert gerada.arquivo.periodo_fim == date(2025, 12, 31)
-    assert gerada.arquivo.algoritmo_versao == "sped.ecd.v1"
+    assert gerada.arquivo.algoritmo_versao == "sped.ecd.v2"
     assert len(gerada.arquivo.hash_arquivo) == 64
     sped_repo.criar.assert_awaited_once()
     sped_repo.marcar_superseded.assert_not_awaited()

@@ -21,6 +21,11 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
+revision: str = "0052"
+down_revision: str | None = "0051"
+branch_labels: str | None = None
+depends_on: str | None = None
+
 _RLS_USING = "NULLIF(current_setting('app.tenant_id', TRUE), '')::uuid = tenant_id"
 
 

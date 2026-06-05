@@ -140,6 +140,7 @@ class LucroPresumidoService:
             ganhos_capital=payload.ganhos_capital,
             receitas_aplicacoes=payload.receitas_aplicacoes,
             outras_adicoes=payload.outras_adicoes,
+            csll_a_compensar=payload.csll_a_compensar,
         )
         apuracao = ApuracaoFiscal(
             tenant_id=tenant_id,
@@ -277,7 +278,12 @@ class LucroPresumidoService:
                 f"Apuração CSLL {ano}-T{trimestre} não encontrada — "
                 f"execute POST /v1/empresas/{empresa_id}/lp/csll primeiro."
             )
-        valor_devido = Decimal(str(apuracao.output_jsonb.get("csll", "0")))
+        # FA3/M3: usa csll_a_recolher (após compensação) como valor do DARF.
+        # Fallback para "csll" mantém compatibilidade com apurações geradas
+        # pela v1 do algoritmo (sem campo csll_a_recolher).
+        csll_output = apuracao.output_jsonb
+        valor_devido_raw = csll_output.get("csll_a_recolher") or csll_output.get("csll", "0")
+        valor_devido = Decimal(str(valor_devido_raw))
         resultado = calcular_darf_csll(valor_devido, ano, trimestre)
         guia = _montar_guia(resultado, tenant_id, empresa_id, apuracao.id, "darf")
         return await GuiaPagamentoRepo(session).criar(guia)

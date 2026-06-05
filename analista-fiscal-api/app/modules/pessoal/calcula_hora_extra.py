@@ -4,6 +4,18 @@ Sprint 19.8 PR1 (#12). Camada 1 (determinística). Funções puras, zero I/O,
 golden-tested. Resolve a pendência "vínculo intermitente + horas
 trabalhadas variáveis" — Sprint 10 PR1 só calculava salário fixo mensal.
 
+FA8 m4 (2026-06-04): corrigido o adicional noturno para usar a hora noturna
+reduzida (52min30s = 7/8 de hora real) conforme CLT art. 73 §1º. O adicional
+de 20% incide sobre o valor-hora normal, mas o número de horas noturnas é
+convertido para horas-reduzidas: ``horas_noturnas_reduzidas = horas ÷ (52,5/60)``.
+Isso aumenta a base do adicional em ~14,3% — a empresa paga mais horas
+"nominais" noturnas porque cada uma delas é mais curta. ALGORITMO_VERSAO
+bumped para "hora_extra.v2".
+
+FA8 m5 (2026-06-04): ``ResultadoHoraExtra`` agora documenta explicitamente que
+o valor retornado é PARCIAL — não inclui o reflexo de hora extra habitual em
+DSR (Lei 605/49 art. 7º + Súmula 172 TST). Ver docstring da classe e da função.
+
 **Regras CLT cobertas:**
 
   * **Hora extra** — Art. 7º XVI CF/88: mínimo de 50% sobre hora normal.
@@ -11,10 +23,14 @@ trabalhadas variáveis" — Sprint 10 PR1 só calculava salário fixo mensal.
     pra jornada 44h/semana). Adicionais maiores (100% domingo/feriado)
     via parâmetro ``percentual_adicional``.
 
-  * **Adicional noturno** — Art. 73 CLT: 20% sobre hora normal das 22h às
-    5h. A hora noturna é reduzida (52min30s = 1h noturna), mas isso é
-    aplicação prática controversa — usamos a forma mais simples (sem
-    redução horária; admin que ajustar se necessário).
+  * **Adicional noturno** — CLT art. 73 + §1º: 20% sobre hora normal das
+    22h às 5h. A hora noturna urbana tem duração ficta de 52min30s (= 7/8
+    de hora real). Isso significa que, por exemplo, 7 horas reais noturnas
+    equivalem a 8 horas noturnas-reduzidas. O adicional de 20% é calculado
+    sobre essas horas-noturnas-reduzidas, refletindo o benefício legal.
+    Base legal: CLT art. 73 caput (adicional 20%) + §1º (hora noturna
+    urbana = 52min30s). Súmula TST 65 (adicional incide sobre hora-noturna
+    reduzida, não sobre a hora real).
 
   * **Desconto de falta** — Falta injustificada desconta ``salario_diário
     × dias_faltados``. Salário diário = ``salario_mensal / 30`` (regra
@@ -46,7 +62,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Final
 
-ALGORITMO_VERSAO: Final = "hora_extra.v1"
+ALGORITMO_VERSAO: Final = "hora_extra.v2"
 
 _ZERO = Decimal("0")
 _DIAS_MES_REGRA_GERAL = Decimal("30")
@@ -54,16 +70,41 @@ _DIAS_MES_REGRA_GERAL = Decimal("30")
 # 44h × 5 = 220h/mês; 40h × 5 = 200h/mês; etc.
 _SEMANAS_MES = Decimal("5")
 _QUANTIZE = Decimal("0.01")
+# CLT art. 73 §1º — hora noturna urbana = 52min30s (52,5min).
+# Fator de redução: 52,5/60 = 7/8. Para converter horas reais em
+# horas-noturnas-reduzidas (para fins do adicional): dividir por (52,5/60),
+# equivalente a multiplicar por 60/52,5 = 8/7.
+# Exemplo: 7 horas reais noturnas = 7 × (60/52,5) = 8 horas-noturnas-reduzidas.
+_FATOR_HORA_NOTURNA = Decimal("60") / Decimal("52.5")  # ≈ 1,142857...
 
 
 @dataclass(frozen=True, slots=True)
 class ResultadoHoraExtra:
-    """Valor + memória de cálculo (auditável)."""
+    """Valor + memória de cálculo (auditável).
+
+    **ATENÇÃO — valor PARCIAL (m5 FA8):**
+    O campo ``valor`` representa apenas o adicional ou a hora extra apurada
+    para o período, SEM incluir o reflexo sobre o DSR (Descanso Semanal
+    Remunerado). Horas extras habituais geram reflexo no DSR conforme Lei
+    605/49 art. 7º e Súmula 172 TST. O cálculo do reflexo de DSR exige o
+    número de domingos/feriados do mês e habitualidade das HEs — escopo de
+    sprint dedicada. O consumidor NÃO deve tratar este valor como verba
+    final sem calcular separadamente o reflexo em DSR quando aplicável.
+
+    Para o adicional noturno: ``horas_calculadas`` representa as horas
+    noturnas reais (input); ``horas_noturnas_reduzidas`` representa as
+    horas convertidas para horas-noturnas-reduzidas (CLT art. 73 §1º), que
+    é a base efetiva do cálculo do adicional. Para hora extra comum,
+    ``horas_noturnas_reduzidas`` é ``None``.
+    """
 
     valor: Decimal
     salario_hora_normal: Decimal
     horas_calculadas: Decimal
     percentual_adicional: Decimal
+    # Preenchido apenas para adicional noturno (m4 FA8).
+    # horas_noturnas × _FATOR_HORA_NOTURNA (CLT art. 73 §1º).
+    horas_noturnas_reduzidas: Decimal | None = None
     algoritmo_versao: str = ALGORITMO_VERSAO
 
 
@@ -148,12 +189,34 @@ def calcular_adicional_noturno(
     horas_noturnas: Decimal,
     percentual: Decimal = Decimal("0.20"),
 ) -> ResultadoHoraExtra:
-    """Valor do adicional noturno (CLT art. 73 — 20% sobre hora normal).
+    """Valor do adicional noturno (CLT art. 73 + §1º — 20% sobre hora normal).
+
+    **Hora noturna reduzida (m4 FA8):** CLT art. 73 §1º estabelece que a
+    hora noturna urbana tem duração ficta de 52min30s (7/8 de hora real).
+    Isso significa que o empregado que trabalha, por exemplo, 7 horas reais
+    entre 22h e 5h, recebe o adicional como se tivesse trabalhado
+    ``7 × (60 / 52,5) = 8`` horas noturnas-reduzidas.
+
+    Fórmula:
+      ``horas_noturnas_reduzidas = horas_noturnas × (60 / 52,5)``
+      ``adicional = hora_normal × percentual × horas_noturnas_reduzidas``
 
     Algumas categorias têm percentual maior via CCT (até 35-50%) — admin
-    informa explicitamente. Função pura — adicional noturno não inclui o
-    salário base normal (esse já vem na folha mensal); aqui retorna **só
-    o adicional** (a diferença entre hora noturna e hora diurna).
+    informa explicitamente. Função pura — retorna **só o adicional**
+    (a diferença entre hora noturna e hora diurna); o salário base já vem
+    na folha mensal.
+
+    **ATENÇÃO — valor PARCIAL:** não inclui reflexo de DSR (Lei 605/49
+    art. 7º + Súmula 172 TST). Ver docstring de ``ResultadoHoraExtra``.
+
+    Args:
+        salario_mensal: salário mensal base (> 0).
+        jornada_semanal_horas: jornada contratual em [12, 44].
+        horas_noturnas: horas *reais* trabalhadas entre 22h–5h (> 0).
+        percentual: adicional noturno (default 20%; CCT pode aumentar).
+
+    Returns:
+        ResultadoHoraExtra com ``horas_noturnas_reduzidas`` preenchido.
     """
     if horas_noturnas <= _ZERO:
         raise ValueError(
@@ -162,7 +225,11 @@ def calcular_adicional_noturno(
     if percentual <= _ZERO or percentual > Decimal("1.0"):
         raise ValueError(f"percentual fora de (0, 1.0]: {percentual}")
     hora_normal = calcular_salario_hora(salario_mensal, jornada_semanal_horas)
-    valor = (hora_normal * percentual * horas_noturnas).quantize(
+    # Converter horas reais → horas-noturnas-reduzidas (CLT art. 73 §1º).
+    horas_reduzidas = (horas_noturnas * _FATOR_HORA_NOTURNA).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_EVEN
+    )
+    valor = (hora_normal * percentual * horas_reduzidas).quantize(
         _QUANTIZE, rounding=ROUND_HALF_EVEN
     )
     return ResultadoHoraExtra(
@@ -170,6 +237,7 @@ def calcular_adicional_noturno(
         salario_hora_normal=hora_normal,
         horas_calculadas=horas_noturnas,
         percentual_adicional=percentual,
+        horas_noturnas_reduzidas=horas_reduzidas,
     )
 
 

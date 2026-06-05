@@ -39,12 +39,25 @@ class TestPrimeiraParcela:
         r = calcular_13o_primeira(Decimal("0"), 12)
         assert r.valor_primeira_parcela == Decimal("0.00")
 
-    def test_avos_zero_levanta(self) -> None:
-        with pytest.raises(ValueError, match="avos deve estar entre"):
-            calcular_13o_primeira(Decimal("3000"), 0)
+    def test_avos_zero_retorna_zero(self) -> None:
+        """m8 FA8: avos=0 legítimo → retorna resultado zero (sem 13º a pagar).
+
+        Ocorre quando admissão+demissão no mesmo mês com <15 dias trabalhados
+        (Decreto 57.155/1965 — regra dos 15 dias). O mês não conta; o 13º é
+        zero. Não deve lançar ValueError (comportamento simetrico com rescisão).
+        """
+        r = calcular_13o_primeira(Decimal("3000"), 0)
+        assert r.base_proporcional == Decimal("0.00")
+        assert r.valor_primeira_parcela == Decimal("0.00")
+        assert r.avos == 0
+
+    def test_avos_menos_um_levanta(self) -> None:
+        """m8 FA8: avos negativos ainda são inválidos."""
+        with pytest.raises(ValueError, match="avos deve estar entre 0 e 12"):
+            calcular_13o_primeira(Decimal("3000"), -1)
 
     def test_avos_treze_levanta(self) -> None:
-        with pytest.raises(ValueError, match="avos deve estar entre"):
+        with pytest.raises(ValueError, match="avos deve estar entre 0 e 12"):
             calcular_13o_primeira(Decimal("3000"), 13)
 
     def test_salario_negativo_levanta(self) -> None:
@@ -54,8 +67,11 @@ class TestPrimeiraParcela:
 
 class TestSegundaParcela:
     def test_ano_completo_3000_sem_dep(self) -> None:
-        # base = 3000; INSS escalonado: 253,41; IRRF: base 2746,59 × 7,5% − 169,44 = 36,55
-        # primeira paga = 1500; segunda = 3000 − 1500 − 253,41 − 36,55 = 1210,04
+        # base = 3000; INSS escalonado: 253,41
+        # IRRF_legal: base 2746,59 × 7,5% − 169,44 = 36,55
+        # IRRF_simpl: base 2435,20 (3000−564,80) → faixa 2 → 13,20
+        # min(36,55 ; 13,20) = 13,20 → simplificado (FA2 M5)
+        # segunda = 3000 − 1500 − 253,41 − 13,20 = 1233,39
         r = calcular_13o_segunda(
             salario=Decimal("3000.00"),
             avos=12,
@@ -66,8 +82,9 @@ class TestSegundaParcela:
         )
         assert r.base_proporcional == Decimal("3000.00")
         assert r.inss.inss == Decimal("253.41")
-        assert r.irrf.irrf == Decimal("36.55")
-        assert r.valor_segunda_parcela == Decimal("1210.04")
+        assert r.irrf.irrf == Decimal("13.20")
+        assert r.irrf.metodo == "simplificado"
+        assert r.valor_segunda_parcela == Decimal("1233.39")
 
     def test_proporcional_6_meses_5000_com_1_dep(self) -> None:
         # avos=6: base = 5000 × 6/12 = 2500
@@ -105,7 +122,9 @@ class TestSegundaParcela:
         assert r.valor_segunda_parcela == Decimal("3581.07")
 
     def test_primeira_diferente_da_metade(self) -> None:
-        # base 3000, primeira paga 1000 (em vez de 1500): segunda = 3000 − 1000 − 253,41 − 36,55 = 1710,04
+        # base 3000, primeira paga 1000 (em vez de 1500)
+        # IRRF 13,20 (simplificado vence — ver test_ano_completo_3000_sem_dep)
+        # segunda = 3000 − 1000 − 253,41 − 13,20 = 1733,39
         r = calcular_13o_segunda(
             salario=Decimal("3000.00"),
             avos=12,
@@ -114,7 +133,7 @@ class TestSegundaParcela:
             faixas_irrf=IRRF_FAIXAS,
             dependentes=0,
         )
-        assert r.valor_segunda_parcela == Decimal("1710.04")
+        assert r.valor_segunda_parcela == Decimal("1733.39")
 
     def test_primeira_negativa_levanta(self) -> None:
         with pytest.raises(ValueError, match="primeira_parcela_paga"):
@@ -137,3 +156,126 @@ class TestSegundaParcela:
             dependentes=0,
         )
         assert r.algoritmo_versao == ALGORITMO_VERSAO
+        # Confirmar que o IRRF usa o método simplificado (FA2 M5)
+        assert r.irrf.metodo == "simplificado"
+
+
+class TestFgts13o:
+    """Golden tests — FGTS do empregador no 13º salário (Lei 8.036/90 art.15).
+
+    FIX PR3 #6: calcula_13o agora modela FGTS 8% sobre base_proporcional.
+    FGTS do 13º registrado integralmente na 2ª parcela (1ª é adiantamento
+    sem tributos) → total anual = 8% × base, contado uma única vez.
+    """
+
+    def test_fgts_13o_nao_registrado_primeira_parcela(self) -> None:
+        """1ª parcela não tem fgts — apenas adiantamento de 50% da base."""
+        # ResultadoFerias13oPrimeira não tem campo fgts_empregador por design.
+        # Verificamos que base e primeira calculam corretamente.
+        r = calcular_13o_primeira(Decimal("3000.00"), 12)
+        assert r.base_proporcional == Decimal("3000.00")
+        assert r.valor_primeira_parcela == Decimal("1500.00")
+
+    def test_fgts_segunda_parcela_ano_completo_3000(self) -> None:
+        # avos=12: base_13 = 3000; fgts = 3000 × 8% = 240.00
+        r = calcular_13o_segunda(
+            salario=Decimal("3000.00"),
+            avos=12,
+            primeira_parcela_paga=Decimal("1500.00"),
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        assert r.base_proporcional == Decimal("3000.00")
+        assert r.base_fgts == Decimal("3000.00")
+        assert r.fgts_empregador == Decimal("240.00")
+
+    def test_fgts_segunda_parcela_proporcional_8_avos(self) -> None:
+        # avos=8: base_13 = 3000×8/12 = 2000; fgts = 2000 × 8% = 160.00
+        r = calcular_13o_segunda(
+            salario=Decimal("3000.00"),
+            avos=8,
+            primeira_parcela_paga=Decimal("1000.00"),
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        assert r.base_proporcional == Decimal("2000.00")
+        assert r.base_fgts == Decimal("2000.00")
+        assert r.fgts_empregador == Decimal("160.00")
+
+    def test_fgts_total_anual_nao_duplica(self) -> None:
+        """Soma dos fgts_empregador entre 1ª e 2ª parcela = 8% × base — sem duplicar.
+
+        1ª parcela NÃO tem campo fgts_empregador (adiantamento puro).
+        2ª parcela registra o FGTS total do 13º (= 8% × base_proporcional).
+        Assim o total anual de FGTS do 13º = fgts_empregador da 2ª, exatamente 8%.
+        """
+        salario = Decimal("3000.00")
+        avos = 12
+        # 1ª parcela: adiantamento puro — sem FGTS
+        r1 = calcular_13o_primeira(salario, avos)
+        # 2ª parcela: FGTS total do 13º registrado aqui
+        r2 = calcular_13o_segunda(
+            salario=salario,
+            avos=avos,
+            primeira_parcela_paga=r1.valor_primeira_parcela,
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        base_13 = r2.base_proporcional
+        fgts_total_anual = r2.fgts_empregador  # 1ª não contribui
+        # Deve ser exatamente 8% × base (sem duplicação da 1ª parcela)
+        from decimal import ROUND_HALF_EVEN
+        esperado = (base_13 * Decimal("0.08")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_EVEN
+        )
+        assert fgts_total_anual == esperado  # 3000 × 8% = 240.00
+
+    def test_versao_bumped(self) -> None:
+        """Bump v2→v3 sinaliza correção m8 FA8: avos=0 agora aceito."""
+        assert ALGORITMO_VERSAO == "13o.v3"
+
+
+class TestAvosZeroM8:
+    """m8 FA8 — avos=0 legítimo (admissão+demissão <15 dias no mesmo mês).
+
+    Decreto 57.155/1965 art. 1º §2º: se o empregado trabalhou menos de
+    15 dias no único mês do vínculo, o mês não conta para o 13º → avos=0.
+    O 13º deve ser zero, sem lançar ValueError. Uniformiza com rescisão.
+
+    O pré-cálculo de avos (regra dos 15 dias) é responsabilidade do service.
+    """
+
+    def test_primeira_parcela_avos_zero_retorna_zero(self) -> None:
+        r = calcular_13o_primeira(Decimal("3000.00"), 0)
+        assert r.avos == 0
+        assert r.base_proporcional == Decimal("0.00")
+        assert r.valor_primeira_parcela == Decimal("0.00")
+
+    def test_segunda_parcela_avos_zero_retorna_zero(self) -> None:
+        r = calcular_13o_segunda(
+            salario=Decimal("3000.00"),
+            avos=0,
+            primeira_parcela_paga=Decimal("0.00"),
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        assert r.avos == 0
+        assert r.base_proporcional == Decimal("0.00")
+        assert r.inss.inss == Decimal("0.00")
+        assert r.irrf.irrf == Decimal("0.00")
+        assert r.fgts_empregador == Decimal("0.00")
+        assert r.valor_segunda_parcela == Decimal("0.00")
+
+    def test_avos_negativo_ainda_levanta(self) -> None:
+        """Avos negativos continuam inválidos mesmo após a correção m8."""
+        with pytest.raises(ValueError, match="avos deve estar entre 0 e 12"):
+            calcular_13o_primeira(Decimal("3000"), -1)
+
+    def test_avos_treze_ainda_levanta(self) -> None:
+        """Avos > 12 continuam inválidos."""
+        with pytest.raises(ValueError, match="avos deve estar entre 0 e 12"):
+            calcular_13o_primeira(Decimal("3000"), 13)

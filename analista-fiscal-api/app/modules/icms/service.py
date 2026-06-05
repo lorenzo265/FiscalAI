@@ -58,7 +58,8 @@ class IcmsService:
                 f"Alíquota ICMS para UF {empresa.uf!r} ausente em "
                 f"{competencia.isoformat()}"
             )
-        aliquota_interna, _fecp = aliquota
+        # FA7-m2: aliquota_fecp agora é usada (antes era descartada com _fecp)
+        aliquota_interna, aliquota_fecp = aliquota
 
         resultado = calcular_icms_mensal(
             competencia=competencia.isoformat(),
@@ -66,6 +67,7 @@ class IcmsService:
             aliquota_interna=aliquota_interna,
             debito=payload.debito,
             credito=payload.credito,
+            aliquota_fecp=aliquota_fecp,
             saldo_credor_anterior=payload.saldo_credor_anterior,
             ajustes_devedores=payload.ajustes_devedores,
             ajustes_credores=payload.ajustes_credores,
@@ -82,6 +84,8 @@ class IcmsService:
             faixas_usadas={
                 "uf": empresa.uf,
                 "aliquota_interna": str(aliquota_interna),
+                "aliquota_fecp": str(aliquota_fecp),
+                "aliquota_efetiva": str(resultado.aliquota_efetiva),
                 "fonte": "aliquota_icms_uf SCD",
             },
             algoritmo_versao=resultado.algoritmo_versao,
