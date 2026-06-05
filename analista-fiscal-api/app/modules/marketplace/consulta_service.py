@@ -265,12 +265,26 @@ class ConsultaService:
         session: AsyncSession,
         *,
         consulta_id: UUID,
+        empresa_id: UUID,
         rating: int,
         comentario: str | None = None,
     ) -> ConsultaMarketplace:
+        """Avalia consulta concluída.
+
+        FIX #10 — empresa_id é validado ANTES de qualquer mutação: se a consulta
+        não pertence à empresa informada no path, levanta ConsultaNaoEncontrada sem
+        gravar nada. Mesmo padrão de ``detalhar_consulta`` / ``pagar_consulta`` no
+        router (§8.1 — verificação de ownership antes de efeito colateral).
+        """
         if rating < 1 or rating > 5:
             raise ConsultaForaDeFluxo("rating deve estar entre 1 e 5")
         consulta = await self._carregar(session, consulta_id)
+        # Verificação de ownership ANTES de qualquer escrita — §8.1.
+        # RLS bloqueia cross-tenant; esta guarda bloqueia cross-empresa same-tenant.
+        if consulta.empresa_id != empresa_id:
+            raise ConsultaNaoEncontrada(
+                f"Consulta {consulta_id} não pertence à empresa {empresa_id}"
+            )
         if consulta.status != "concluida":
             raise ConsultaForaDeFluxo(
                 f"Consulta em status {consulta.status!r} ainda não pode ser avaliada"
@@ -292,6 +306,7 @@ class ConsultaService:
         log.info(
             "marketplace.consulta.avaliada",
             consulta_id=str(consulta.id),
+            empresa_id=str(empresa_id),
             rating=rating,
         )
         return consulta

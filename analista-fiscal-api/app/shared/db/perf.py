@@ -15,12 +15,14 @@ Este módulo centraliza:
    listeners ``before_cursor_execute``/``after_cursor_execute`` no
    ``sync_engine`` interno do AsyncEngine para medir cada query e logar
    ``db.slow_query`` structlog quando ultrapassar o limiar. Statement é
-   truncado e parâmetros são *redacted* (`tenant_id`/CPF/CNPJ vazam pelo
-   structlog processor existente).
+   truncado e parâmetros não logados. PII residual no snippet do statement
+   é capturado pelo processador ``_redact_pii`` registrado na cadeia
+   structlog (``app/shared/logging.py``).
 
 Princípios cravados:
   * §8.10 Observabilidade — slow query log em toda sessão (app + workers).
-  * §8.7 LGPD — statement truncado, parâmetros não logados.
+  * §8.7 LGPD — statement truncado, parâmetros não logados; ``_redact_pii``
+    cobre CPF/CNPJ/e-mail que possam aparecer no snippet de statement.
 """
 
 from __future__ import annotations

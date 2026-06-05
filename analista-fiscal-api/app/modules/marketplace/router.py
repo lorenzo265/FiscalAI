@@ -15,6 +15,7 @@ fica para sprint futura junto com painel interno.
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 from typing import Annotated
 
@@ -55,6 +56,7 @@ from app.shared.exceptions import (
     ContadorParceiroNaoEncontrado,
     EmpresaNaoEncontrada,
     SemParceirosDisponiveis,
+    WebhookPagamentoAssinaturaInvalida,
 )
 from uuid import UUID
 
@@ -290,17 +292,16 @@ async def avaliar_consulta(
     ctx: TenantDep,
     session: SessionDep,
 ) -> ConsultaOut:
-    # Empresa_id é validado por RLS (consulta de outro tenant não chega).
+    # FIX #10: empresa_id é passado ao service e validado ANTES de qualquer
+    # mutação/commit (§8.1). RLS bloqueia cross-tenant; o service bloqueia
+    # cross-empresa same-tenant sem efeito colateral.
     consulta = await ConsultaService().avaliar(
         session,
         consulta_id=consulta_id,
+        empresa_id=empresa_id,
         rating=payload.rating,
         comentario=payload.comentario,
     )
-    if consulta.empresa_id != empresa_id:
-        raise ConsultaNaoEncontrada(
-            f"Consulta {consulta_id} não pertence à empresa {empresa_id}"
-        )
     return ConsultaOut.model_validate(consulta)
 
 
@@ -429,17 +430,69 @@ async def revogar_consentimento(
 webhook_router = APIRouter(prefix="/v1/webhooks", tags=["marketplace-webhooks"])
 
 
+def _verificar_hmac_webhook_pagamento(
+    body_bytes: bytes,
+    signature: str | None,
+    secret: str,
+) -> bool:
+    """Valida X-Provider-Signature contra HMAC-SHA256(body, secret).
+
+    Reusa o padrão de ``verificar_assinatura_pluggy`` (mesma lógica: prefixo
+    opcional ``sha256=``, comparação via ``hmac.compare_digest``). Fail-closed:
+    secret vazio ou ausente → False (§8.9).
+    """
+    if not secret or not signature:
+        return False
+    esperado = hmac.new(
+        secret.encode(), body_bytes, hashlib.sha256
+    ).hexdigest()
+    # Aceita com ou sem prefixo "sha256=" (compatibilidade Stripe/Pagar.me/outros).
+    recebido = (
+        signature[len("sha256="):]
+        if signature.startswith("sha256=")
+        else signature
+    )
+    return hmac.compare_digest(esperado, recebido.strip().lower())
+
+
 @webhook_router.post(
     "/pagamento",
     response_model=CobrancaOut,
     summary="Webhook do provider de pagamento — atualiza status (Sprint 13 PR3)",
 )
 async def webhook_pagamento(
-    payload: WebhookPagamentoIn,
+    request: Request,
     session: WebhookSessionDep,
+    x_provider_signature: Annotated[str | None, Header(alias="X-Provider-Signature")] = None,
 ) -> CobrancaOut:
-    # Em prod a assinatura HMAC do provider é validada aqui (header
-    # X-Stripe-Signature ou X-Pagarme-Signature). Stub PR3 confia no payload.
+    """FIX #11 — HMAC validado ANTES de qualquer processamento.
+
+    1. Lê o body bruto (bytes) — necessário para HMAC sobre payload não-parseado.
+    2. Verifica X-Provider-Signature contra MARKETPLACE_PAGAMENTO_WEBHOOK_SECRET.
+       Fail-closed: secret vazio → rejeita (401). Assinatura inválida → rejeita (401).
+    3. Só depois deserializa WebhookPagamentoIn e chama o service.
+    A sessão (WebhookSessionDep) continua sendo superuser (bypassa RLS) porque o
+    provider não conhece o tenant — mas o acesso agora requer assinatura válida.
+    """
+    settings = _settings(request)
+    body_bytes = await request.body()
+
+    if not _verificar_hmac_webhook_pagamento(
+        body_bytes, x_provider_signature, settings.MARKETPLACE_PAGAMENTO_WEBHOOK_SECRET
+    ):
+        raise WebhookPagamentoAssinaturaInvalida(
+            "X-Provider-Signature ausente ou inválida — webhook rejeitado"
+        )
+
+    import json
+    try:
+        raw = json.loads(body_bytes)
+    except (ValueError, TypeError) as exc:
+        raise WebhookPagamentoAssinaturaInvalida(
+            "Payload do webhook não é JSON válido"
+        ) from exc
+
+    payload = WebhookPagamentoIn.model_validate(raw)
     cobranca = await ConsultaPagamentoService().processar_webhook(
         session,
         provider_externo_id=payload.provider_externo_id,

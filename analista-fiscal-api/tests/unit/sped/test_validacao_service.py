@@ -121,7 +121,7 @@ def _arquivo_sped(
         recibo_transmissao=None,
         status=status,
         validacao_jsonb=None,
-        algoritmo_versao="sped.ecd.v1",
+        algoritmo_versao="sped.ecd.v2",
         gerado_por_usuario_id=None,
         supersedes=None,
         superseded_by=None,

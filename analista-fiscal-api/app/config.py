@@ -209,6 +209,15 @@ class Settings(BaseSettings):
             "admin retornam 503. Em prod vem do secret manager."
         ),
     )
+    MARKETPLACE_PAGAMENTO_WEBHOOK_SECRET: str = Field(
+        default="",
+        description=(
+            "Segredo HMAC-SHA256 para validar webhooks do provider de pagamento "
+            "(header X-Provider-Signature). Vazio = webhook rejeitado com 401 "
+            "(fail-closed). Em prod vem do secret manager (Stripe/Pagar.me webhook "
+            "secret gerado no painel do provider)."
+        ),
+    )
 
     # Sprint 19.6 PR3 — Storage de blobs (PDFs/XMLs/recibos). Substitui
     # anti-pattern de BYTEA em Postgres. Default 'local' = .storage/
@@ -315,6 +324,10 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Prefixo do placeholder de JWT_SECRET — qualquer valor que inicie com
+    # esta string é considerado não-seguro (commitado no repo, público).
+    _JWT_PLACEHOLDER_PREFIX: str = "TROCAR_EM_PRODUCAO"
+
     @model_validator(mode="after")
     def _fail_fast_em_prod(self) -> Self:
         if self.ENVIRONMENT is Environment.PROD:
@@ -322,6 +335,24 @@ class Settings(BaseSettings):
                 raise ValueError("DATABASE_URL aponta para localhost em ENVIRONMENT=prod")
             if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
                 raise ValueError("REDIS_URL aponta para localhost em ENVIRONMENT=prod")
+            # JWT_SECRET com placeholder ou curto → forja de tid → takeover cross-tenant.
+            if self.JWT_SECRET.startswith(self._JWT_PLACEHOLDER_PREFIX):
+                raise ValueError(
+                    "JWT_SECRET contém placeholder padrão em ENVIRONMENT=prod. "
+                    "Gere um segredo com: openssl rand -hex 32"
+                )
+            if len(self.JWT_SECRET) < 32:
+                raise ValueError(
+                    f"JWT_SECRET tem {len(self.JWT_SECRET)} chars em ENVIRONMENT=prod "
+                    "(mínimo 32). Gere com: openssl rand -hex 32)"
+                )
+            # META_WHATSAPP_VERIFY_TOKEN com valor padrão (hardcoded no repo)
+            # em produção compromete a segurança do webhook Meta.
+            if self.META_WHATSAPP_VERIFY_TOKEN == "fiscalai-webhook-verify":
+                raise ValueError(
+                    "META_WHATSAPP_VERIFY_TOKEN usa o valor padrão em ENVIRONMENT=prod. "
+                    "Configure um token aleatório no painel Meta e no env."
+                )
         return self
 
 

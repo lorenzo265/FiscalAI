@@ -573,6 +573,58 @@ class TestEfdIcmsIpi:
         assert "efd_icms.e110_recolher_negativo" in codes
 
 
+# ── Anti-regressão FIX #1 — validador detecta 9990 off-by-one ───────────────
+
+
+class TestValidador9990OffByOne:
+    """Anti-regressão do bug #1 (auditoria 2026-06-04).
+
+    O validador agora verifica o 9990 além do 9999. Um arquivo com o 9990
+    calculado com a fórmula antiga (+1 em vez de +2) deve ser rejeitado.
+
+    Antes da correção do validador, esses arquivos passavam aqui mas eram
+    rejeitados pelo PVA — a barreira de defesa estava ausente.
+    """
+
+    def test_9990_divergente_eh_erro(self) -> None:
+        """Altera o 9990 para um valor incorreto e verifica que é rejeitado."""
+        conteudo = _efd_contribuicoes_perfeita()
+        linhas = conteudo.splitlines(keepends=True)
+        for i, ln in enumerate(linhas):
+            if ln.startswith("|9990|"):
+                partes = ln.strip().split("|")
+                qtd_real = int(partes[2])
+                partes[2] = str(qtd_real - 1)  # simula o off-by-one antigo
+                linhas[i] = "|".join(partes) + "\n"
+                break
+        r = validar_efd_contribuicoes("".join(linhas))
+        codes = {e.codigo for e in r.erros}
+        assert "estrutura.9990_divergente" in codes, (
+            f"Esperado 'estrutura.9990_divergente' nos erros, mas got: {codes}"
+        )
+
+    def test_arquivo_gerado_pelo_gerador_passa_validacao_9990(self) -> None:
+        """O gerador corrigido produz 9990 correto — validador aceita."""
+        r = validar_efd_contribuicoes(_efd_contribuicoes_perfeita())
+        # Não deve haver erro de 9990.
+        codes = {e.codigo for e in r.erros}
+        assert "estrutura.9990_divergente" not in codes, (
+            f"Arquivo gerado tem 9990 incorreto: {codes}"
+        )
+        assert "estrutura.9990_ausente" not in codes
+
+    def test_9990_ausente_eh_erro(self) -> None:
+        """Remove o 9990 e verifica que o validador acusa ausência."""
+        conteudo = _efd_contribuicoes_perfeita()
+        linhas = [
+            ln for ln in conteudo.splitlines(keepends=True)
+            if not ln.startswith("|9990|")
+        ]
+        r = validar_efd_contribuicoes("".join(linhas))
+        codes = {e.codigo for e in r.erros}
+        assert "estrutura.9990_ausente" in codes
+
+
 # ── Dispatcher + serialização JSONB ─────────────────────────────────────────
 
 

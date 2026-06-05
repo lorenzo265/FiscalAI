@@ -76,11 +76,54 @@ async def test_local_disk_roundtrip(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_local_disk_normaliza_dot_dot(tmp_path: Path) -> None:
-    """Path traversal mitigado — `..` no key vira `_`."""
+    """Path traversal via `..` é mitigado em duas camadas.
+
+    Camada 1 (léxica): `..` vira `_` → `../etc/passwd` → `_/etc/passwd`
+    que fica dentro de base_path (nenhuma escrita fora do diretório).
+    Camada 2 (resolve): garante confinamento real para sequências que
+    escapem do replace léxico (ex.: symlinks, encodings exóticos).
+    """
     s = LocalDiskStorage(base_path=str(tmp_path))
+    # A camada léxica converte "../etc/passwd" → "_/etc/passwd" (dentro da base)
+    # → não lança, mas também não escreve fora do base_path.
     await s.put_bytes("../etc/passwd", b"x")
-    # Não escreveu fora do base_path.
+    # Confirma que não escreveu fora do base_path (era o objetivo).
     assert not (tmp_path.parent / "etc" / "passwd").exists()
+    # O arquivo foi criado dentro da base com o nome normalizado.
+    assert (tmp_path / "_" / "etc" / "passwd").exists()
+
+
+@pytest.mark.asyncio
+async def test_local_disk_path_traversal_resolve_guard(tmp_path: Path) -> None:
+    """O guard resolve()+is_relative_to() bloqueia caminhos que escapem da base
+    mesmo após a normalização léxica.
+
+    Este teste usa um symlink para criar um path que resolve para fora da base
+    sem conter `..` explícito — exercita a camada 2 de defesa.
+    """
+    import os
+
+    outside_dir = tmp_path.parent / "outside_dir"
+    outside_dir.mkdir(exist_ok=True)
+    link_path = tmp_path / "escape_link"
+
+    try:
+        os.symlink(str(outside_dir), str(link_path))
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks não suportados neste ambiente")
+
+    s = LocalDiskStorage(base_path=str(tmp_path))
+    # Key que atravessa o symlink para fora da base
+    with pytest.raises(StorageError, match="path traversal"):
+        await s.put_bytes("escape_link/secret.txt", b"x")
+
+
+@pytest.mark.asyncio
+async def test_local_disk_path_traversal_symlink_style(tmp_path: Path) -> None:
+    """Keys legítimas com underscores e pontos simples passam normalmente."""
+    s = LocalDiskStorage(base_path=str(tmp_path))
+    key = await s.put_bytes("tenant/abc/._./file.txt", b"data")
+    assert key == "tenant/abc/._./file.txt"
 
 
 @pytest.mark.asyncio

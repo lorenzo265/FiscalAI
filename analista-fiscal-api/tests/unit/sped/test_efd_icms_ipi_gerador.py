@@ -374,6 +374,102 @@ class TestBlocoGCiap:
         assert "|G990|" in conteudo
 
 
+# ── Anti-regressão FIX #8 — E110 VL_SLD_APURADO ────────────────────────────
+
+
+class TestE110SaldoApurado:
+    """FIX #8 (auditoria 2026-06-04): E110 VL_SLD_APURADO deve refletir o
+    saldo líquido (débitos − créditos − saldo_credor_anterior), não o
+    valor_icms_a_recolher.  O bug anterior duplicava o campo VL_ICMS_RECOLHER
+    no VL_SLD_APURADO e ignorava meses com créditos > débitos, fazendo o PVA
+    acusar inconsistência aritmética.
+    """
+
+    @staticmethod
+    def _extrair_e110_campos(texto: str) -> list[str]:
+        for ln in texto.splitlines():
+            if ln.startswith("|E110|"):
+                return ln.strip().split("|")[2:-1]
+        pytest.fail("E110 não encontrado no arquivo gerado")
+
+    def test_e110_saldo_apurado_mes_devedor(self) -> None:
+        """Mês devedor: VL_SLD_APURADO = débitos − créditos (positivo)."""
+        ap = ApuracaoMensalIcms(
+            valor_total_debitos=Decimal("9000.00"),
+            valor_total_creditos=Decimal("0"),
+            saldo_credor_anterior=Decimal("0"),
+            ajustes_devedores=Decimal("0"),
+            ajustes_credores=Decimal("0"),
+            valor_icms_a_recolher=Decimal("9000.00"),
+            saldo_credor_a_transportar=Decimal("0"),
+        )
+        out = gerar_efd_icms_ipi(_entrada_minima(apuracao=ap))
+        campos = self._extrair_e110_campos(out.conteudo.decode("latin-1"))
+        # campos[8] = VL_SLD_CREDOR_ANT, campos[9] = VL_SLD_APURADO,
+        # campos[10] = VL_TOT_DED, campos[11] = VL_ICMS_RECOLHER
+        sld_apurado = campos[9]   # índice 9 (VL_SLD_APURADO, 10º campo)
+        icms_recolher = campos[11]
+        assert sld_apurado == "9000,00", (
+            f"VL_SLD_APURADO devedor esperado 9000,00, é {sld_apurado}"
+        )
+        assert icms_recolher == "9000,00", (
+            f"VL_ICMS_RECOLHER devedor esperado 9000,00, é {icms_recolher}"
+        )
+
+    def test_e110_saldo_apurado_mes_credor(self) -> None:
+        """Mês com créditos > débitos: VL_SLD_APURADO = débitos − créditos
+        (negativo = saldo credor).  Bug anterior: positivo (copiava a_recolher=0
+        de forma ambígua, mas não refletia a aritmética real).
+
+        Com créditos=3000, débitos=1000: saldo = 1000-3000 = -2000.
+        """
+        ap = ApuracaoMensalIcms(
+            valor_total_debitos=Decimal("1000.00"),
+            valor_total_creditos=Decimal("3000.00"),
+            saldo_credor_anterior=Decimal("0"),
+            ajustes_devedores=Decimal("0"),
+            ajustes_credores=Decimal("0"),
+            valor_icms_a_recolher=Decimal("0"),
+            saldo_credor_a_transportar=Decimal("2000.00"),
+        )
+        out = gerar_efd_icms_ipi(_entrada_minima(apuracao=ap))
+        campos = self._extrair_e110_campos(out.conteudo.decode("latin-1"))
+        sld_apurado = campos[9]
+        icms_recolher = campos[11]
+        sld_credor_transp = campos[12]
+        # VL_SLD_APURADO = 1000 - 3000 = -2000 (negativo = saldo credor)
+        assert sld_apurado == "-2000,00", (
+            f"VL_SLD_APURADO credor esperado -2000,00, é {sld_apurado}"
+        )
+        # VL_ICMS_RECOLHER deve continuar 0,00 (saldo credor, não recolhe)
+        assert icms_recolher == "0,00", (
+            f"VL_ICMS_RECOLHER credor esperado 0,00, é {icms_recolher}"
+        )
+        # VL_SLD_CREDOR_TRANSPORTAR = 2000,00
+        assert sld_credor_transp == "2000,00", (
+            f"VL_SLD_CREDOR_TRANSPORTAR esperado 2000,00, é {sld_credor_transp}"
+        )
+
+    def test_e110_saldo_apurado_com_saldo_credor_anterior(self) -> None:
+        """Saldo credor de mês anterior reduz o saldo apurado corrente."""
+        ap = ApuracaoMensalIcms(
+            valor_total_debitos=Decimal("5000.00"),
+            valor_total_creditos=Decimal("2000.00"),
+            saldo_credor_anterior=Decimal("1000.00"),
+            ajustes_devedores=Decimal("0"),
+            ajustes_credores=Decimal("0"),
+            valor_icms_a_recolher=Decimal("2000.00"),  # 5000-2000-1000 = 2000
+            saldo_credor_a_transportar=Decimal("0"),
+        )
+        out = gerar_efd_icms_ipi(_entrada_minima(apuracao=ap))
+        campos = self._extrair_e110_campos(out.conteudo.decode("latin-1"))
+        sld_apurado = campos[9]
+        # 5000 - 2000 - 1000 = 2000
+        assert sld_apurado == "2000,00", (
+            f"VL_SLD_APURADO com credor_ant esperado 2000,00, é {sld_apurado}"
+        )
+
+
 # ── Determinismo ────────────────────────────────────────────────────────────
 
 

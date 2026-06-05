@@ -133,8 +133,8 @@ class TestGranularidadeItem:
         # Item 2 — CFOP 6108, SKU-002, NUM_ITEM=2.
         assert "|2|SKU-002|" in c170s[1]
         assert "|6108|" in c170s[1]
-        # Algoritmo bumpado pra v2.
-        assert ALGORITMO_VERSAO == "sped.efd_contribuicoes.v3"
+        # Algoritmo bumpado pra v4 (auditoria 2026-06-04 FIX #7).
+        assert ALGORITMO_VERSAO == "sped.efd_contribuicoes.v4"
 
     def test_fallback_v1_quando_sem_itens(self) -> None:
         """Backward-compat — itens vazio mantém 'MERC-GENERICO' agregado."""

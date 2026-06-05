@@ -111,14 +111,34 @@ def extrair_datas(texto: str) -> list[str]:
     return [m.group(0).strip() for m in _RE_DATA.finditer(texto)]
 
 
+def _contem_afirmacao_fiscal(texto: str) -> bool:
+    """Retorna True se o texto contém pelo menos uma afirmação fiscal verificável.
+
+    Uma afirmação fiscal é qualquer ocorrência de valor monetário (R$), data,
+    CNPJ ou percentagem. Textos puramente conversacionais sem esses elementos
+    (ex.: "Olá!", "Não tenho essa informação") não são afirmações fiscais e
+    não acionam o gate de citação obrigatória.
+    """
+    return bool(
+        extrair_valores_monetarios(texto)
+        or extrair_percentagens(texto)
+        or extrair_cnpjs(texto)
+        or extrair_datas(texto)
+    )
+
+
 def validar_resposta(resp: LLMResponse, fontes: list[FonteFato]) -> bool:
     """
-    Re-check determinístico pós-LLM (§8.6 do Plano).
+    Re-check determinístico pós-LLM (§8.5 + §8.6 do Plano).
 
     Regra 1: Toda citação deve referenciar um fato_id que existe nas fontes.
     Regra 2: Todo valor monetário (R$) no texto deve aparecer literalmente no payload de alguma fonte.
+    Regra 2b: Toda percentagem (alíquota, FatorR) deve aparecer literalmente no payload de alguma fonte.
     Regra 3: Todo CNPJ no texto deve aparecer literalmente no payload de alguma fonte.
     Regra 4: Toda data no texto deve aparecer literalmente no payload de alguma fonte.
+    Regra 5 (§8.5): Se há fontes disponíveis E o texto contém afirmação fiscal verificável,
+                    exige ≥1 citação com fato_id válido. Impede que resposta fiscal passe
+                    sem nenhuma âncora ao grafo — o caso central do achado #4.
 
     Retorna False em qualquer violação → caller usa RESPOSTA_PADRAO_VERIFICAR.
     """
@@ -153,6 +173,13 @@ def validar_resposta(resp: LLMResponse, fontes: list[FonteFato]) -> bool:
     for data in extrair_datas(resp.texto):
         if data not in payloads:
             return False
+
+    # Regra 5 (§8.5): citação obrigatória quando há afirmação fiscal + fontes disponíveis.
+    # Aplica-se apenas quando fontes existem (sem fontes o assistente já sinaliza ao usuário
+    # que não há dados — não faz sentido exigir citação de grafo vazio).
+    # Não-afirmações (saudações, "não sei", orientações genéricas) passam sem citação.
+    if fontes and _contem_afirmacao_fiscal(resp.texto) and len(resp.citacoes) == 0:
+        return False
 
     return True
 

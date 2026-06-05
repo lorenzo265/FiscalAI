@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.modules.multa_juros.calcula_selic import ALGORITMO_VERSAO
 from app.modules.multa_juros.schemas import SimularMoraIn
 
 
@@ -110,3 +111,64 @@ async def test_denuncia_espontanea_sem_atraso_zero_tudo() -> None:
     assert out.juros_selic == Decimal("0")
     assert out.total_acrescimos == Decimal("0")
     assert out.valor_atualizado == Decimal("500.00")
+
+
+# ── algoritmo_versao propagado ao SimularMoraOut ──────────────────────────────
+
+
+async def test_simular_mora_propaga_algoritmo_versao() -> None:
+    from app.modules.multa_juros.service import simular_mora
+
+    session = AsyncMock()
+    with patch(
+        "app.modules.multa_juros.service.buscar_taxas_selic",
+        new=AsyncMock(return_value=_TAXAS_MOCK),
+    ):
+        out = await simular_mora(_payload(), session)
+
+    assert out.algoritmo_versao == ALGORITMO_VERSAO
+
+
+# ── extra="forbid" em SimularMoraIn ──────────────────────────────────────────
+
+
+def test_simular_mora_in_rejeita_campo_extra() -> None:
+    """SimularMoraIn com extra="forbid" deve rejeitar campos desconhecidos."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        SimularMoraIn(
+            valor=Decimal("100.00"),
+            data_vencimento=date(2025, 1, 1),
+            data_pagamento=date(2025, 4, 1),
+            campo_invasor="oops",  # type: ignore[call-arg]
+        )
+
+
+# ── narrow except: ValueError não-SELIC não vira SelicInsuficienteError ──────
+
+
+async def test_valor_error_nao_selic_nao_mascarado() -> None:
+    """ValueError de 'pagamento anterior ao vencimento' não deve ser mascarado
+    como SelicInsuficienteError — deve propagar como ValueError original."""
+    from app.modules.multa_juros.service import simular_mora
+
+    # Payload válido pelo schema (o model_validator aceita datas iguais).
+    # Forcamos data_pagamento == data_vencimento → dias_atraso=0 → sem erro.
+    # Para testar o except narrow, precisamos de um ValueError que NÃO seja de SELIC.
+    # Criamos um mock que lança ValueError com mensagem diferente.
+    session = AsyncMock()
+
+    def _raise_non_selic(*args: object, **kwargs: object) -> object:
+        raise ValueError("erro interno genérico — não é SELIC")
+
+    payload = _payload()
+    with patch(
+        "app.modules.multa_juros.service.buscar_taxas_selic",
+        new=AsyncMock(return_value=_TAXAS_MOCK),
+    ), patch(
+        "app.modules.multa_juros.service.calcular_mora",
+        side_effect=_raise_non_selic,
+    ):
+        with pytest.raises(ValueError, match="erro interno genérico"):
+            await simular_mora(payload, session)

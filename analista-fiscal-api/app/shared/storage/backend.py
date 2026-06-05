@@ -73,9 +73,20 @@ class LocalDiskStorage:
         self._base.mkdir(parents=True, exist_ok=True)
 
     def _path_for(self, key: str) -> Path:
-        # Normaliza key — proteção mínima contra path traversal.
+        # Normaliza key — dupla camada de proteção contra path traversal:
+        # 1. Substituição léxica de ".." (defesa em texto — rápida).
+        # 2. Resolução real do path + verificação de confinamento dentro de
+        #    _base (defesa simbólica — detecta symlinks e sequências exóticas
+        #    que passariam pelo replace léxico).
         safe = key.replace("..", "_").lstrip("/")
-        return self._base / safe
+        candidate = self._base / safe
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(self._base.resolve()):
+            raise StorageError(
+                f"key recusada por path traversal: {key!r} resolve para "
+                f"{resolved!r} fora de {self._base!r}"
+            )
+        return candidate
 
     async def put_bytes(
         self,

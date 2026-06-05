@@ -748,6 +748,16 @@ class CredenciaisParceiroInvalidas(DomainError):
     http_status = 401
 
 
+class WebhookPagamentoAssinaturaInvalida(DomainError):
+    """Assinatura HMAC-SHA256 do webhook de pagamento ausente ou inválida.
+
+    Fail-closed: qualquer payload sem assinatura válida é rejeitado antes de
+    qualquer processamento (§8.9 — integração externa autenticada).
+    """
+
+    http_status = 401
+
+
 class ParceiroSemSenhaDefinida(DomainError):
     """Parceiro nunca definiu senha — bloqueio fail-closed antes de login."""
 

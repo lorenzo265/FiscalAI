@@ -77,11 +77,11 @@ def test_efd_contribuicoes_emite_bloco_i_stub() -> None:
     assert regs.get("P990") == 1
 
 
-def test_efd_contribuicoes_algoritmo_versao_v3() -> None:
-    """Sprint 19.8 PR1 bump v2→v3."""
+def test_efd_contribuicoes_algoritmo_versao_v4() -> None:
+    """Auditoria 2026-06-04 bump v3→v4 (FIX #7 M200/M600 regime cumulativo)."""
     from app.modules.sped.efd.gerador_contribuicoes import ALGORITMO_VERSAO
 
-    assert ALGORITMO_VERSAO == "sped.efd_contribuicoes.v3"
+    assert ALGORITMO_VERSAO == "sped.efd_contribuicoes.v4"
 
 
 # ── #30 — EFD ICMS-IPI Bloco B stub ────────────────────────────────────────
@@ -110,8 +110,8 @@ def test_efd_icms_ipi_emite_bloco_b_stub() -> None:
     assert regs.get("B990") == 1
 
 
-def test_efd_icms_ipi_algoritmo_versao_v3() -> None:
-    """Sprint 19.8 PR1 bump v2→v3."""
+def test_efd_icms_ipi_algoritmo_versao_v4() -> None:
+    """Auditoria 2026-06-04 bump v3→v4 (FIX #8 E110 VL_SLD_APURADO)."""
     from app.modules.sped.efd.gerador_icms_ipi import ALGORITMO_VERSAO
 
-    assert ALGORITMO_VERSAO == "sped.efd_icms_ipi.v3"
+    assert ALGORITMO_VERSAO == "sped.efd_icms_ipi.v4"

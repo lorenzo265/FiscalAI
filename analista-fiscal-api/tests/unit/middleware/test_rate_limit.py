@@ -29,6 +29,7 @@ from app.shared.middleware.rate_limit import (
     limite_para_path,
     montar_headers_rate_limit,
 )
+_IP_TESTE = "192.168.1.1"
 
 
 # ── calcular_janela_atual ─────────────────────────────────────────────────────
@@ -91,20 +92,38 @@ def test_endpoints_padrão_nao_sensiveis(path: str):
 def test_chave_redis_formato_correto():
     tenant = str(uuid4())
     janela = 1_748_000_000
-    chave = construir_chave_redis(tenant, janela)
-    assert chave == f"rl:{tenant}:{janela}"
+    chave = construir_chave_redis(tenant, janela, _IP_TESTE)
+    # Formato esperado: rl:<tid>:<ip>:<janela>
+    assert chave == f"rl:{tenant}:{_IP_TESTE}:{janela}"
 
 
 def test_chave_redis_difere_por_tenant():
     t1, t2 = str(uuid4()), str(uuid4())
     janela = 1_748_000_000
-    assert construir_chave_redis(t1, janela) != construir_chave_redis(t2, janela)
+    assert construir_chave_redis(t1, janela, _IP_TESTE) != construir_chave_redis(t2, janela, _IP_TESTE)
 
 
 def test_chave_redis_difere_por_janela():
     tenant = str(uuid4())
     j1, j2 = 1_748_000_000, 1_748_003_600
-    assert construir_chave_redis(tenant, j1) != construir_chave_redis(tenant, j2)
+    assert construir_chave_redis(tenant, j1, _IP_TESTE) != construir_chave_redis(tenant, j2, _IP_TESTE)
+
+
+def test_chave_redis_difere_por_ip():
+    """IPs distintos produzem chaves distintas — forja de tid não polui bucket da vítima."""
+    tenant = str(uuid4())
+    janela = 1_748_000_000
+    chave_atacante = construir_chave_redis(tenant, janela, "10.0.0.1")
+    chave_vitima = construir_chave_redis(tenant, janela, "10.0.0.2")
+    assert chave_atacante != chave_vitima
+
+
+def test_chave_redis_sem_ip_usa_unknown():
+    """Sem IP (client=None) a chave usa 'unknown' como fallback."""
+    tenant = str(uuid4())
+    janela = 1_748_000_000
+    chave = construir_chave_redis(tenant, janela, "")
+    assert ":unknown:" in chave
 
 
 # ── montar_headers_rate_limit ─────────────────────────────────────────────────
@@ -152,7 +171,7 @@ async def test_primeira_requisicao_permitida():
     redis_mock.expire = AsyncMock()
 
     tenant = str(uuid4())
-    result = await checar_rate_limit(redis_mock, tenant, "/v1/relatorios/dre")
+    result = await checar_rate_limit(redis_mock, tenant, "/v1/relatorios/dre", client_ip=_IP_TESTE)
 
     assert result.permitido is True
     assert result.contagem_atual == 1
@@ -166,7 +185,7 @@ async def test_dentro_do_limite_padrao_permitido():
     redis_mock.incr.return_value = 999
     redis_mock.expire = AsyncMock()
 
-    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/fiscal/apuracoes")
+    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/fiscal/apuracoes", client_ip=_IP_TESTE)
     assert result.permitido is True
 
 
@@ -176,7 +195,7 @@ async def test_acima_do_limite_padrao_bloqueado():
     redis_mock.incr.return_value = 1001
     redis_mock.expire = AsyncMock()
 
-    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre")
+    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre", client_ip=_IP_TESTE)
     assert result.permitido is False
     assert result.motivo_bloqueio != ""
 
@@ -187,7 +206,7 @@ async def test_acima_do_limite_sensivel_bloqueado():
     redis_mock.incr.return_value = 101
     redis_mock.expire = AsyncMock()
 
-    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/pgdas/transmitir")
+    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/pgdas/transmitir", client_ip=_IP_TESTE)
     assert result.permitido is False
     assert result.limite == _LIMITE_SENSIVEL
 
@@ -199,7 +218,7 @@ async def test_redis_indisponivel_fail_open():
     redis_mock = AsyncMock()
     redis_mock.incr.side_effect = redis_async.RedisError("connection refused")
 
-    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre")
+    result = await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre", client_ip=_IP_TESTE)
     assert result.permitido is True
 
 
@@ -211,10 +230,38 @@ async def test_expire_chamado_somente_na_primeira_requisicao():
 
     # Segunda requisição (contagem=2) — expire NÃO deve ser chamado
     redis_mock.incr.return_value = 2
-    await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre")
+    await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre", client_ip=_IP_TESTE)
     redis_mock.expire.assert_not_called()
 
     # Primeira requisição (contagem=1) — expire DEVE ser chamado
     redis_mock.incr.return_value = 1
-    await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre")
+    await checar_rate_limit(redis_mock, str(uuid4()), "/v1/relatorios/dre", client_ip=_IP_TESTE)
     redis_mock.expire.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ips_distintos_contadores_independentes():
+    """Forja de tid não esgota bucket da vítima — IPs distintos → chaves distintas."""
+    import redis.asyncio as redis_async
+
+    contador: dict[str, int] = {}
+
+    async def mock_incr(chave: str) -> int:
+        contador[chave] = contador.get(chave, 0) + 1
+        return contador[chave]
+
+    redis_mock = AsyncMock()
+    redis_mock.incr.side_effect = mock_incr
+    redis_mock.expire = AsyncMock()
+
+    tid_vitima = str(uuid4())
+    # Atacante forja tid da vítima mas tem IP diferente
+    for _ in range(5):
+        await checar_rate_limit(redis_mock, tid_vitima, "/v1/fiscal/apuracoes", client_ip="10.0.0.1")
+    for _ in range(3):
+        await checar_rate_limit(redis_mock, tid_vitima, "/v1/fiscal/apuracoes", client_ip="10.0.0.2")
+
+    # Cada IP tem seu próprio contador — não há contaminação cruzada
+    assert len(contador) == 2
+    chaves = list(contador.keys())
+    assert all("10.0.0.1" in c or "10.0.0.2" in c for c in chaves)

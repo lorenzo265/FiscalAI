@@ -542,9 +542,13 @@ async def test_responder_status_aberta_levanta() -> None:
 async def test_avaliar_rating_fora_de_faixa_levanta() -> None:
     session = AsyncMock()
     with pytest.raises(ConsultaForaDeFluxo):
-        await ConsultaService().avaliar(session, consulta_id=uuid.uuid4(), rating=0)
+        await ConsultaService().avaliar(
+            session, consulta_id=uuid.uuid4(), empresa_id=uuid.uuid4(), rating=0
+        )
     with pytest.raises(ConsultaForaDeFluxo):
-        await ConsultaService().avaliar(session, consulta_id=uuid.uuid4(), rating=6)
+        await ConsultaService().avaliar(
+            session, consulta_id=uuid.uuid4(), empresa_id=uuid.uuid4(), rating=6
+        )
 
 
 @pytest.mark.asyncio
@@ -574,7 +578,11 @@ async def test_avaliar_sucesso_recalcula_rating_parceiro() -> None:
         ),
     ):
         out = await ConsultaService().avaliar(
-            session, consulta_id=consulta.id, rating=5, comentario="ótimo"
+            session,
+            consulta_id=consulta.id,
+            empresa_id=consulta.empresa_id,
+            rating=5,
+            comentario="ótimo",
         )
 
     assert out.rating_cliente == 5
@@ -595,7 +603,10 @@ async def test_avaliar_ja_avaliada_levanta() -> None:
     ):
         with pytest.raises(ConsultaJaAvaliada):
             await ConsultaService().avaliar(
-                session, consulta_id=consulta.id, rating=5
+                session,
+                consulta_id=consulta.id,
+                empresa_id=consulta.empresa_id,
+                rating=5,
             )
 
 
@@ -611,5 +622,90 @@ async def test_avaliar_consulta_nao_concluida_levanta() -> None:
     ):
         with pytest.raises(ConsultaForaDeFluxo):
             await ConsultaService().avaliar(
-                session, consulta_id=consulta.id, rating=4
+                session,
+                consulta_id=consulta.id,
+                empresa_id=consulta.empresa_id,
+                rating=4,
             )
+
+
+# ── FIX #10 — empresa_id validado ANTES do commit ───────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_avaliar_empresa_errada_levanta_antes_de_mutacao() -> None:
+    """FIX #10: empresa_id mismatch levanta ConsultaNaoEncontrada SEM persistir rating.
+
+    Cenário: tenant tem empresa_A e empresa_B. Usuário autentica com empresa_A
+    mas passa o consulta_id que pertence a empresa_B. O service deve rejeitar
+    ANTES de setar rating_cliente ou chamar commit.
+    """
+    session = AsyncMock()
+    session.commit = AsyncMock()
+
+    empresa_a = uuid.uuid4()
+    empresa_b = uuid.uuid4()
+
+    # Consulta pertence à empresa_B
+    consulta = _consulta(status="concluida", contador_id=uuid.uuid4())
+    consulta.empresa_id = empresa_b  # ownership real
+    original_rating = consulta.rating_cliente  # None
+
+    consulta_repo = AsyncMock()
+    consulta_repo.por_id = AsyncMock(return_value=consulta)
+
+    with patch(
+        "app.modules.marketplace.consulta_service.ConsultaRepo",
+        return_value=consulta_repo,
+    ):
+        with pytest.raises(ConsultaNaoEncontrada):
+            await ConsultaService().avaliar(
+                session,
+                consulta_id=consulta.id,
+                empresa_id=empresa_a,  # empresa errada no path
+                rating=5,
+            )
+
+    # Nenhuma mutação deve ter ocorrido
+    assert consulta.rating_cliente == original_rating, "rating_cliente não deve ser alterado"
+    session.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_avaliar_empresa_correta_sucesso() -> None:
+    """FIX #10: empresa_id correto permite avaliação normalmente."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+    contador_id = uuid.uuid4()
+
+    consulta = _consulta(status="concluida", contador_id=contador_id)
+    empresa_id_correto = consulta.empresa_id  # mesmo empresa_id da consulta
+
+    consulta_repo = AsyncMock()
+    consulta_repo.por_id = AsyncMock(return_value=consulta)
+    consulta_repo.avaliacoes_recentes = AsyncMock(return_value=[4])
+
+    parceiro = _parceiro()
+    parceiro_repo = AsyncMock()
+    parceiro_repo.por_id = AsyncMock(return_value=parceiro)
+
+    with (
+        patch(
+            "app.modules.marketplace.consulta_service.ConsultaRepo",
+            return_value=consulta_repo,
+        ),
+        patch(
+            "app.modules.marketplace.consulta_service.ContadorParceiroRepo",
+            return_value=parceiro_repo,
+        ),
+    ):
+        out = await ConsultaService().avaliar(
+            session,
+            consulta_id=consulta.id,
+            empresa_id=empresa_id_correto,
+            rating=4,
+        )
+
+    assert out.rating_cliente == 4
+    session.commit.assert_awaited_once()

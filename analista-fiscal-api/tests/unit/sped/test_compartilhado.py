@@ -199,6 +199,75 @@ class TestGerarBloco9:
             )
 
 
+    def test_9990_conta_ele_proprio_e_9999_anti_regressao(self) -> None:
+        """Anti-regressão do bug #1 (auditoria 2026-06-04).
+
+        O bloco 9 é composto por: 9001 (1) + 9900 × N + 9990 (1) + 9999 (1).
+        O registro 9990 deve declarar a contagem de TODAS essas linhas,
+        incluindo o próprio 9999.  O bug anterior contava +1 (esquecia o 9999),
+        o que fazia o PVA rejeitar todos os arquivos.
+
+        Este teste falha com a implementação anterior (``total_bloco_9 = ... + 1``).
+        """
+        anteriores = [
+            linha("0000", "10"),
+            linha("0001", "0"),
+            linha("0990", "2"),
+        ]
+        bloco_9 = gerar_bloco_9(anteriores)
+
+        # Localiza o 9990 e lê o valor declarado.
+        qtd_9990_declarada = -1
+        for ln in bloco_9:
+            if ln.startswith("|9990|"):
+                qtd_9990_declarada = int(ln.split("|")[2])
+                break
+        assert qtd_9990_declarada >= 0, "9990 não encontrado no bloco 9"
+
+        # Conta as linhas do bloco 9 efetivamente emitidas (9001+9900*N+9990+9999).
+        qtd_bloco_9_real = sum(
+            1 for ln in bloco_9
+            if ln.startswith("|9001|")
+            or ln.startswith("|9900|")
+            or ln.startswith("|9990|")
+            or ln.startswith("|9999|")
+        )
+        assert qtd_9990_declarada == qtd_bloco_9_real, (
+            f"9990 declara {qtd_9990_declarada} mas bloco 9 tem "
+            f"{qtd_bloco_9_real} linhas — off-by-one detectado."
+        )
+
+    def test_9990_inclui_9999_no_total_bloco_9(self) -> None:
+        """Verifica explicitamente que 9999 é contabilizado no QTD_LIN_9.
+
+        Com o bug anterior, o 9990 declarava (N+2) quando o bloco tinha
+        (N+3) linhas reais — o 9999 não era somado.
+        """
+        anteriores = [linha("0000", "v")]
+        bloco_9 = gerar_bloco_9(anteriores)
+
+        # Contagem real dos registros do bloco 9.
+        regs_bloco_9 = {"9001", "9900", "9990", "9999"}
+        n_real = sum(
+            1 for ln in bloco_9
+            if ln.split("|")[1] in regs_bloco_9
+        )
+
+        # Valor declarado pelo 9990.
+        linha_9990 = next(ln for ln in bloco_9 if ln.startswith("|9990|"))
+        n_declarado = int(linha_9990.split("|")[2])
+
+        assert n_declarado == n_real
+        # E 9999 está incluído nessa conta (não é n_real - 1 como no bug).
+        n_sem_9999 = sum(
+            1 for ln in bloco_9
+            if ln.split("|")[1] in {"9001", "9900", "9990"}
+        )
+        assert n_declarado > n_sem_9999, (
+            "9990 não inclui 9999 no total do bloco — off-by-one!"
+        )
+
+
 class TestCalcularHashSha256:
     def test_hash_estavel(self) -> None:
         h1 = calcular_hash_sha256(b"|0000|10|\n")

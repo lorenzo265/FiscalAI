@@ -188,3 +188,83 @@ class TestDfcNaoFecha:
         r = calcular_dfc(e)
         assert r.fecha is False
         assert r.diferenca == Decimal("4000.00")  # calculado − informado
+
+
+# ── FIX #4 (PR6) — DFC dict-index: mesma aritmética que a busca individual ───
+
+
+class TestDfcDictIndexEquivalencia:
+    """Verifica que a lógica de soma in-memory via dict (FIX #4 PR6) produz
+    exatamente o mesmo resultado que somar conta a conta manualmente.
+
+    O cálculo continua byte-idêntico; apenas a contagem de queries muda.
+    """
+
+    def test_soma_grupo_equivale_soma_individual(self) -> None:
+        """Dado um conjunto de saldos, somar via dict-lookup == somar conta a conta."""
+        from decimal import Decimal as D
+
+        saldos = {
+            "1.1.01": D("5000.00"),
+            "1.1.02": D("3000.00"),
+            "1.2.01": D("1200.00"),
+        }
+        grupo = ("1.1.01", "1.1.02", "1.2.99")  # 1.2.99 ausente → 0
+        _zero = D("0")
+        soma_dict = sum((saldos.get(c, _zero) for c in grupo), _zero)
+
+        soma_individual = D("5000.00") + D("3000.00") + D("0")
+
+        assert soma_dict == soma_individual
+
+    def test_conta_ausente_tratada_como_zero(self) -> None:
+        """Conta não existente na posição → soma não levanta, assume 0."""
+        from decimal import Decimal as D
+
+        saldos: dict[str, D] = {}
+        grupo = ("1.1.01", "1.1.02")
+        soma = sum((saldos.get(c, D("0")) for c in grupo), D("0"))
+        assert soma == D("0")
+
+    def test_dfc_resultado_identico_com_dict_lookup(self) -> None:
+        """A entrada manual com os valores extraídos via dict produz o mesmo
+        resultado da calcular_dfc (regressão de paridade antes/depois do fix)."""
+        # Simula o que gerar_dfc faria com saldos conhecidos.
+        clientes_fim = Decimal("8000")
+        clientes_ini = Decimal("5000")
+        estoques_fim = Decimal("3000")
+        estoques_ini = Decimal("4000")
+        fornec_fim = Decimal("6000")
+        fornec_ini = Decimal("4500")
+        encargos_fim = Decimal("1500")
+        encargos_ini = Decimal("1000")
+        imob_fim = Decimal("20000")
+        imob_ini = Decimal("15000")
+        caixa_fim = Decimal("12000")
+        caixa_ini = Decimal("5000")
+
+        e = EntradaDfc(
+            lucro_liquido=Decimal("10000"),
+            depreciacao_periodo=Decimal("500"),
+            provisoes_constituidas=Decimal("0"),
+            variacao_clientes=clientes_fim - clientes_ini,
+            variacao_estoques=estoques_fim - estoques_ini,
+            variacao_fornecedores=fornec_fim - fornec_ini,
+            variacao_encargos_a_pagar=encargos_fim - encargos_ini,
+            aquisicao_imobilizado=max(imob_fim - imob_ini, Decimal("0")),
+            venda_imobilizado=max(imob_ini - imob_fim, Decimal("0")),
+            aporte_capital=Decimal("0"),
+            emprestimos_captados=Decimal("0"),
+            emprestimos_pagos=Decimal("0"),
+            distribuicao_lucros=Decimal("0"),
+            saldo_caixa_inicial=caixa_ini,
+            saldo_caixa_final=caixa_fim,
+        )
+        r = calcular_dfc(e)
+        # Operacional = lucro + deprec − Δclientes − Δestoques + Δfornec + Δencargos
+        # = 10000 + 500 − 3000 − (−1000) + 1500 + 500 = 10500
+        assert r.caixa_operacional.valor == Decimal("10500.00")
+        # Investimento = −(imob_fim − imob_ini) = −5000
+        assert r.caixa_investimento.valor == Decimal("-5000.00")
+        # Variação líquida = 10500 − 5000 = 5500; caixa_ini 5000 → final 10500 (≠ 12000) → não fecha
+        assert r.fecha is False

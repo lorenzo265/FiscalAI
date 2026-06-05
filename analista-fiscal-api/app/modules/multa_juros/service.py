@@ -41,6 +41,7 @@ def _resultado_para_out(resultado: ResultadoMora, payload: SimularMoraIn) -> Sim
         aliquota_juros_acumulada=resultado.aliquota_juros_acumulada,
         data_vencimento=payload.data_vencimento,
         data_pagamento=payload.data_pagamento,
+        algoritmo_versao=resultado.algoritmo_versao,
     )
 
 
@@ -48,6 +49,20 @@ async def _buscar_taxas(payload: SimularMoraIn, session: AsyncSession) -> list[t
     data_inicio = primeiro_dia_mes_seguinte(payload.data_vencimento)
     data_fim = date(payload.data_pagamento.year, payload.data_pagamento.month, 1)
     return await buscar_taxas_selic(session, data_inicio, data_fim)
+
+
+_SELIC_NAO_DISPONIVEL_MSG = "Taxa SELIC não disponível"
+
+
+def _reraise_selic_ou_propaga(exc: ValueError, payload: SimularMoraIn) -> None:
+    """Re-levanta como SelicInsuficienteError apenas para ausência de taxa SELIC.
+
+    Outros ValueError (ex.: pagamento anterior ao vencimento) propagam normalmente —
+    não devem ser mascarados como "SELIC insuficiente".
+    """
+    if _SELIC_NAO_DISPONIVEL_MSG in str(exc):
+        raise SelicInsuficienteError(primeiro_dia_mes_seguinte(payload.data_vencimento)) from exc
+    raise
 
 
 async def simular_mora(
@@ -64,7 +79,8 @@ async def simular_mora(
             taxas_selic=taxas,
         )
     except ValueError as exc:
-        raise SelicInsuficienteError(primeiro_dia_mes_seguinte(payload.data_vencimento)) from exc
+        _reraise_selic_ou_propaga(exc, payload)
+        raise  # pragma: no cover — _reraise_selic_ou_propaga always raises
     return _resultado_para_out(resultado, payload)
 
 
@@ -82,7 +98,8 @@ async def simular_denuncia_espontanea(
             taxas_selic=taxas,
         )
     except ValueError as exc:
-        raise SelicInsuficienteError(primeiro_dia_mes_seguinte(payload.data_vencimento)) from exc
+        _reraise_selic_ou_propaga(exc, payload)
+        raise  # pragma: no cover — _reraise_selic_ou_propaga always raises
     return _resultado_para_out(resultado, payload)
 
 

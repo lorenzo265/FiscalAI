@@ -7,6 +7,7 @@ import pytest
 
 from app.shared.llm.citacao import (
     RESPOSTA_PADRAO_VERIFICAR,
+    _contem_afirmacao_fiscal,
     detectar_out_of_scope,
     extrair_cnpjs,
     extrair_datas,
@@ -147,8 +148,11 @@ def test_rejeita_cnpj_nao_nas_fontes() -> None:
 
 
 def test_valida_cnpj_nas_fontes() -> None:
-    """CNPJ presente nas fontes → válido."""
-    resp = _resp("CNPJ 12.345.678/0001-90 está regular.")
+    """CNPJ presente nas fontes + citação válida → válido (Regras 3 + 5)."""
+    resp = _resp(
+        "CNPJ 12.345.678/0001-90 está regular [empr-001].",
+        citacoes=[Citacao(fato_id="empr-001", trecho_citado="CNPJ: 12.345.678/0001-90")],
+    )
     fontes = [_fonte("empr-001", "CNPJ: 12.345.678/0001-90")]
     assert validar_resposta(resp, fontes) is True
 
@@ -212,3 +216,90 @@ def test_pergunta_in_scope_retorna_none_categoria() -> None:
     eh_out, cat = detectar_out_of_scope("Quanto pago de DAS?")
     assert eh_out is False
     assert cat is None
+
+
+# ── _contem_afirmacao_fiscal ─────────────────────────────────────────────────
+
+
+def test_afirmacao_fiscal_detecta_valor_monetario() -> None:
+    assert _contem_afirmacao_fiscal("O DAS foi R$ 1.234,56.") is True
+
+
+def test_afirmacao_fiscal_detecta_percentagem() -> None:
+    assert _contem_afirmacao_fiscal("Alíquota de 7,30%.") is True
+
+
+def test_afirmacao_fiscal_detecta_cnpj() -> None:
+    assert _contem_afirmacao_fiscal("CNPJ 12.345.678/0001-90") is True
+
+
+def test_afirmacao_fiscal_detecta_data() -> None:
+    assert _contem_afirmacao_fiscal("Vence em 20/06/2026.") is True
+
+
+def test_afirmacao_fiscal_nao_detecta_pleasantry() -> None:
+    assert _contem_afirmacao_fiscal("Olá! Como posso ajudar?") is False
+
+
+def test_afirmacao_fiscal_nao_detecta_orientacao_generica() -> None:
+    assert _contem_afirmacao_fiscal("Não tenho dados suficientes para responder.") is False
+
+
+def test_afirmacao_fiscal_nao_detecta_texto_vazio() -> None:
+    assert _contem_afirmacao_fiscal("") is False
+
+
+# ── Regra 5 (§8.5) — citação obrigatória quando há afirmação fiscal ──────────
+
+
+def test_regra5_rejeita_afirmacao_fiscal_sem_citacao_com_fontes() -> None:
+    """Regra 5: fontes presentes + afirmação fiscal + zero citações → False."""
+    resp = _resp("O DAS de maio foi R$ 1.234,56.")  # sem citacoes
+    fontes = [_fonte("ap-001", "DAS: R$ 1.234,56")]
+    assert validar_resposta(resp, fontes) is False
+
+
+def test_regra5_rejeita_data_sem_citacao_com_fontes() -> None:
+    """Regra 5 + Regra 4: data sem citação e data não nas fontes → False."""
+    resp = _resp("O prazo é 20/07/2026.")  # data diferente da fonte
+    fontes = [_fonte("ag-001", "Prazo: 15/07/2026", tipo="agenda")]
+    assert validar_resposta(resp, fontes) is False
+
+
+def test_regra5_aceita_pleasantry_sem_citacao_com_fontes() -> None:
+    """Resposta sem afirmação fiscal não precisa de citação, mesmo com fontes."""
+    resp = _resp("Não encontrei dados específicos para responder.")
+    fontes = [_fonte("ap-001", "DAS: R$ 1.234,56")]
+    assert validar_resposta(resp, fontes) is True
+
+
+def test_regra5_nao_se_aplica_sem_fontes() -> None:
+    """Sem fontes, Regra 5 não dispara (grafo vazio é situação conhecida)."""
+    resp = _resp("O DAS foi R$ 1.234,56.")  # sem citacoes, mas também sem fontes
+    assert validar_resposta(resp, []) is False  # já rejeitado pela Regra 2 (valor não nas fontes)
+
+
+def test_regra5_aceita_afirmacao_fiscal_com_citacao_valida() -> None:
+    """Afirmação fiscal + citação válida + valor nas fontes → True."""
+    resp = _resp(
+        "O DAS de maio foi R$ 1.234,56 [ap-001].",
+        citacoes=[Citacao(fato_id="ap-001", trecho_citado="DAS: R$ 1.234,56")],
+    )
+    fontes = [_fonte("ap-001", "DAS: R$ 1.234,56")]
+    assert validar_resposta(resp, fontes) is True
+
+
+def test_regra5_rejeita_percentagem_sem_citacao_com_fontes() -> None:
+    """Regra 5: alíquota em resposta sem citação + fontes disponíveis → False."""
+    resp = _resp("A alíquota é 7,30%.")  # sem citacoes
+    fontes = [_fonte("ap-001", "Alíquota efetiva: 7,30%")]
+    assert validar_resposta(resp, fontes) is False
+
+
+# ── Integração: Regra 5 + serviço (via test_service_assistente) ──────────────
+
+
+def test_regra5_sem_fontes_pleasantry_nao_rejeita() -> None:
+    """Saudação/orientação sem fontes e sem afirmação fiscal → sempre True."""
+    resp = _resp("Olá! Para mais informações, consulte seu contador.")
+    assert validar_resposta(resp, []) is True

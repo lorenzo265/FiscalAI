@@ -117,7 +117,7 @@ def _arquivo_sped_ativo(empresa_id: uuid.UUID) -> SimpleNamespace:
         periodo_fim=date(2025, 12, 31),
         superseded_by=None,
         hash_arquivo="0" * 64,
-        algoritmo_versao="sped.ecf.v1",
+        algoritmo_versao="sped.ecf.v2",
         gerado_em=datetime(2026, 7, 5),
         status="gerado",
     )
@@ -193,7 +193,7 @@ async def test_gera_ecf_feliz_com_4_trimestres() -> None:
     assert gerada.arquivo.tipo == "ecf"
     assert gerada.arquivo.periodo_inicio == date(2025, 1, 1)
     assert gerada.arquivo.periodo_fim == date(2025, 12, 31)
-    assert gerada.arquivo.algoritmo_versao == "sped.ecf.v1"
+    assert gerada.arquivo.algoritmo_versao == "sped.ecf.v2"
     assert len(gerada.arquivo.hash_arquivo) == 64
     sped_repo.criar.assert_awaited_once()
     sped_repo.marcar_superseded.assert_not_awaited()

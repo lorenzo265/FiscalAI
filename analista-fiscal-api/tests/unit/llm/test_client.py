@@ -9,10 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.shared.llm.client import (
+    FonteFato,
     LLMClient,
     LLMProvider,
     LLMRequest,
     LLMResponse,
+    _extrair_citacoes,
 )
 
 
@@ -247,3 +249,118 @@ async def test_aclose_fecha_http(mock_settings: MagicMock, mock_redis: AsyncMock
     client = LLMClient(settings=mock_settings, redis=mock_redis, http_client=mock_http)
     await client.aclose()
     mock_http.aclose.assert_called_once()
+
+
+# ── _extrair_citacoes (FIX #4 — §8.5) ───────────────────────────────────────
+
+
+def _fonte(id_: str, payload: str = "conteudo") -> FonteFato:
+    return FonteFato(id=id_, tipo="apuracao_das", payload=payload)
+
+
+def test_extrair_citacoes_parseia_id_valido() -> None:
+    """LLM referencia [ap-001] que está nas fontes → Citacao populada."""
+    texto = "O DAS foi R$ 1.234,56 conforme apuração [ap-001]."
+    fontes = [_fonte("ap-001", "DAS: R$ 1.234,56")]
+    resultado = _extrair_citacoes(texto, fontes)
+    assert len(resultado) == 1
+    assert resultado[0].fato_id == "ap-001"
+    assert "DAS: R$ 1.234,56" in resultado[0].trecho_citado
+
+
+def test_extrair_citacoes_descarta_id_inexistente() -> None:
+    """LLM inventa [id-fantasma] que não existe nas fontes → descartado."""
+    texto = "Resposta fabricada [id-fantasma]."
+    fontes = [_fonte("ap-001", "DAS: R$ 1.234,56")]
+    resultado = _extrair_citacoes(texto, fontes)
+    assert resultado == []
+
+
+def test_extrair_citacoes_sem_fontes_retorna_vazio() -> None:
+    """Sem fontes disponíveis, nenhuma citação pode ser válida."""
+    texto = "Resposta [ap-001]."
+    resultado = _extrair_citacoes(texto, [])
+    assert resultado == []
+
+
+def test_extrair_citacoes_multiplos_ids() -> None:
+    """Múltiplos IDs válidos → uma Citacao por ID."""
+    texto = "Faturamento [mov-01] e DAS [ap-01]."
+    fontes = [_fonte("mov-01", "Faturamento: R$ 35.000"), _fonte("ap-01", "DAS: R$ 1.200")]
+    resultado = _extrair_citacoes(texto, fontes)
+    ids = {c.fato_id for c in resultado}
+    assert ids == {"mov-01", "ap-01"}
+
+
+def test_extrair_citacoes_deduplica_mesmo_id() -> None:
+    """ID repetido no texto → apenas uma Citacao."""
+    texto = "O DAS [ap-001] foi pago [ap-001]."
+    fontes = [_fonte("ap-001", "DAS pago")]
+    resultado = _extrair_citacoes(texto, fontes)
+    assert len(resultado) == 1
+
+
+def test_extrair_citacoes_id_parcialmente_invalido() -> None:
+    """Mistura de IDs válidos e inválidos → só os válidos."""
+    texto = "Dados [real-001] e imaginado [fake-999]."
+    fontes = [_fonte("real-001", "Dado real")]
+    resultado = _extrair_citacoes(texto, fontes)
+    assert len(resultado) == 1
+    assert resultado[0].fato_id == "real-001"
+
+
+@pytest.mark.asyncio
+async def test_chamar_ollama_popula_citacoes_de_fontes(
+    mock_settings: MagicMock, mock_redis: AsyncMock
+) -> None:
+    """_chamar_ollama deve popular citacoes quando o modelo cita IDs válidos."""
+    mock_http = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "message": {"content": "O DAS foi R$ 1.234,56 [ap-2026-05] conforme apuração."},
+        "eval_count": 50,
+        "prompt_eval_count": 100,
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_http.post.return_value = mock_response
+
+    client = LLMClient(settings=mock_settings, redis=mock_redis, http_client=mock_http)
+    fonte = FonteFato(id="ap-2026-05", tipo="apuracao_das", payload="DAS: R$ 1.234,56")
+    req = LLMRequest(
+        prompt="Qual meu DAS?",
+        contem_pii=True,
+        fontes_disponiveis=[fonte],
+    )
+
+    resp = await client.chamar(req, provider=LLMProvider.OLLAMA_GEMMA_3_4B)
+
+    assert len(resp.citacoes) == 1
+    assert resp.citacoes[0].fato_id == "ap-2026-05"
+
+
+@pytest.mark.asyncio
+async def test_chamar_ollama_descarta_citacao_id_invalido(
+    mock_settings: MagicMock, mock_redis: AsyncMock
+) -> None:
+    """_chamar_ollama deve descartar IDs que não existem nas fontes."""
+    mock_http = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "message": {"content": "Resposta inventada [id-nao-existe]."},
+        "eval_count": 20,
+        "prompt_eval_count": 40,
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_http.post.return_value = mock_response
+
+    client = LLMClient(settings=mock_settings, redis=mock_redis, http_client=mock_http)
+    fonte = FonteFato(id="ap-001", tipo="apuracao_das", payload="DAS real")
+    req = LLMRequest(
+        prompt="Qual meu DAS?",
+        contem_pii=True,
+        fontes_disponiveis=[fonte],
+    )
+
+    resp = await client.chamar(req, provider=LLMProvider.OLLAMA_GEMMA_3_4B)
+
+    assert resp.citacoes == []

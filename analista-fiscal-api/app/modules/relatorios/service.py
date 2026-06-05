@@ -243,6 +243,9 @@ class RelatoriosService:
 
         # Variações de saldos finais (fim − início do período).
         # Códigos vêm de `plano_referencial.GRUPOS_CONTABEIS` — fonte canônica única.
+        # FIX #9 (PR6): buscamos os saldos posicao_em UMA VEZ para cada snapshot
+        # (fim e antes) e indexamos por código em memória — elimina o N+1 de antes
+        # (~12 chamadas individuais × 2 = ~24 queries → 2 queries).
         antes = _date_anterior(payload.periodo_inicio)
         cod_clientes = codigos_do_grupo("clientes")
         cod_estoques = codigos_do_grupo("estoques")
@@ -251,42 +254,31 @@ class RelatoriosService:
         cod_imob = codigos_do_grupo("imobilizado_bruto")
         cod_caixa = codigos_do_grupo("caixa_equivalentes")
 
-        clientes_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_clientes, payload.periodo_fim,
-        )
-        clientes_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_clientes, antes,
-        )
-        estoques_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_estoques, payload.periodo_fim,
-        )
-        estoques_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_estoques, antes,
-        )
-        fornec_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_fornec, payload.periodo_fim,
-        )
-        fornec_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_fornec, antes,
-        )
-        encargos_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_encargos, payload.periodo_fim,
-        )
-        encargos_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_encargos, antes,
-        )
-        imob_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_imob, payload.periodo_fim,
-        )
-        imob_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_imob, antes,
-        )
-        caixa_fim = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_caixa, payload.periodo_fim,
-        )
-        caixa_ini = await _soma_saldos_codigos(
-            saldos_repo, empresa_id, cod_caixa, antes,
-        )
+        saldos_fim_list = await saldos_repo.saldos_posicao_em(empresa_id, payload.periodo_fim)
+        saldos_ant_list = await saldos_repo.saldos_posicao_em(empresa_id, antes)
+        saldos_fim_idx: dict[str, Decimal] = {s.codigo: s.saldo_final for s in saldos_fim_list}
+        saldos_ant_idx: dict[str, Decimal] = {s.codigo: s.saldo_final for s in saldos_ant_list}
+
+        _zero = Decimal("0")
+
+        def _soma_grupo_fim(codigos: tuple[str, ...]) -> Decimal:
+            return sum((saldos_fim_idx.get(c, _zero) for c in codigos), _zero)
+
+        def _soma_grupo_ant(codigos: tuple[str, ...]) -> Decimal:
+            return sum((saldos_ant_idx.get(c, _zero) for c in codigos), _zero)
+
+        clientes_fim = _soma_grupo_fim(cod_clientes)
+        clientes_ini = _soma_grupo_ant(cod_clientes)
+        estoques_fim = _soma_grupo_fim(cod_estoques)
+        estoques_ini = _soma_grupo_ant(cod_estoques)
+        fornec_fim = _soma_grupo_fim(cod_fornec)
+        fornec_ini = _soma_grupo_ant(cod_fornec)
+        encargos_fim = _soma_grupo_fim(cod_encargos)
+        encargos_ini = _soma_grupo_ant(cod_encargos)
+        imob_fim = _soma_grupo_fim(cod_imob)
+        imob_ini = _soma_grupo_ant(cod_imob)
+        caixa_fim = _soma_grupo_fim(cod_caixa)
+        caixa_ini = _soma_grupo_ant(cod_caixa)
 
         entrada = EntradaDfc(
             lucro_liquido=dre.lucro_liquido.valor,

@@ -49,6 +49,22 @@ class TestVerificarAssinaturaMeta:
         result = verificar_assinatura_meta(payload, sig, secret)
         assert isinstance(result, bool)
 
+    # ── FIX #6 (PR6) — guards para app_secret e signature_header vazios ──────
+
+    def test_app_secret_vazio_retorna_false(self) -> None:
+        """Fail-closed: secret vazio → False imediato (sem computar HMAC)."""
+        payload = b'{"object":"whatsapp_business_account"}'
+        sig = _gerar_assinatura(payload, "qualquer_secret")
+        assert verificar_assinatura_meta(payload, sig, app_secret="") is False
+
+    def test_signature_header_vazio_retorna_false(self) -> None:
+        """Fail-closed: header de assinatura vazio → False imediato."""
+        payload = b'{"object":"whatsapp_business_account"}'
+        assert verificar_assinatura_meta(payload, signature_header="", app_secret="meu_secret") is False
+
+    def test_ambos_vazios_retorna_false(self) -> None:
+        assert verificar_assinatura_meta(b"x", "", "") is False
+
 
 class TestExtrairMensagens:
     def test_mensagem_texto(self) -> None:

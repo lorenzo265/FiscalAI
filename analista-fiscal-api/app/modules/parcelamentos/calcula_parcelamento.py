@@ -36,7 +36,7 @@ from enum import StrEnum
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "parcelamento.ordinario.v1"
+ALGORITMO_VERSAO = "parcelamento.ordinario.v2"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -118,13 +118,27 @@ def gerar_parcelamento_ordinario(
             f"Reduza num_parcelas ou aumente o valor."
         )
 
-    parcelas = tuple(
-        ParcelaProjetada(
-            numero=n,
-            vencimento=_proximo_vencimento(data_adesao, n),
-            valor_projetado=parcela_base,
+    # Reconciliação de centavos: a última parcela absorve o resíduo de arredondamento
+    # para garantir que sum(parcelas) == divida_consolidada (ex.: R$1000/3 = 333,33×3
+    # = 999,99 vs 333,33×2 + 333,34 = 1000,00).
+    ultima_parcela = divida_consolidada - parcela_base * Decimal(num_parcelas - 1)
+
+    parcelas_list: list[ParcelaProjetada] = []
+    for n in range(1, num_parcelas + 1):
+        valor = ultima_parcela if n == num_parcelas else parcela_base
+        parcelas_list.append(
+            ParcelaProjetada(
+                numero=n,
+                vencimento=_proximo_vencimento(data_adesao, n),
+                valor_projetado=valor,
+            )
         )
-        for n in range(1, num_parcelas + 1)
+    parcelas = tuple(parcelas_list)
+
+    # Invariante: reconciliação deve ser exata.
+    soma = sum(p.valor_projetado for p in parcelas)
+    assert soma == divida_consolidada, (
+        f"Erro de reconciliação: sum(parcelas)={soma} != divida_consolidada={divida_consolidada}"
     )
 
     return ResultadoParcelamento(

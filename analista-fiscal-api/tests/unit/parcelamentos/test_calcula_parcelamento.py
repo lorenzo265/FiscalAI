@@ -14,6 +14,67 @@ from app.modules.parcelamentos.calcula_parcelamento import (
 )
 
 
+# ── Reconciliação de centavos ─────────────────────────────────────────────────
+
+
+class TestReconciliacaoCentavos:
+    """sum(parcelas) deve ser SEMPRE igual a divida_consolidada (FIX #13 PR6)."""
+
+    def test_1000_em_3_parcelas_fecha_exato(self) -> None:
+        # 1000 / 3 = 333,33 × 3 = 999,99 sem reconciliação → bug
+        # Com fix: 333,33 + 333,33 + 333,34 = 1000,00
+        r = gerar_parcelamento_ordinario(
+            Decimal("1000.00"), 3, date(2026, 1, 1),
+        )
+        soma = sum(p.valor_projetado for p in r.parcelas)
+        assert soma == Decimal("1000.00")
+        # Última parcela absorve o centavo extra
+        assert r.parcelas[-1].valor_projetado == Decimal("333.34")
+        assert r.parcelas[0].valor_projetado == Decimal("333.33")
+
+    def test_divisao_irregular_em_7_parcelas_fecha_exato(self) -> None:
+        # 2001 / 7 = 285,857... → arredondado 285,86 × 7 = 2001,02 sem reconciliação → bug
+        # 2001 / 7: parcela_base=285,86; última=2001 - 285,86×6 = 2001 - 1715,16 = 285,84
+        r = gerar_parcelamento_ordinario(
+            Decimal("2001.00"), 7, date(2026, 1, 1),
+        )
+        soma = sum(p.valor_projetado for p in r.parcelas)
+        assert soma == Decimal("2001.00")
+
+    def test_divisao_exata_todas_iguais(self) -> None:
+        # 60.000 / 60 = 1.000,00 exato — todas devem ser iguais
+        r = gerar_parcelamento_ordinario(
+            Decimal("60000.00"), 60, date(2026, 1, 1),
+        )
+        soma = sum(p.valor_projetado for p in r.parcelas)
+        assert soma == Decimal("60000.00")
+        assert all(p.valor_projetado == Decimal("1000.00") for p in r.parcelas)
+
+    def test_reconciliacao_pf_7_parcelas(self) -> None:
+        # 1001 / 7 = 143,0142... → 143,01 × 7 = 1001,07 sem reconciliação
+        r = gerar_parcelamento_ordinario(
+            Decimal("1001.00"), 7, date(2026, 1, 1),
+            contribuinte=TipoContribuinte.PF,
+        )
+        soma = sum(p.valor_projetado for p in r.parcelas)
+        assert soma == Decimal("1001.00")
+
+    @pytest.mark.parametrize("divida,n", [
+        ("12000.00", 60),
+        ("50000.00", 24),
+        ("999.99", 3),
+        ("1000.00", 3),
+        ("2001.00", 7),
+        ("10000.01", 6),
+    ])
+    def test_reconciliacao_invariante_parametrizado(self, divida: str, n: int) -> None:
+        r = gerar_parcelamento_ordinario(
+            Decimal(divida), n, date(2026, 6, 1),
+        )
+        soma = sum(p.valor_projetado for p in r.parcelas)
+        assert soma == Decimal(divida)
+
+
 class TestCronogramaBasico:
     def test_60k_em_60_parcelas(self) -> None:
         # 60.000 / 60 = 1.000 por parcela

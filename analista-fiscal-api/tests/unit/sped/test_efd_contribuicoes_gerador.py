@@ -309,6 +309,92 @@ class TestPreCondicoes:
             gerar_efd_contribuicoes(entrada)
 
 
+# ── Anti-regressão FIX #7 — M200/M600 regime cumulativo ────────────────────
+
+
+class TestM200M600RegimeCumulativo:
+    """FIX #7 (auditoria 2026-06-04): M200/M600 campos NC devem ser zero em
+    regime cumulativo; apurado e a_recolher vão nos campos CUM.
+
+    O bug anterior gravava os valores nos campos NC_*, causando glosa no
+    PVA que cruza 0110.COD_INC_TRIB="2" × M200.VL_TOT_CONT_NC_PER > 0.
+    """
+
+    def _extrair_m200(self, texto: str) -> list[str]:
+        for ln in texto.splitlines():
+            if ln.startswith("|M200|"):
+                return ln.strip().split("|")[2:-1]  # remove pipes externos e REG
+        pytest.fail("M200 não encontrado no arquivo gerado")
+
+    def _extrair_m600(self, texto: str) -> list[str]:
+        for ln in texto.splitlines():
+            if ln.startswith("|M600|"):
+                return ln.strip().split("|")[2:-1]
+        pytest.fail("M600 não encontrado no arquivo gerado")
+
+    def test_m200_campos_nc_sao_zero_em_cumulativo(self) -> None:
+        """Campos não-cumulativos (índices 0,3,5,6) devem ser 0,00."""
+        entrada = _entrada_minima(mercadorias=(_doc_mercadoria(),))
+        out = gerar_efd_contribuicoes(entrada)
+        campos = self._extrair_m200(out.conteudo.decode("latin-1"))
+        # Layout M200: 12 campos (índices 0..11)
+        # 0=VL_TOT_CONT_NC_PER, 3=VL_TOT_CONT_NC_DEV, 5=VL_OUT_DED_NC, 6=VL_CONT_NC_REC
+        assert campos[0] == "0,00", f"VL_TOT_CONT_NC_PER deve ser 0,00, é {campos[0]}"
+        assert campos[3] == "0,00", f"VL_TOT_CONT_NC_DEV deve ser 0,00, é {campos[3]}"
+        assert campos[5] == "0,00", f"VL_OUT_DED_NC deve ser 0,00, é {campos[5]}"
+        assert campos[6] == "0,00", f"VL_CONT_NC_REC deve ser 0,00, é {campos[6]}"
+
+    def test_m200_campos_cum_recebem_apurado(self) -> None:
+        """Campos cumulativos (índices 7,10,11) recebem os valores apurados."""
+        ap = ApuracaoMensalPisCofins(
+            base_calculo_pis=Decimal("100000.00"),
+            aliquota_pis=Decimal("0.65"),
+            valor_pis_apurado=Decimal("650.00"),
+            valor_pis_a_recolher=Decimal("650.00"),
+            base_calculo_cofins=Decimal("100000.00"),
+            aliquota_cofins=Decimal("3.00"),
+            valor_cofins_apurado=Decimal("3000.00"),
+            valor_cofins_a_recolher=Decimal("3000.00"),
+        )
+        entrada = _entrada_minima(apuracao=ap)
+        out = gerar_efd_contribuicoes(entrada)
+        campos = self._extrair_m200(out.conteudo.decode("latin-1"))
+        # 7=VL_TOT_CONT_CUM_PER (apurado), 10=VL_CONT_CUM_REC (a_recolher),
+        # 11=VL_TOT_CONT_REC (total = a_recolher em regime puro cumulativo)
+        assert campos[7] == "650,00", f"VL_TOT_CONT_CUM_PER deve ser 650,00, é {campos[7]}"
+        assert campos[10] == "650,00", f"VL_CONT_CUM_REC deve ser 650,00, é {campos[10]}"
+        assert campos[11] == "650,00", f"VL_TOT_CONT_REC deve ser 650,00, é {campos[11]}"
+
+    def test_m600_campos_nc_sao_zero_em_cumulativo(self) -> None:
+        """Mesmo que M200 — campos NC de Cofins devem ser zero em cumulativo."""
+        entrada = _entrada_minima(mercadorias=(_doc_mercadoria(),))
+        out = gerar_efd_contribuicoes(entrada)
+        campos = self._extrair_m600(out.conteudo.decode("latin-1"))
+        assert campos[0] == "0,00", f"M600 VL_TOT_CONT_NC_PER deve ser 0,00, é {campos[0]}"
+        assert campos[3] == "0,00", f"M600 VL_TOT_CONT_NC_DEV deve ser 0,00, é {campos[3]}"
+        assert campos[5] == "0,00", f"M600 VL_OUT_DED_NC deve ser 0,00, é {campos[5]}"
+        assert campos[6] == "0,00", f"M600 VL_CONT_NC_REC deve ser 0,00, é {campos[6]}"
+
+    def test_m600_campos_cum_recebem_apurado(self) -> None:
+        """Campos cumulativos de Cofins recebem valores apurados."""
+        ap = ApuracaoMensalPisCofins(
+            base_calculo_pis=Decimal("100000.00"),
+            aliquota_pis=Decimal("0.65"),
+            valor_pis_apurado=Decimal("650.00"),
+            valor_pis_a_recolher=Decimal("650.00"),
+            base_calculo_cofins=Decimal("100000.00"),
+            aliquota_cofins=Decimal("3.00"),
+            valor_cofins_apurado=Decimal("3000.00"),
+            valor_cofins_a_recolher=Decimal("3000.00"),
+        )
+        entrada = _entrada_minima(apuracao=ap)
+        out = gerar_efd_contribuicoes(entrada)
+        campos = self._extrair_m600(out.conteudo.decode("latin-1"))
+        assert campos[7] == "3000,00", f"M600 VL_TOT_CONT_CUM_PER deve ser 3000,00, é {campos[7]}"
+        assert campos[10] == "3000,00", f"M600 VL_CONT_CUM_REC deve ser 3000,00, é {campos[10]}"
+        assert campos[11] == "3000,00", f"M600 VL_TOT_CONT_REC deve ser 3000,00, é {campos[11]}"
+
+
 # ── Idempotência do hash ────────────────────────────────────────────────────
 
 

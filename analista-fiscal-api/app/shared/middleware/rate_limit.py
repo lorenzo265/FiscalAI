@@ -84,9 +84,26 @@ def limite_para_path(path: str) -> int:
     return _LIMITE_SENSIVEL if eh_endpoint_sensivel(path) else _LIMITE_PADRAO
 
 
-def construir_chave_redis(tenant_id: str, janela_ts: int) -> str:
-    """Constrói a chave Redis para o sliding window counter."""
-    return f"rl:{tenant_id}:{janela_ts}"
+def construir_chave_redis(
+    tenant_id: str,
+    janela_ts: int,
+    client_ip: str = "",
+) -> str:
+    """Constrói a chave Redis para o sliding window counter.
+
+    Formato: ``rl:<tid>:<ip>:<janela>``
+
+    O ``tid`` é extraído do JWT **sem verificar assinatura** (identificação,
+    não autenticação). Um atacante pode forjar ``tid`` para apontar para a
+    UUID de uma vítima — mas, como a chave inclui também o ``client_ip``,
+    ele só esgota o bucket de *sua própria* combinação (ip+tid), nunca o da
+    vítima real (ip_vitima+tid). O DoS dirigido por tenant é assim evitado
+    sem mover o middleware para depois da camada de autenticação.
+    """
+    # ip sanitizado: remove porta e caracteres fora do espaço esperado.
+    safe_ip = client_ip.split(":")[0] if ":" in client_ip else client_ip
+    safe_ip = safe_ip or "unknown"
+    return f"rl:{tenant_id}:{safe_ip}:{janela_ts}"
 
 
 def montar_headers_rate_limit(
@@ -115,6 +132,7 @@ async def checar_rate_limit(
     tenant_id: str,
     path: str,
     *,
+    client_ip: str = "",
     agora_ts: float = 0.0,
 ) -> RateLimitResult:
     """Incrementa o counter e retorna o resultado.
@@ -123,10 +141,13 @@ async def checar_rate_limit(
       1. INCR da chave  → retorna novo valor.
       2. Se valor == 1 (primeira req da janela) → EXPIRE _JANELA_SEG.
       3. Compara com limite → decide se bloqueia.
+
+    A chave inclui ``client_ip`` para mitigar DoS por forja de ``tid``
+    (ver ``construir_chave_redis``).
     """
     limite = limite_para_path(path)
     janela = calcular_janela_atual(agora_ts)
-    chave = construir_chave_redis(tenant_id, janela)
+    chave = construir_chave_redis(tenant_id, janela, client_ip)
     reset_ts = janela + _JANELA_SEG
 
     try:
@@ -201,7 +222,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if redis is None:
             return await call_next(request)
 
-        result = await checar_rate_limit(redis, tenant_id, path)
+        # Extrai IP do cliente para compor a chave de rate limit
+        # (mitiga DoS por forja de tid — ver construir_chave_redis).
+        client_ip = request.client.host if request.client else ""
+        result = await checar_rate_limit(redis, tenant_id, path, client_ip=client_ip)
 
         if not result.permitido:
             log.warning(

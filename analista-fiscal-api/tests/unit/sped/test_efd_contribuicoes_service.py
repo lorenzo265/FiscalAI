@@ -173,7 +173,7 @@ async def test_gera_efd_contribuicoes_persiste_arquivo_com_hash() -> None:
     assert gerada.arquivo.tipo == "efd_contribuicoes"
     assert gerada.arquivo.periodo_inicio == date(2026, 3, 1)
     assert gerada.arquivo.periodo_fim == date(2026, 3, 31)
-    assert gerada.arquivo.algoritmo_versao == "sped.efd_contribuicoes.v3"
+    assert gerada.arquivo.algoritmo_versao == "sped.efd_contribuicoes.v4"
     assert len(gerada.arquivo.hash_arquivo) == 64
     sped_repo.criar.assert_awaited_once()
     sped_repo.marcar_superseded.assert_not_awaited()

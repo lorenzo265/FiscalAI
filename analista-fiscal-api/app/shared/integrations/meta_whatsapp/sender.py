@@ -50,12 +50,19 @@ class MetaWhatsAppSender:
         await self._http.aclose()
 
     async def enviar_texto(self, phone: str, texto: str) -> JsonObject:
-        """Envia mensagem de texto simples para o número E.164 informado."""
+        """Envia mensagem de texto simples para o número E.164 informado.
+
+        Aplica retry em 5xx/TransportError (mesmo padrão de ``enviar_template``).
+        Erros 4xx (payload inválido, número fora da janela 24h) levantam
+        ``EnvioWhatsappFalhou`` diretamente sem retry.
+        """
+        from app.shared.exceptions import EnvioWhatsappFalhou
+
         if not self._phone_id:
             log.warning("whatsapp.sender.sem_phone_id", phone_sufixo=phone[-4:])
             return {"status": "skip_sem_configuracao"}
 
-        payload = {
+        payload: JsonObject = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": phone,
@@ -63,13 +70,47 @@ class MetaWhatsAppSender:
             "text": {"preview_url": False, "body": texto},
         }
         url = f"{_GRAPH_URL}/{self._phone_id}/messages"
-        resp = await self._http.post(url, json=payload)
 
+        try:
+            return await self._post_texto(url, payload, phone)
+        except _MetaTemporaryError as exc:
+            log.warning(
+                "whatsapp.texto.tentativas_esgotadas",
+                phone_sufixo=phone[-4:],
+                erro=str(exc)[:200],
+            )
+            raise EnvioWhatsappFalhou(
+                f"Meta WhatsApp indisponível após retries: {exc}"
+            ) from exc
+
+    @retry(
+        wait=wait_exponential_jitter(initial=1, max=8),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(_MetaTemporaryError),
+        reraise=True,
+    )
+    async def _post_texto(
+        self,
+        url: str,
+        payload: JsonObject,
+        phone: str,
+    ) -> JsonObject:
+        """POST com retry — 5xx/TransportError viram ``_MetaTemporaryError``."""
+        from app.shared.exceptions import EnvioWhatsappFalhou
+
+        try:
+            resp = await self._http.post(url, json=payload)
+        except httpx.TransportError as exc:
+            raise _MetaTemporaryError(f"transport: {exc}") from exc
+
+        if 500 <= resp.status_code < 600:
+            raise _MetaTemporaryError(
+                f"http_{resp.status_code}: {resp.text[:200]}"
+            )
         if not resp.is_success:
-            from app.shared.exceptions import WhatsAppErro
-
-            raise WhatsAppErro(
-                f"Falha ao enviar mensagem WhatsApp: {resp.status_code} {resp.text[:200]}"
+            # 4xx — erro do nosso lado. Sem retry.
+            raise EnvioWhatsappFalhou(
+                f"Meta WhatsApp {resp.status_code}: {resp.text[:200]}"
             )
 
         result: JsonObject = resp.json()

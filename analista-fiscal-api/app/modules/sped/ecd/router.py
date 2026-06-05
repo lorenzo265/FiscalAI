@@ -68,7 +68,7 @@ async def download_ecd(
     session: SessionDep,
 ) -> Response:
     arquivo = await ArquivoSpedRepo(session).por_id(sped_id)
-    if arquivo is None or arquivo.empresa_id != empresa_id:
+    if arquivo is None or arquivo.empresa_id != empresa_id or arquivo.tipo != "ecd":
         raise HTTPException(status_code=404, detail="Arquivo SPED não encontrado")
 
     nome = (

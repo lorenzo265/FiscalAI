@@ -57,7 +57,7 @@ from app.modules.sped.compartilhado import (
     montar_arquivo,
 )
 
-ALGORITMO_VERSAO = "sped.ecd.v1"
+ALGORITMO_VERSAO = "sped.ecd.v2"
 
 # Versão do leiaute ECD publicado pela RFB. ADE Cofis 64/2024 define
 # v10 vigente a partir do ano-calendário 2024. Atualizar em conjunto

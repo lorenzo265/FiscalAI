@@ -72,7 +72,13 @@ from app.modules.sped.compartilhado import (
     montar_arquivo,
 )
 
-ALGORITMO_VERSAO = "sped.efd_contribuicoes.v3"
+ALGORITMO_VERSAO = "sped.efd_contribuicoes.v4"
+# Auditoria 2026-06-04 bump v3→v4 — FIX #7: M200/M600 regime cumulativo
+# agora grava o apurado nos campos cumulativos corretos (VL_TOT_CONT_CUM_PER
+# e VL_CONT_CUM_REC) e zera os campos não-cumulativos (VL_TOT_CONT_NC_PER,
+# VL_TOT_CONT_NC_DEV, VL_OUT_DED_NC, VL_CONT_NC_REC). Antes, os valores de
+# apuração iam para os campos NC, causando glosa no PVA que cruza 0110×M200.
+#
 # Sprint 19.8 PR1 bump v2→v3 — adiciona stubs explícitos dos blocos I, P
 # e D (entrada faltava). Sem mudanças funcionais quando ``itens`` e
 # retenções vêm zerados.
@@ -727,22 +733,39 @@ def _gerar_bloco_m(entrada: EntradaEfdContribuicoes) -> list[str]:
     out.append(linha("M001", _IND_MOV_COM_DADOS))
 
     ap = entrada.apuracao
-    # M200 — consolidação PIS do período.
+    # M200 — consolidação PIS do período (regime cumulativo — COD_INC_TRIB="2").
+    #
+    # Layout M200 (12 campos após REG):
+    #   1  VL_TOT_CONT_NC_PER  — contribuição não-cumulativa do período → ZERO em cumulativo
+    #   2  VL_TOT_CRED_DESC    — créditos descontados NC → ZERO
+    #   3  VL_TOT_CRED_DESC_ANT — créditos NC de períodos anteriores → ZERO
+    #   4  VL_TOT_CONT_NC_DEV  — contribuição NC devolvida → ZERO em cumulativo
+    #   5  VL_RET_NC            — retenções NC → ZERO
+    #   6  VL_OUT_DED_NC        — outras deduções NC → ZERO em cumulativo
+    #   7  VL_CONT_NC_REC       — NC a recolher → ZERO em cumulativo
+    #   8  VL_TOT_CONT_CUM_PER  — contribuição cumulativa do período (★)
+    #   9  VL_RET_CUM           — retenções cumulativas → ZERO (MVP)
+    #  10  VL_OUT_DED_CUM       — outras deduções cumulativas → ZERO (MVP)
+    #  11  VL_CONT_CUM_REC      — cumulativo a recolher (★)
+    #  12  VL_TOT_CONT_REC      — total a recolher (NC + CUM) (★)
+    #
+    # Bug anterior (v3): apurado e a_recolher iam para campos NC (1,4,6,7),
+    # causando glosa quando PVA cruzava 0110.COD_INC_TRIB="2" × M200 NC>0.
     out.append(
         linha(
             "M200",
-            ap.valor_pis_apurado,  # VL_TOT_CONT_NC_PER (zero em cumulativo)
-            _ZERO,  # VL_TOT_CRED_DESC
-            _ZERO,  # VL_TOT_CRED_DESC_ANT
-            ap.valor_pis_apurado,  # VL_TOT_CONT_NC_DEV
-            _ZERO,  # VL_RET_NC
-            ap.valor_pis_a_recolher,  # VL_OUT_DED_NC
-            ap.valor_pis_a_recolher,  # VL_CONT_NC_REC
-            ap.valor_pis_apurado,  # VL_TOT_CONT_CUM_PER
-            _ZERO,  # VL_RET_CUM
-            _ZERO,  # VL_OUT_DED_CUM
-            ap.valor_pis_a_recolher,  # VL_CONT_CUM_REC
-            ap.valor_pis_a_recolher,  # VL_TOT_CONT_REC
+            _ZERO,               # VL_TOT_CONT_NC_PER — zero em cumulativo
+            _ZERO,               # VL_TOT_CRED_DESC
+            _ZERO,               # VL_TOT_CRED_DESC_ANT
+            _ZERO,               # VL_TOT_CONT_NC_DEV — zero em cumulativo
+            _ZERO,               # VL_RET_NC
+            _ZERO,               # VL_OUT_DED_NC — zero em cumulativo
+            _ZERO,               # VL_CONT_NC_REC — zero em cumulativo
+            ap.valor_pis_apurado,       # VL_TOT_CONT_CUM_PER (★)
+            _ZERO,               # VL_RET_CUM
+            _ZERO,               # VL_OUT_DED_CUM
+            ap.valor_pis_a_recolher,    # VL_CONT_CUM_REC (★)
+            ap.valor_pis_a_recolher,    # VL_TOT_CONT_REC (★)
         )
     )
     # M400 — receitas isentas/não tributadas PIS (placeholder vazio).
@@ -756,21 +779,22 @@ def _gerar_bloco_m(entrada: EntradaEfdContribuicoes) -> list[str]:
         )
     )
     # M600 — consolidação Cofins do período (mesmo layout que M200).
+    # Bug anterior idêntico ao M200 — campos NC recebiam os valores cumulativos.
     out.append(
         linha(
             "M600",
-            ap.valor_cofins_apurado,
-            _ZERO,
-            _ZERO,
-            ap.valor_cofins_apurado,
-            _ZERO,
-            ap.valor_cofins_a_recolher,
-            ap.valor_cofins_a_recolher,
-            ap.valor_cofins_apurado,
-            _ZERO,
-            _ZERO,
-            ap.valor_cofins_a_recolher,
-            ap.valor_cofins_a_recolher,
+            _ZERO,               # VL_TOT_CONT_NC_PER — zero em cumulativo
+            _ZERO,               # VL_TOT_CRED_DESC
+            _ZERO,               # VL_TOT_CRED_DESC_ANT
+            _ZERO,               # VL_TOT_CONT_NC_DEV — zero em cumulativo
+            _ZERO,               # VL_RET_NC
+            _ZERO,               # VL_OUT_DED_NC — zero em cumulativo
+            _ZERO,               # VL_CONT_NC_REC — zero em cumulativo
+            ap.valor_cofins_apurado,    # VL_TOT_CONT_CUM_PER (★)
+            _ZERO,               # VL_RET_CUM
+            _ZERO,               # VL_OUT_DED_CUM
+            ap.valor_cofins_a_recolher, # VL_CONT_CUM_REC (★)
+            ap.valor_cofins_a_recolher, # VL_TOT_CONT_REC (★)
         )
     )
     # M800 — receitas isentas/não tributadas Cofins (placeholder vazio).

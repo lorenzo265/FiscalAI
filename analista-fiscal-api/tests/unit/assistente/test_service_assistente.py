@@ -157,6 +157,47 @@ async def test_fallback_quando_citacao_invalida_apos_2_tentativas() -> None:
     assert resposta.resposta == RESPOSTA_PADRAO_VERIFICAR
 
 
+# ── Regra 5 (§8.5) — fallback quando afirmação fiscal sem citação ─────────────
+
+
+async def test_fallback_quando_afirmacao_fiscal_sem_citacao_e_fontes_presentes() -> None:
+    """Regra 5 §8.5: resposta com R$ + fontes disponíveis mas zero citações → fallback."""
+    from app.shared.llm.citacao import RESPOSTA_PADRAO_VERIFICAR
+
+    empresa_id = uuid4()
+    payload = PerguntaIn(pergunta="Qual meu DAS de maio?")
+    session = AsyncMock()
+    llm_client = AsyncMock()
+
+    # LLM responde com valor monetário mas sem [ID] de citação
+    llm_client.chamar = AsyncMock(
+        return_value=_llm_resp(
+            texto="O DAS de maio foi R$ 1.234,56.",
+            citacoes=[],  # cliente não extraiu citação (ou modelo não citou ID)
+        )
+    )
+    settings = _mock_settings()
+
+    # RAG retorna uma fonte (grafo não vazio)
+    from app.shared.llm.client import FonteFato
+
+    fontes_rag = [{"id": "ap-001", "tipo": "apuracao_das", "payload": "DAS: R$ 1.234,56"}]
+
+    with patch(
+        "app.modules.assistente.service.buscar_contexto_rag",
+        new=AsyncMock(return_value=MagicMock(nodes=[], similaridade_media=0.0, query_usada="")),
+    ), patch(
+        "app.modules.assistente.service.contexto_para_fontes",
+        return_value=fontes_rag,
+    ):
+        resposta = await responder_pergunta(empresa_id, payload, session, llm_client, settings)
+
+    # Duas tentativas (LLM sempre responde sem citação) → fallback
+    assert llm_client.chamar.call_count == 2
+    assert resposta.resposta == RESPOSTA_PADRAO_VERIFICAR
+    assert resposta.provider_usado == "fallback"
+
+
 # ── RAG falha graciosamente ───────────────────────────────────────────────────
 
 

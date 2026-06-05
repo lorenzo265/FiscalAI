@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -15,6 +16,50 @@ from app.config import Settings
 from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
+
+# Regex para capturar IDs citados pelo LLM na forma [ID]
+# Exemplo: "O DAS foi R$ 1.234,56 [ap-2026-05-001]." → ["ap-2026-05-001"]
+_RE_CITACAO = re.compile(r"\[([^\]]+)\]")
+
+
+def _extrair_citacoes(texto: str, fontes: list["FonteFato"]) -> list["Citacao"]:
+    """Parseia referências ``[ID]`` do texto e valida contra as fontes fornecidas.
+
+    Princípio §8.5: só gera Citacao para IDs que o modelo *realmente* usou
+    (apareceram no texto) E que existem entre as ``fontes_disponiveis`` passadas
+    no request. IDs inventados pelo modelo (não presentes nas fontes) são
+    silenciosamente descartados — o re-check de §8.6 cuidará da rejeição.
+
+    O ``trecho_citado`` é o início do payload da fonte (máx. 120 chars) que
+    serve de âncora de rastreabilidade para auditoria. Não é o trecho literal
+    extraído do texto do LLM, pois o modelo pode parafrasear; o ID já garante
+    a ligação ao fato.
+    """
+    if not fontes:
+        return []
+
+    ids_validos: dict[str, "FonteFato"] = {f.id: f for f in fontes}
+    vistos: set[str] = set()
+    citacoes: list[Citacao] = []
+
+    for m in _RE_CITACAO.finditer(texto):
+        id_referenciado = m.group(1).strip()
+        if id_referenciado in vistos:
+            continue  # deduplica múltiplas menções ao mesmo ID
+        vistos.add(id_referenciado)
+        fonte = ids_validos.get(id_referenciado)
+        if fonte is None:
+            # ID não existe nas fontes fornecidas → descartar (não inventar)
+            log.debug(
+                "llm.citacao_id_invalido",
+                id_referenciado=id_referenciado,
+            )
+            continue
+        trecho = fonte.payload[:120]
+        citacoes.append(Citacao(fato_id=id_referenciado, trecho_citado=trecho))
+
+    return citacoes
+
 
 # Custo por token (USD) para providers Gemini — atualizar conforme pricing
 _CUSTO_POR_TOKEN: dict[str, tuple[Decimal, Decimal]] = {
@@ -215,9 +260,11 @@ class LLMClient:
         tokens_input = int(data.get("prompt_eval_count", 0))
         tokens_output = int(data.get("eval_count", 0))
 
+        citacoes = _extrair_citacoes(texto, request.fontes_disponiveis)
+
         return LLMResponse(
             texto=texto,
-            citacoes=[],
+            citacoes=citacoes,
             tokens_input=tokens_input,
             tokens_output=tokens_output,
             tokens_cached=0,
@@ -269,9 +316,12 @@ class LLMClient:
             Decimal(tokens_input) * custo_input + Decimal(tokens_output) * custo_output
         )
 
+        texto_gemini = response.text or ""
+        citacoes = _extrair_citacoes(texto_gemini, request.fontes_disponiveis)
+
         return LLMResponse(
-            texto=response.text or "",
-            citacoes=[],
+            texto=texto_gemini,
+            citacoes=citacoes,
             tokens_input=tokens_input,
             tokens_output=tokens_output,
             tokens_cached=tokens_cached,

@@ -146,8 +146,11 @@ def gerar_bloco_9(linhas_anteriores: Sequence[str]) -> list[str]:
 
     tipos_que_terao_9900 = sorted(set(base.keys()) | {"9900", "9990", "9999"})
     base["9900"] = len(tipos_que_terao_9900)
-    # 9990 é a contagem total do bloco 9: 9001 + (n × 9900) + ele próprio.
-    total_bloco_9 = base["9001"] + base["9900"] + 1
+    # 9990 é a contagem total do bloco 9:
+    #   1 (9001) + N (9900 × N tipos) + 1 (9990 ele próprio) + 1 (9999 fecha o arquivo
+    #   mas ainda pertence ao bloco 9 — o PVA valida QTD_LIN_9 incluindo o 9999).
+    # Bug anterior: contava apenas +1 (esquecia o 9999). Corrigido para +2.
+    total_bloco_9 = base["9001"] + base["9900"] + 2
     base["9990"] = 1
     # 9999 conta TODAS as linhas do arquivo, inclusive ele.
     total_geral = sum(base.values()) + 1  # +1 = a própria linha 9999

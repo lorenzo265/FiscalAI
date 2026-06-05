@@ -126,8 +126,13 @@ class ConsultaPagamentoService:
             )
 
         idem_key = idempotency_pagamento(consulta_id)
-        # Se já houver cobrança (idempotência), devolve a existente.
-        existente = await self._buscar_por_consulta(session, consulta_id)
+        # FIX #13: gate usa idem_key (uuid5 determinístico, UNIQUE no DB via
+        # uq_cobranca_idempotency) em vez de apenas consulta_id. Isso alinha o
+        # gate com o contrato do §8.9: a chave de idempotência é o árbitro, não
+        # a foreign key de negócio. Ambas as UNIQUEs existem (0033 migration:
+        # uq_cobranca_consulta + uq_cobranca_idempotency), mas a idem_key é o
+        # ponto de entrada canônico para retry seguro do lado do caller.
+        existente = await self._buscar_por_idem_key(session, idem_key)
         if existente is not None:
             return existente
 
@@ -151,9 +156,9 @@ class ConsultaPagamentoService:
         try:
             await session.commit()
         except IntegrityError:
-            # Race: outra request criou no meio. Refetch + devolve.
+            # Race: outra request criou no meio. Refetch via idem_key + devolve.
             await session.rollback()
-            existente = await self._buscar_por_consulta(session, consulta_id)
+            existente = await self._buscar_por_idem_key(session, idem_key)
             if existente is None:
                 raise
             return existente
@@ -228,6 +233,18 @@ class ConsultaPagamentoService:
             status=status,
         )
         return cobranca
+
+    @staticmethod
+    async def _buscar_por_idem_key(
+        session: AsyncSession, idem_key: UUID
+    ) -> CobrancaConsulta | None:
+        """Gate primário de idempotência — usa a UNIQUE(idempotency_key) (§8.9)."""
+        from sqlalchemy import select
+
+        stmt = select(CobrancaConsulta).where(
+            CobrancaConsulta.idempotency_key == idem_key
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
 
     @staticmethod
     async def _buscar_por_consulta(

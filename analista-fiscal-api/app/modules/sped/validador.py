@@ -190,7 +190,76 @@ def _validar_estrutura(
                 )
             )
 
-    # 3) 9999 == total real de linhas significativas.
+    # 3a) 9990 == total de linhas do bloco 9.
+    #
+    # O bloco 9 contém: 9001 + (N × 9900) + 9990 + 9999.
+    # O PVA valida QTD_LIN_9 (campo do 9990) estritamente contra a contagem
+    # real dessas linhas. Verificamos aqui para capturar o off-by-one que
+    # antes só era detectado pelo PVA (e que nosso gerador tinha até a
+    # correção de 2026-06-04).
+    _REG_BLOCO_9 = {"9001", "9900", "9990", "9999"}
+    total_bloco_9_real = sum(contagem.get(r, 0) for r in _REG_BLOCO_9)
+    linhas_9990 = [
+        (nro, campos) for nro, reg, campos in linhas if reg == "9990"
+    ]
+    if not linhas_9990:
+        erros.append(
+            IssueValidacao(
+                severidade="erro",
+                codigo="estrutura.9990_ausente",
+                mensagem="Arquivo sem registro 9990 (totalizador do bloco 9).",
+            )
+        )
+    elif len(linhas_9990) > 1:
+        erros.append(
+            IssueValidacao(
+                severidade="erro",
+                codigo="estrutura.9990_duplicado",
+                mensagem=f"Arquivo tem {len(linhas_9990)} registros 9990.",
+            )
+        )
+    else:
+        _, campos_9990 = linhas_9990[0]
+        if not campos_9990:
+            erros.append(
+                IssueValidacao(
+                    severidade="erro",
+                    codigo="estrutura.9990_sem_campo",
+                    mensagem="Registro 9990 sem campo de totalização.",
+                )
+            )
+        else:
+            try:
+                declarado_9990 = int(campos_9990[0])
+            except ValueError:
+                erros.append(
+                    IssueValidacao(
+                        severidade="erro",
+                        codigo="estrutura.9990_invalido",
+                        mensagem=(
+                            f"Registro 9990 com valor não-numérico: "
+                            f"{campos_9990[0]!r}"
+                        ),
+                    )
+                )
+            else:
+                if declarado_9990 != total_bloco_9_real:
+                    erros.append(
+                        IssueValidacao(
+                            severidade="erro",
+                            codigo="estrutura.9990_divergente",
+                            mensagem=(
+                                f"Registro 9990 declara {declarado_9990} linhas "
+                                f"no bloco 9, bloco tem {total_bloco_9_real}."
+                            ),
+                            contexto={
+                                "declarado": str(declarado_9990),
+                                "real": str(total_bloco_9_real),
+                            },
+                        )
+                    )
+
+    # 3b) 9999 == total real de linhas significativas.
     total_real = sum(contagem.values())
     linhas_9999 = [
         (nro, campos) for nro, reg, campos in linhas if reg == "9999"

@@ -121,14 +121,23 @@ def calcular_parcela_mensal(
     )
 
     # Última parcela: fecha resíduo de arredondamento. Critérios cumulativos:
-    #   a) Já foram feitas (vida_util_meses - 1) parcelas anteriores; ou
+    #   a) Já foram feitas (vida_util_meses - 1) parcelas com base na competência
+    #      (meses decorridos desde a elegibilidade); ou
     #   b) A parcela padrão sozinha já cobre o restante.
+    #
+    # FIX #5 (PR6): derivamos o número de parcelas anteriores a partir da
+    # competência — não da divisão do valor acumulado pela parcela padrão,
+    # que pode errar por 1 quando os centavos de ROUND_HALF_EVEN se acumulam
+    # (ex.: parcela_padrao=333,33 → acumulado_2=666,66 → 666,66/333,33=2,0,
+    # mas no mês 59 o acumulado pode cair no arredondamento).
     restante = base_depreciavel - valor_acumulado_anterior
-    parcelas_anteriores = (
-        int((valor_acumulado_anterior / parcela_padrao).to_integral_value())
-        if parcela_padrao > Decimal("0")
-        else 0
+    competencia_inicial = _primeiro_dia_mes_seguinte(bem.data_aquisicao)
+    # Meses decorridos entre a competência inicial e a competência atual (inclusive).
+    meses_desde_inicio = (
+        (competencia.year - competencia_inicial.year) * 12
+        + (competencia.month - competencia_inicial.month)
     )
+    parcelas_anteriores = meses_desde_inicio  # quantas competências ANTES desta
     eh_ultima_por_contagem = parcelas_anteriores + 1 >= bem.vida_util_meses
     eh_ultima_por_valor = parcela_padrao >= restante
 

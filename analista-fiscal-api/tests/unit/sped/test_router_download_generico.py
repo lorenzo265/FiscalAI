@@ -30,7 +30,7 @@ def _arquivo_fake(*, tipo: str = "ecd") -> ArquivoSped:
         conteudo_bytea=b"|0000|fake-sped|conteudo|\r\n",
         tamanho_bytes=27,
         hash_arquivo="a" * 64,
-        algoritmo_versao="sped.ecd.v1",
+        algoritmo_versao="sped.ecd.v2",
     )
 
 
@@ -53,7 +53,7 @@ async def test_download_genericu_serve_bytea_com_headers() -> None:
     )
     assert resp.status_code == 200
     assert resp.headers["X-Sped-Hash"] == "a" * 64
-    assert resp.headers["X-Sped-Algoritmo-Versao"] == "sped.ecd.v1"
+    assert resp.headers["X-Sped-Algoritmo-Versao"] == "sped.ecd.v2"
     assert resp.media_type == "application/octet-stream"
     assert "filename=" in resp.headers["Content-Disposition"]
     assert "efd_contribuicoes" in resp.headers["Content-Disposition"]
@@ -140,3 +140,57 @@ async def test_download_filename_inclui_periodo() -> None:
     cd = resp.headers["Content-Disposition"]
     assert "20260401-20260430" in cd
     assert ".txt" in cd
+
+
+# ── FIX #7 (PR6) — download_ecd legado: guard de tipo ─────────────────────────
+#
+# O endpoint /sped/ecd/{id}/download legado só checava empresa_id. Com o fix,
+# um arquivo de tipo "ecf" não pode ser baixado via rota ECD.
+
+
+@pytest.mark.asyncio
+async def test_download_ecd_legado_rejeita_tipo_errado() -> None:
+    """FIX #7: arquivo ECF não deve ser servido pelo endpoint legado ECD."""
+    from app.modules.sped.ecd.router import download_ecd
+    from app.modules.sped.ecd.repo import ArquivoSpedRepo as EcdArquivoSpedRepo
+
+    arquivo = _arquivo_fake(tipo="ecf")  # tipo errado para rota ECD
+    fake_repo = MagicMock()
+    fake_repo.por_id = AsyncMock(return_value=arquivo)
+
+    import app.modules.sped.ecd.router as ecd_mod
+
+    ecd_mod.ArquivoSpedRepo = lambda _s: fake_repo  # type: ignore[assignment, misc]
+
+    with pytest.raises(HTTPException) as ei:
+        await download_ecd(
+            empresa_id=arquivo.empresa_id,
+            sped_id=arquivo.id,
+            ctx=MagicMock(),
+            session=MagicMock(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_download_ecd_legado_serve_arquivo_correto() -> None:
+    """FIX #7: arquivo ECD correto é servido normalmente."""
+    arquivo = _arquivo_fake(tipo="ecd")
+    arquivo.empresa_id = arquivo.empresa_id
+
+    import app.modules.sped.ecd.router as ecd_mod
+
+    fake_repo = MagicMock()
+    fake_repo.por_id = AsyncMock(return_value=arquivo)
+    ecd_mod.ArquivoSpedRepo = lambda _s: fake_repo  # type: ignore[assignment, misc]
+
+    from app.modules.sped.ecd.router import download_ecd
+
+    resp = await download_ecd(
+        empresa_id=arquivo.empresa_id,
+        sped_id=arquivo.id,
+        ctx=MagicMock(),
+        session=MagicMock(),
+    )
+    assert resp.status_code == 200
+    assert resp.headers["X-Sped-Hash"] == "a" * 64

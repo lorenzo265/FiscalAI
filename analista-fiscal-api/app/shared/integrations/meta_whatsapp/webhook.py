@@ -15,7 +15,13 @@ def verificar_assinatura_meta(
 
     Usa hmac.compare_digest para evitar timing attacks.
     DEVE ser chamada antes de qualquer processamento do payload.
+
+    Retorna False imediatamente se app_secret ou signature_header estiverem
+    vazios — fail-closed (espelha pluggy/webhook.py).
     """
+    if not app_secret or not signature_header:
+        return False
+
     expected = "sha256=" + hmac_lib.new(
         app_secret.encode(), payload_bytes, hashlib.sha256
     ).hexdigest()

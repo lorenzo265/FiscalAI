@@ -72,11 +72,19 @@ from app.modules.sped.compartilhado import (
 )
 from app.modules.sped.efd.ciap import SnapshotCiap
 
+# Auditoria 2026-06-04 bump (#8): E110 VL_SLD_APURADO corrigido.
+ALGORITMO_VERSAO = "sped.efd_icms_ipi.v4"
+# Auditoria 2026-06-04 bump v3→v4 — FIX #8: E110 campo VL_SLD_APURADO
+# (campo 10/índice 9) recebia ``valor_icms_a_recolher`` (duplicando o campo
+# VL_ICMS_RECOLHER). Corrigido para refletir o saldo apurado real:
+#   débitos − créditos − saldo_credor_anterior
+# (positivo = saldo devedor; negativo = saldo credor, que vai em
+# VL_SLD_CREDOR_TRANSPORTAR). O PVA recalcula aritmeticamente e acusava
+# inconsistência quando créditos > débitos.
+#
 # Sprint 19.6 PR1 bump (#31): Bloco G CIAP real (antes era vazio).
-ALGORITMO_VERSAO = "sped.efd_icms_ipi.v3"
 # Sprint 19.8 PR1 — bump v2→v3: bloco B agora emitido (stub IND_MOV=1)
-# para cobertura completa do leiaute. #30/#29/#32 documentados via stubs
-# explícitos com comentários apontando pro runbook de ativação externos.
+# para cobertura completa do leiaute.
 
 # Versão do leiaute EFD ICMS-IPI — Ajuste SINIEF 02/2009 + Guia Prático
 # v3.1.7 (vigente 2024+). Atualizar com bump de ALGORITMO_VERSAO quando
@@ -555,23 +563,37 @@ def _gerar_bloco_e(entrada: EntradaEfdIcmsIpi) -> list[str]:
     )
     ap = entrada.apuracao_icms
     # E110 — apuração consolidada do ICMS.
+    #
+    # VL_SLD_APURADO = VL_TOT_DEBITOS − VL_TOT_CREDITOS − VL_SLD_CREDOR_ANT
+    # (fórmula simplificada quando ajustes = 0; positivo = saldo devedor,
+    #  negativo = saldo credor). O PVA recalcula esse campo aritmeticamente
+    #  e rejeita o arquivo quando diverge do declarado.
+    #
+    # Bug anterior (v3): VL_SLD_APURADO recebia ``valor_icms_a_recolher``
+    # (sempre ≥ 0), ignorando o saldo credor e duplicando o VL_ICMS_RECOLHER.
+    # Em meses com créditos > débitos o PVA detectava inconsistência aritmética.
+    _saldo_apurado = (
+        ap.valor_total_debitos
+        - ap.valor_total_creditos
+        - ap.saldo_credor_anterior
+    )
     out.append(
         linha(
             "E110",
-            ap.valor_total_debitos,  # VL_TOT_DEBITOS
-            "0",  # VL_AJ_DEBITOS
-            "0",  # VL_TOT_AJ_DEBITOS
-            "0",  # VL_ESTORNOS_CRED
-            ap.valor_total_creditos,  # VL_TOT_CREDITOS
-            "0",  # VL_AJ_CREDITOS
-            "0",  # VL_TOT_AJ_CREDITOS
-            "0",  # VL_ESTORNOS_DEB
-            ap.saldo_credor_anterior,
-            ap.valor_icms_a_recolher,  # VL_SLD_APURADO (devedor)
-            ap.ajustes_devedores,  # VL_TOT_DED
-            ap.valor_icms_a_recolher,  # VL_ICMS_RECOLHER
+            ap.valor_total_debitos,         # VL_TOT_DEBITOS
+            "0",                            # VL_AJ_DEBITOS
+            "0",                            # VL_TOT_AJ_DEBITOS
+            "0",                            # VL_ESTORNOS_CRED
+            ap.valor_total_creditos,        # VL_TOT_CREDITOS
+            "0",                            # VL_AJ_CREDITOS
+            "0",                            # VL_TOT_AJ_CREDITOS
+            "0",                            # VL_ESTORNOS_DEB
+            ap.saldo_credor_anterior,       # VL_SLD_CREDOR_ANT
+            _saldo_apurado,                 # VL_SLD_APURADO (★ corrigido)
+            ap.ajustes_devedores,           # VL_TOT_DED
+            ap.valor_icms_a_recolher,       # VL_ICMS_RECOLHER
             ap.saldo_credor_a_transportar,  # VL_SLD_CREDOR_TRANSPORTAR
-            "0",  # DEB_ESP
+            "0",                            # DEB_ESP
         )
     )
     # E116 — uma linha por obrigação a recolher.

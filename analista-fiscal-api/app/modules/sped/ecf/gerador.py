@@ -29,7 +29,7 @@ from app.modules.sped.compartilhado import (
     montar_arquivo,
 )
 
-ALGORITMO_VERSAO = "sped.ecf.v1"
+ALGORITMO_VERSAO = "sped.ecf.v2"
 
 # Versão do leiaute ECF — ADE Cofis 51/2024 define v10 vigente a partir
 # do ano-calendário 2024. Atualizar junto com bump de ALGORITMO_VERSAO.
