@@ -1009,7 +1009,7 @@ class LancamentoContabil(Base):
     __table_args__ = (
         CheckConstraint(
             "origem_tipo IN ('manual','nfe','transacao','depreciacao',"
-            "'provisao','encerramento','ajuste','importacao')",
+            "'provisao','encerramento','ajuste','importacao','folha','apuracao')",
             name="ck_lanc_origem_tipo",
         ),
         CheckConstraint(

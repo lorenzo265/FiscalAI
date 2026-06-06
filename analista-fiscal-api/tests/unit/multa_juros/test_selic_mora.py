@@ -17,6 +17,7 @@ from decimal import Decimal
 import pytest
 
 from app.modules.multa_juros.calcula_selic import (
+    ALGORITMO_VERSAO,
     ResultadoMora,
     calcular_denuncia_espontanea,
     calcular_mora,
@@ -79,8 +80,19 @@ def test_sem_atraso_zero_acrescimos() -> None:
 
 
 def test_multa_5_dias_dentro_mesmo_mes() -> None:
-    """5 dias de atraso no mesmo mês: multa = 5 × 0,33% = 1,65%; juros 0 (sem mês cheio).
-    Acréscimo mês pagamento: 1%.
+    """5 dias de atraso no mesmo mês do vencimento.
+
+    Lei 9.430/1996 art. 61 §3º + Sicalc: juros de mora (SELIC acumulada + 1%
+    do mês de pagamento) só incidem a partir do 1º dia do mês SUBSEQUENTE ao
+    vencimento.  Dentro do mês → apenas multa de mora; juros = 0.
+
+    Gabarito (v2 — FA1 corrigido):
+      DAS R$1.000,00, vence 20/05/2025, paga 25/05/2025 (5 dias de atraso)
+      Multa: 5 × 0,33% = 1,65% → R$16,50
+      SELIC acumulada: 0 meses cheios → R$0,00
+      Acréscimo mês pagamento: 0 (mesmo mês do vencimento)
+      Total acréscimos: R$16,50
+      Valor atualizado: R$1.016,50
     """
     r = _mora("1000.00", date(2025, 5, 20), date(2025, 5, 25))
     assert r.dias_atraso == 5
@@ -88,8 +100,34 @@ def test_multa_5_dias_dentro_mesmo_mes() -> None:
     assert r.multa_mora == Decimal("16.50")
     assert r.meses_selic == 0
     assert r.juros_selic == Decimal("0.00")
+    # FA1: mesmo mês do vencimento → 1% NÃO incide (Lei 9.430 art. 61 §3º)
+    assert r.acrescimo_mes_pagamento == Decimal("0.00")
+    assert r.total_acrescimos == Decimal("16.50")
+    assert r.valor_atualizado == Decimal("1016.50")
+
+
+def test_acrescimo_mes_incide_em_mes_subsequente() -> None:
+    """Guard FA1: 1% incide quando pagamento é em mês subsequente ao vencimento.
+
+    Gabarito:
+      DAS R$1.000,00, vence 20/05/2025, paga 10/06/2025 (21 dias de atraso)
+      Multa: 21 × 0,33% = 6,93% → R$69,30
+      SELIC acumulada: 0 meses cheios (mês seguinte ao venc = jun;
+                        mês do pagamento = jun → jun < jun é falso → 0 meses)
+      Acréscimo mês pagamento: 1% de R$1.000 = R$10,00  ← incide (jun > mai)
+      Total acréscimos: R$79,30
+      Valor atualizado: R$1.079,30
+    """
+    r = _mora("1000.00", date(2025, 5, 20), date(2025, 6, 10))
+    assert r.dias_atraso == 21
+    assert r.aliquota_multa == Decimal("0.0693")
+    assert r.multa_mora == Decimal("69.30")
+    assert r.meses_selic == 0
+    assert r.juros_selic == Decimal("0.00")
+    # FA1: mês subsequente → 1% incide
     assert r.acrescimo_mes_pagamento == Decimal("10.00")
-    assert r.valor_atualizado == Decimal("1026.50")
+    assert r.total_acrescimos == Decimal("79.30")
+    assert r.valor_atualizado == Decimal("1079.30")
 
 
 def test_multa_teto_20_porcento() -> None:
@@ -217,6 +255,21 @@ def test_erro_selic_insuficiente() -> None:
     taxas_parciais = [(date(2025, 1, 1), Decimal("0.0119"))]
     with pytest.raises(ValueError, match="Taxa SELIC não disponível"):
         _mora("1000.00", date(2024, 12, 20), date(2025, 3, 20), taxas=taxas_parciais)
+
+
+# ── ALGORITMO_VERSAO ─────────────────────────────────────────────────────────
+
+
+def test_algoritmo_versao_presente_no_resultado() -> None:
+    """ResultadoMora deve carregar ALGORITMO_VERSAO para rastreabilidade."""
+    r = _mora("1000.00", date(2025, 5, 20), date(2025, 5, 25))
+    assert r.algoritmo_versao == ALGORITMO_VERSAO
+    assert r.algoritmo_versao == "mora.sicalc.v2"  # FA1: v1→v2 (guard mesmo mês)
+
+
+def test_algoritmo_versao_denuncia_espontanea() -> None:
+    r = _espontanea("1000.00", date(2025, 1, 1), date(2025, 4, 15))
+    assert r.algoritmo_versao == ALGORITMO_VERSAO
 
 
 # ── Invariantes ──────────────────────────────────────────────────────────────

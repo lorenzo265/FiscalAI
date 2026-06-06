@@ -16,6 +16,10 @@ export function PassoCnpj() {
   const dados = useOnboardingStore((s) => s.dadosReceita);
   const setCnpj = useOnboardingStore((s) => s.setCnpj);
   const setDados = useOnboardingStore((s) => s.setDadosReceita);
+  const setEmpresaCriada = useOnboardingStore((s) => s.setEmpresaCriada);
+  const setRegime = useOnboardingStore((s) => s.setRegime);
+  const setAnexoSimples = useOnboardingStore((s) => s.setAnexoSimples);
+  const setFaturamento12m = useOnboardingStore((s) => s.setFaturamento12m);
   const proximo = useOnboardingStore((s) => s.proximo);
 
   const [erro, setErro] = React.useState<string | null>(null);
@@ -31,8 +35,21 @@ export function PassoCnpj() {
     setErro(null);
     setCarregando(true);
     try {
-      const r = await api.empresa.lookupCnpj(apenasDigitos(cnpj));
+      // O onboarding do backend consulta a Receita (BrasilAPI) E já cria a
+      // empresa no tenant — capturamos ambos.
+      const { dados: r, empresa } = await api.empresa.lookupCnpjComEmpresa(
+        apenasDigitos(cnpj)
+      );
       setDados(r);
+      setEmpresaCriada(empresa);
+      // Pré-preenche regime/anexo/faturamento com o que o backend derivou,
+      // para os passos seguintes refletirem a sugestão (o usuário pode ajustar).
+      if (empresa) {
+        setRegime(empresa.regime);
+        if (empresa.anexoSimples) setAnexoSimples(empresa.anexoSimples);
+        if (empresa.faturamento12m > 0)
+          setFaturamento12m(empresa.faturamento12m);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setErro("Não conseguimos consultar este CNPJ agora. Tente novamente.");

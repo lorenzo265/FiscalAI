@@ -11,6 +11,38 @@
 
 ---
 
+## Integração Front-Back (2026-06-05) — fixes de backend
+
+Durante a ligação do frontend Arkan ao backend real (registro detalhado em
+**`hadoff-front-back.md`** na raiz), 4 bugs de backend foram encontrados e corrigidos pelo
+orquestrador (branch `hardening-fiscal-2026-06`):
+
+1. **Migration 0034** (`aliquota_cbs_ibs`): `op.bulk_insert` passava `sa.bindparam(...)` como
+   valor de `valid_from` → driver pg8000 falhava (`invalid date :vf_*`). Trocado por
+   `datetime.date(...)` literais. Travava a cadeia em 0033.
+2. **`FiscalService.calcular_e_salvar_das`**: faltava `await self._session.commit()` →
+   apuração DAS não persistia (GET 404, re-POST nunca 409). Adicionado (padrão dos demais
+   services). Verificado: POST→GET 200→re-POST 409. `pytest tests/unit/fiscal` 51 verdes.
+3. **Cadeia de migrations travada em 0041** (`CREATE INDEX CONCURRENTLY` incompatível com o
+   driver pg8000 que `alembic/env.py` força — `autocommit_block` não escapa a transação;
+   **bug de infra latente que atingiria prod**). DB de dev levado a **head (0055)** aplicando
+   os 4 índices da 0041 manualmente + `stamp`; 0049 exigiu backfill de `codigo_municipio_ibge`
+   (80 empresas-cruft). Desbloqueou eSocial (colunas da 0051). *Fix próprio de `env.py` fica
+   como tarefa de infra (trocar driver do alembic p/ psycopg).*
+4. **Migration 0056** (nova): `ck_lanc_origem_tipo` não incluía `'folha'`, mas
+   `ContabilLancadorService.lote_folha` (Sprint 19.7) cria lançamento com `origem_tipo='folha'`
+   → fechar folha dava 500 e não contabilizava. Adicionado `'folha'` ao CHECK + `models.py`;
+   `fechar_folha_mensal` ganhou `await session.rollback()` no except fail-soft (endpoint
+   responde 200 mesmo se o lançamento falhar). Verificado: lançamento `origem=folha` D=C
+   balanceado criado — conecta Pessoal→Contábil→Relatórios com dado real.
+
+Também: `CORSMiddleware` + setting `CORS_ORIGINS` (`app/main.py`/`config.py`) e
+`scripts/seed/seed_dev.py` (tenant `demo`, `demo@arkan.dev`/`arkan1234`, 1 empresa SN).
+Pendências de robustez registradas no handoff (`GET …/lancamentos` sem competência e
+balancete mês-inválido → 500 por ValueError não tratado).
+
+---
+
 ## Sprint de Hardening — Auditoria Profunda (2026-06-04)
 
 Auditoria de recall do backend completo (34 módulos, 52 migrations, ~46k LOC) por 6 revisores de

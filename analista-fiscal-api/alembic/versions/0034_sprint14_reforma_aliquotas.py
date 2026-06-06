@@ -38,6 +38,8 @@ Hardening:
 
 from __future__ import annotations
 
+import datetime
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -149,9 +151,7 @@ def _seed_vigencias_iniciais() -> None:
                 "classificacao_lc214": None,
                 "aliquota_cbs": "0.0090",
                 "aliquota_ibs": "0.0010",
-                "valid_from": sa.bindparam(
-                    "vf_teste_2026", value="2026-01-01", type_=sa.Date()
-                ),
+                "valid_from": datetime.date(2026, 1, 1),
                 "valid_to": None,
                 "algoritmo_versao": seed,
                 "fonte_norma": "LC 214/2025 art. 348 §3º (cobranca-teste 2026)",
@@ -168,9 +168,7 @@ def _seed_vigencias_iniciais() -> None:
                 "classificacao_lc214": None,
                 "aliquota_cbs": "0.0880",
                 "aliquota_ibs": "0.0010",
-                "valid_from": sa.bindparam(
-                    "vf_transicao_2027", value="2027-01-01", type_=sa.Date()
-                ),
+                "valid_from": datetime.date(2027, 1, 1),
                 "valid_to": None,
                 "algoritmo_versao": seed,
                 "fonte_norma": (
@@ -190,9 +188,7 @@ def _seed_vigencias_iniciais() -> None:
                 "classificacao_lc214": None,
                 "aliquota_cbs": "0.0880",
                 "aliquota_ibs": "0.1770",
-                "valid_from": sa.bindparam(
-                    "vf_pleno_2033", value="2033-01-01", type_=sa.Date()
-                ),
+                "valid_from": datetime.date(2033, 1, 1),
                 "valid_to": None,
                 "algoritmo_versao": seed,
                 "fonte_norma": (

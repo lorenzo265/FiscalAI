@@ -4,7 +4,7 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,22 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: Environment = Environment.LOCAL
     LOG_LEVEL: str = "INFO"
+
+    # CORS — origens do frontend autorizadas a chamar a API. Aceita lista
+    # separada por vírgula via env (ex.: CORS_ORIGINS="http://localhost:3000,
+    # https://app.arkan.com.br"). Default cobre o dev local do Next (:3000).
+    CORS_ORIGINS: list[str] = Field(
+        default=["http://localhost:3000"],
+        description="Origens permitidas no CORS (lista; env aceita CSV).",
+    )
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _split_cors_origins(cls, v: object) -> object:
+        """Permite CORS_ORIGINS como CSV no env (Pydantic não faz split de str→list)."""
+        if isinstance(v, str):
+            return [origem.strip() for origem in v.split(",") if origem.strip()]
+        return v
 
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://fiscal:fiscal@localhost:5432/fiscal",
@@ -62,6 +78,10 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = Field(
         default="http://localhost:11434",
         description="URL do servidor Ollama (LLM local).",
+    )
+    OLLAMA_MODEL: str = Field(
+        default="gemma3:4b",
+        description="Modelo de chat do Ollama (LLM local). Ex.: gemma3:4b, gemma4:latest.",
     )
 
     # LLM — Sprint 3

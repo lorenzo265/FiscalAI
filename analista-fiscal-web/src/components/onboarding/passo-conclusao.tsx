@@ -21,6 +21,7 @@ import { pseudoUuid } from "@/lib/mocks/utils";
 export function PassoConclusao() {
   const router = useRouter();
   const dados = useOnboardingStore((s) => s.dadosReceita);
+  const empresaCriada = useOnboardingStore((s) => s.empresaCriada);
   const cnpj = useOnboardingStore((s) => s.cnpj);
   const regime = useOnboardingStore((s) => s.regime);
   const anexo = useOnboardingStore((s) => s.anexoSimples);
@@ -32,7 +33,7 @@ export function PassoConclusao() {
   const reset = useOnboardingStore((s) => s.reset);
   const voltar = useOnboardingStore((s) => s.voltar);
 
-  const { salvarEmpresa } = useEmpresaAtual();
+  const { salvarEmpresa, refresh } = useEmpresaAtual();
   const [submetendo, setSubmetendo] = React.useState(false);
 
   const fatEstimado = fat > 0 ? fat : 850_000;
@@ -50,41 +51,64 @@ export function PassoConclusao() {
     }
     setSubmetendo(true);
     try {
-      const empresa: Empresa = {
-        id: pseudoUuid(),
-        cnpj: dados.cnpj,
-        razaoSocial: dados.razaoSocial,
-        nomeFantasia: dados.nomeFantasia,
-        regime,
-        anexoSimples: regime === "SIMPLES_NACIONAL" && anexo ? anexo : undefined,
-        setor: setorPorCnae(dados.cnaePrincipal.codigo),
-        cnae: dados.cnaePrincipal.codigo,
-        uf: dados.endereco.uf,
-        municipio: dados.endereco.municipio,
-        inscricaoEstadual: "ISENTO",
-        inscricaoMunicipal: "98765432",
-        faturamento12m: fatEstimado,
-        socios,
-        certificadoA1:
-          certificadoNome && !certificadoPulado
-            ? {
-                nomeArquivo: certificadoNome,
-                validade: "2027-05-08",
-                mock: true,
-              }
-            : undefined,
-        bancosConectados: bancosWizard.map((b) => ({
-          id: b.id,
-          banco: b.banco,
-          apelido: b.apelido,
-          saldo: b.saldo,
-          ultimaSync: new Date().toISOString(),
-        })),
-        modulosAtivos: modulosPorRegime(regime),
-        criadoEm: new Date().toISOString(),
-      };
+      // A empresa já foi criada no backend pelo onboarding (passo CNPJ).
+      // Enriquecemos com o que o wizard coletou (certificado/bancos são locais)
+      // e a definimos como ativa. Se por algum motivo não houver empresa criada,
+      // caímos no objeto local (modo degradado) — registrado como gap.
+      const empresa: Empresa = empresaCriada
+        ? {
+            ...empresaCriada,
+            anexoSimples:
+              regime === "SIMPLES_NACIONAL" && anexo
+                ? anexo
+                : empresaCriada.anexoSimples,
+            faturamento12m: fatEstimado,
+            socios,
+            certificadoA1:
+              certificadoNome && !certificadoPulado
+                ? { nomeArquivo: certificadoNome, validade: "2027-05-08", mock: true }
+                : undefined,
+            bancosConectados: bancosWizard.map((b) => ({
+              id: b.id,
+              banco: b.banco,
+              apelido: b.apelido,
+              saldo: b.saldo,
+              ultimaSync: new Date().toISOString(),
+            })),
+          }
+        : {
+            id: pseudoUuid(),
+            cnpj: dados.cnpj,
+            razaoSocial: dados.razaoSocial,
+            nomeFantasia: dados.nomeFantasia,
+            regime,
+            anexoSimples:
+              regime === "SIMPLES_NACIONAL" && anexo ? anexo : undefined,
+            setor: setorPorCnae(dados.cnaePrincipal.codigo),
+            cnae: dados.cnaePrincipal.codigo,
+            uf: dados.endereco.uf,
+            municipio: dados.endereco.municipio,
+            inscricaoEstadual: "ISENTO",
+            inscricaoMunicipal: "98765432",
+            faturamento12m: fatEstimado,
+            socios,
+            certificadoA1:
+              certificadoNome && !certificadoPulado
+                ? { nomeArquivo: certificadoNome, validade: "2027-05-08", mock: true }
+                : undefined,
+            bancosConectados: bancosWizard.map((b) => ({
+              id: b.id,
+              banco: b.banco,
+              apelido: b.apelido,
+              saldo: b.saldo,
+              ultimaSync: new Date().toISOString(),
+            })),
+            modulosAtivos: modulosPorRegime(regime),
+            criadoEm: new Date().toISOString(),
+          };
 
       await salvarEmpresa(empresa);
+      await refresh();
       reset();
       toast.success("Empresa cadastrada — bem-vindo ao Arkan.");
       router.push("/home");

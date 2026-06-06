@@ -207,6 +207,11 @@ class LLMClient:
     def _rotear(self, request: LLMRequest) -> LLMProvider:
         if request.contem_pii:
             return LLMProvider.OLLAMA_GEMMA_3_4B
+        # Sem chave Gemini configurada → usa o LLM local (Ollama). Mantém o
+        # assistente funcional em dev/self-hosted privacy-first; quando uma
+        # GEMINI_API_KEY é provida, o padrão volta a ser o Gemini cloud.
+        if not self._settings.GEMINI_API_KEY:
+            return LLMProvider.OLLAMA_GEMMA_3_4B
         return LLMProvider.GEMINI_2_5_FLASH_LITE
 
     async def _get_cache(self, cache_key: str, provider: LLMProvider) -> LLMResponse | None:
@@ -238,7 +243,7 @@ class LLMClient:
         messages.append({"role": "user", "content": request.prompt})
 
         payload: JsonObject = {
-            "model": "gemma3:4b",
+            "model": self._settings.OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
             "options": {"temperature": request.temperature},
@@ -247,9 +252,13 @@ class LLMClient:
             payload["format"] = "json"
 
         try:
+            # Timeout generoso: LLM local pode carregar o modelo na 1ª chamada
+            # (modelos grandes / offload parcial em CPU) e levar bem mais que os
+            # 60s default do httpx.
             r = await self._http.post(
                 f"{self._settings.OLLAMA_URL}/api/chat",
                 json=payload,
+                timeout=httpx.Timeout(180.0),
             )
             r.raise_for_status()
         except httpx.HTTPError as e:

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -44,6 +44,11 @@ ALGORITMO_VERSAO = "lancador-auto-2026.07"
 # substitui a contra-partida genérica (`outras_receitas`/`outras_despesas`)
 # por baixa de duplicata: CREDIT × NF saída → C `clientes`; DEBIT × NF
 # entrada → D `fornecedores`. Sem match, comportamento v06 preservado.
+
+ALGORITMO_VERSAO_IMPOSTOS = "lancador-impostos-2026.01"
+# Sprint (lançador de impostos) — ApuracaoFiscal → LancamentoContabil.
+# Fecha o ciclo: imposto calculado → passivo fiscal (2.1.4.x) + despesa
+# (5.1.05 Impostos sobre Receita ou 5.3.01 Provisão IRPJ/CSLL).
 
 
 # ── Views imutáveis dos fatos ────────────────────────────────────────────────
@@ -448,6 +453,138 @@ def gerar_partidas_de_provisao(
         origem_tipo="provisao",
         origem_id=prov.id,
         partidas=partidas,
+    )
+
+
+# ── Apuração fiscal → lançamento de imposto ─────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class ApuracaoFatoView:
+    """Subset imutável de ``ApuracaoFiscal`` usado pelo lançador de impostos.
+
+    Criado pelo ``lote_impostos`` após extrair o valor via
+    ``_valor_apuracao()``. A extração ocorre no service (que tem I/O);
+    este dataclass e a função pura abaixo são zero-I/O e testáveis.
+    """
+
+    id: UUID
+    competencia: date   # primeiro dia do mês (DATE no banco)
+    tipo: str           # das | irpj | csll | pis | cofins | iss | icms
+    valor: Decimal      # valor a recolher, já quantizado (0.01 ROUND_HALF_EVEN)
+
+
+@dataclass(frozen=True, slots=True)
+class ContasImpostos:
+    """UUIDs das 9 contas analíticas necessárias para o lançador de impostos.
+
+    Resolvidas por ``resolver_contas_impostos()`` no service a partir das
+    chaves simbólicas em ``_CHAVES_IMPOSTOS``. Separadas de ``ContasAuto``
+    para que a ausência destas contas (empresas antigas) não quebre os
+    outros lotes (nfe/transacao/etc.).
+    """
+
+    das_recolher: UUID           # 2.1.4.01 DAS Simples Nacional
+    icms_recolher: UUID          # 2.1.4.02 ICMS a Recolher
+    iss_recolher: UUID           # 2.1.4.03 ISS a Recolher
+    pis_recolher: UUID           # 2.1.4.04 PIS a Recolher
+    cofins_recolher: UUID        # 2.1.4.05 COFINS a Recolher
+    irpj_recolher: UUID          # 2.1.4.06 IRPJ a Recolher
+    csll_recolher: UUID          # 2.1.4.07 CSLL a Recolher
+    impostos_sobre_receita: UUID # 5.1.05 Impostos sobre Receita (débito)
+    provisao_irpj_csll: UUID     # 5.3.01 Provisão IRPJ/CSLL (débito)
+
+
+# Tipos cujo lançamento é D 5.1.05 / C <passivo>
+_TIPOS_IMPOSTOS_RECEITA = frozenset({"das", "icms", "iss", "pis", "cofins"})
+# Tipos cujo lançamento é D 5.3.01 / C <passivo>
+_TIPOS_PROVISAO_RESULTADO = frozenset({"irpj", "csll"})
+
+_CENTAVO = Decimal("0.01")
+
+
+def gerar_partidas_de_apuracao(
+    ap: ApuracaoFatoView,
+    contas: ContasImpostos,
+) -> LancamentoCandidato | None:
+    """ApuracaoFiscal → lançamento contábil de imposto apurado.
+
+    Mapa débito / crédito:
+
+      das / icms / iss / pis / cofins:
+        D 5.1.05 Impostos sobre Receita  /  C 2.1.4.0x <tributo> a Recolher
+
+      irpj / csll:
+        D 5.3.01 Provisão IRPJ/CSLL      /  C 2.1.4.06/07 <tributo> a Recolher
+
+      dctf / efd_contrib:
+        Retorna None — são declarações acessórias, sem movimento de imposto.
+
+      valor ≤ 0:
+        Retorna None — sem imposto a lançar (saldo credor ou base zero).
+
+    Princípio §8.8 — zero I/O, puro Python.
+
+    Args:
+        ap: snapshot do fato ApuracaoFiscal já persistido.
+        contas: UUIDs resolvidos das 9 contas de imposto.
+
+    Returns:
+        LancamentoCandidato pronto para persistência ou None quando não há
+        fato contábil (dctf/efd_contrib ou valor ≤ 0).
+    """
+    # Declarações acessórias — sem movimento de caixa/resultado.
+    if ap.tipo in ("dctf", "efd_contrib"):
+        return None
+
+    valor = ap.valor.quantize(_CENTAVO, rounding=ROUND_HALF_EVEN)
+    if valor <= Decimal("0"):
+        return None
+
+    competencia = date(ap.competencia.year, ap.competencia.month, 1)
+    tipo_upper = ap.tipo.upper()
+
+    # Resolve conta crédito (passivo fiscal) por tipo.
+    if ap.tipo == "das":
+        conta_credito = contas.das_recolher
+    elif ap.tipo == "icms":
+        conta_credito = contas.icms_recolher
+    elif ap.tipo == "iss":
+        conta_credito = contas.iss_recolher
+    elif ap.tipo == "pis":
+        conta_credito = contas.pis_recolher
+    elif ap.tipo == "cofins":
+        conta_credito = contas.cofins_recolher
+    elif ap.tipo == "irpj":
+        conta_credito = contas.irpj_recolher
+    elif ap.tipo == "csll":
+        conta_credito = contas.csll_recolher
+    else:
+        # Tipo inesperado não modelado — sem lançamento (defensivo).
+        return None
+
+    # Resolve conta débito (despesa/provisão) por grupo.
+    if ap.tipo in _TIPOS_IMPOSTOS_RECEITA:
+        conta_debito = contas.impostos_sobre_receita
+    else:
+        # irpj / csll
+        conta_debito = contas.provisao_irpj_csll
+
+    comp_str = f"{ap.competencia.year}-{ap.competencia.month:02d}"
+    historico = f"{tipo_upper} apurado {comp_str}"
+
+    partidas = (
+        PartidaCandidata(conta_id=conta_debito, tipo="D", valor=valor),
+        PartidaCandidata(conta_id=conta_credito, tipo="C", valor=valor),
+    )
+    return LancamentoCandidato(
+        historico=historico,
+        data_lancamento=competencia,
+        competencia=competencia,
+        origem_tipo="apuracao",
+        origem_id=ap.id,
+        partidas=partidas,
+        versao=ALGORITMO_VERSAO_IMPOSTOS,
     )
 
 

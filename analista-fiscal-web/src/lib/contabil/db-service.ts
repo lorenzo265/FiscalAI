@@ -1,47 +1,27 @@
-import { getDb } from "@/lib/db";
-import type { LancamentoContabil } from "@/lib/schemas/contabil";
+/**
+ * Service de contábil — Onda 2: passou de Dexie/mock para a API real.
+ *
+ * Mantém a SUPERFÍCIE pública que os consumidores já usam (o hook
+ * `use-contabil` e o adapter de `relatorios`), mas a fonte de verdade agora é o
+ * backend FastAPI (`@/lib/api/contabil`). Não há mais seed local de
+ * lançamentos — os dados vêm do módulo contábil do servidor.
+ *
+ * `garantirSeedContabil` vira no-op (o backend é a fonte). É mantida apenas
+ * para preservar a assinatura chamada por `garantir-todos.ts` e pelo hook.
+ */
 import type { Empresa } from "@/lib/schemas/empresa";
-import {
-  gerarLancamentosBancariosMock,
-  gerarLancamentosDeNotas,
-} from "@/lib/contabil/geracao";
-import { listarNotas, garantirSeedNotas } from "@/lib/notas/db-service";
 
-const SEED_KEY = "analista-fiscal:contabil-seeded";
+export {
+  listarLancamentos,
+  adicionarLancamento,
+  removerLancamento,
+} from "@/lib/api/contabil";
 
-export async function garantirSeedContabil(empresa: Empresa): Promise<void> {
-  if (typeof window === "undefined") return;
-  const flag = `${SEED_KEY}:${empresa.cnpj}`;
-  if (localStorage.getItem(flag)) return;
-
-  await garantirSeedNotas(empresa);
-  const db = getDb();
-  const total = await db.lancamentos.count();
-  if (total === 0) {
-    const notas = await listarNotas();
-    const lancamentos = [
-      ...gerarLancamentosBancariosMock(empresa),
-      ...gerarLancamentosDeNotas(notas),
-    ];
-    await db.lancamentos.bulkPut(lancamentos);
-  }
-  localStorage.setItem(flag, "1");
-}
-
-export async function listarLancamentos(): Promise<LancamentoContabil[]> {
-  const db = getDb();
-  const lista = await db.lancamentos.toArray();
-  return lista.sort((a, b) => a.data.localeCompare(b.data));
-}
-
-export async function adicionarLancamento(
-  lancamento: LancamentoContabil
-): Promise<void> {
-  const db = getDb();
-  await db.lancamentos.put(lancamento);
-}
-
-export async function removerLancamento(id: string): Promise<void> {
-  const db = getDb();
-  await db.lancamentos.delete(id);
+/**
+ * No-op de compatibilidade. A contabilidade agora é lida do backend; não há
+ * seed local a popular. Mantida para não quebrar os chamadores existentes
+ * (`garantirTodosSeeds`, `useLancamentos`).
+ */
+export async function garantirSeedContabil(_empresa: Empresa): Promise<void> {
+  return;
 }

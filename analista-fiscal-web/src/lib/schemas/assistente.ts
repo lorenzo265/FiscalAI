@@ -13,6 +13,9 @@ export const tipoCitacaoSchema = z.enum([
   "intimacao",
   "folha",
   "agenda",
+  // `fonte` = citação genérica vinda do backend (grafo de memória):
+  // o backend só fornece `{fato_id, trecho_citado}`, sem categoria de domínio.
+  "fonte",
 ]);
 export type TipoCitacao = z.infer<typeof tipoCitacaoSchema>;
 
@@ -26,6 +29,7 @@ export const TIPO_CITACAO_LABEL: Record<TipoCitacao, string> = {
   intimacao: "Intimação",
   folha: "Folha",
   agenda: "Agenda",
+  fonte: "Fonte",
 };
 
 export const citacaoSchema = z.object({
@@ -93,6 +97,39 @@ export const mensagemAssistenteSchema = z.object({
 });
 export type MensagemAssistente = z.infer<typeof mensagemAssistenteSchema>;
 export const mensagensAssistenteSchema = z.array(mensagemAssistenteSchema);
+
+// ── Contrato do backend (POST .../assistente/perguntar) ─────────────────────
+// `fetchJson` aplica `toCamel` antes de validar; por isso os campos snake do
+// backend (`fato_id`, `trecho_citado`, `encaminhar_marketplace`, …) chegam aqui
+// em camelCase. Dinheiro/decimais (`custoUsd`) ficam como STRING — nunca number.
+
+export const citacaoBackendSchema = z.object({
+  fatoId: z.string(),
+  trechoCitado: z.string(),
+});
+export type CitacaoBackend = z.infer<typeof citacaoBackendSchema>;
+
+// Só tipos planos + `.nullable()/.optional()` (input == output) para o schema
+// casar com `z.ZodSchema<RespostaAssistente>` em `fetchJson` — NÃO usar
+// `.default()/.catch()` aqui (mudam o tipo de input e quebram a inferência).
+// `custoUsd` permanece STRING (decimal NUMERIC — nunca number). Campos
+// `metadata` (tokens/custo/latência) não são exibidos; mantidos por completude.
+export const respostaAssistenteSchema = z.object({
+  resposta: z.string(),
+  citacoes: z.array(citacaoBackendSchema),
+  encaminharMarketplace: z.boolean(),
+  categoriaMarketplace: z.string().nullable(),
+  categoriaMarketplaceSugerida: z.string().nullable().optional(),
+  parceirosSugeridos: z.array(z.unknown()).optional(),
+  providerUsado: z.string(),
+  tokensInput: z.number(),
+  tokensOutput: z.number(),
+  tokensCached: z.number(),
+  custoUsd: z.string(),
+  latenciaMs: z.number(),
+  empresaId: z.string(),
+});
+export type RespostaAssistente = z.infer<typeof respostaAssistenteSchema>;
 
 export const SUGESTOES_INICIAIS: Sugestao[] = [
   { texto: "Quanto pago de DAS?", pergunta: "Quanto pago de DAS este mês?" },

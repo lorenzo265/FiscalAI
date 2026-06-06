@@ -2,8 +2,12 @@
 
 import * as React from "react";
 import type { Empresa } from "@/lib/schemas/empresa";
-import { getDb } from "@/lib/db";
-import { perfMark } from "@/lib/perf";
+import { api, ApiError } from "@/lib/api-client";
+import { isLogado } from "@/lib/auth";
+import {
+  getEmpresaIdAtiva,
+  setEmpresaIdAtiva,
+} from "@/lib/empresa-ativa";
 
 interface EmpresaContextValue {
   empresa: Empresa | null;
@@ -13,139 +17,85 @@ interface EmpresaContextValue {
   resetar: () => Promise<void>;
 }
 
-const EmpresaContext = React.createContext<EmpresaContextValue | undefined>(undefined);
+const EmpresaContext = React.createContext<EmpresaContextValue | undefined>(
+  undefined
+);
 
-const CACHE_KEY = "analista-fiscal:empresa-cache";
-const CACHE_VERSION = 1;
-
-interface CacheEnvelope {
-  v: number;
-  empresa: Empresa;
-}
-
-function lerCache(): Empresa | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CacheEnvelope;
-    if (parsed.v !== CACHE_VERSION) return null;
-    return parsed.empresa;
-  } catch {
-    return null;
-  }
-}
-
-function gravarCache(empresa: Empresa | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (empresa) {
-      const env: CacheEnvelope = { v: CACHE_VERSION, empresa };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(env));
-    } else {
-      localStorage.removeItem(CACHE_KEY);
-    }
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
-
+/**
+ * EmpresaProvider (Fase B — Auth & Empresa). HTTP real.
+ *
+ * No boot, se houver sessão (`isLogado()`), carrega `GET /v1/empresas`, escolhe
+ * a empresa ativa (a salva em `getEmpresaIdAtiva()` ou a primeira) e persiste o
+ * `empresa_id` ativo (usado pelos adapters de domínio para montar as rotas
+ * `/v1/empresas/{id}/...`). Sem sessão, fica `loading=false` com `empresa=null`
+ * — o `AuthGuard`/telas de auth cuidam do redirect.
+ *
+ * API pública do contexto preservada (`empresa`, `loading`, `refresh`,
+ * `salvarEmpresa`, `resetar`) — telas e wizard dependem dela.
+ */
 export function EmpresaProvider({ children }: { children: React.ReactNode }) {
   const [empresa, setEmpresa] = React.useState<Empresa | null>(null);
   const [loading, setLoading] = React.useState(true);
 
-  // Etapa 1 — síncrona no client mount: lê cache de localStorage.
-  // Isso libera AuthGuard imediatamente quando há cache válido (boot ~5ms vs ~80ms).
-  React.useEffect(() => {
-    const stop = perfMark("empresa-provider:hydrate-cache");
-    const cache = lerCache();
-    if (cache) {
-      setEmpresa(cache);
-      setLoading(false);
-      // Dispara seeds dos módulos em background — antecipa o trabalho
-      // pra primeira navegação não pagar (~30-50ms cada).
-      void import("@/lib/seeds/garantir-todos").then(({ garantirTodosSeeds }) =>
-        garantirTodosSeeds(cache)
-      );
-      stop({ hit: true });
-    } else {
-      stop({ hit: false });
-    }
-  }, []);
-
-  // Etapa 2 — assíncrona: revalida contra Dexie. Atualiza UI se estiver fora.
   const carregar = React.useCallback(async () => {
-    const stop = perfMark("empresa-provider:carregar");
+    if (!isLogado()) {
+      setEmpresa(null);
+      setEmpresaIdAtiva(null);
+      setLoading(false);
+      return;
+    }
     try {
-      if (process.env.NEXT_PUBLIC_PERF_BYPASS === "1") {
-        const { criarEmpresaDemo } = await import("@/lib/stores/empresa-demo");
-        const demo = criarEmpresaDemo();
-        setEmpresa(demo);
-        gravarCache(demo);
-        stop({ bypass: true });
+      const lista = await api.empresa.listar();
+      const salvaId = getEmpresaIdAtiva();
+      const escolhida =
+        (salvaId ? lista.find((e) => e.id === salvaId) : undefined) ?? lista[0];
+      if (!escolhida) {
+        setEmpresa(null);
+        setEmpresaIdAtiva(null);
         return;
       }
-      const db = getDb();
-      const lista = await db.empresas.toArray();
-      const next = lista[0] ?? null;
-      setEmpresa((prev) => {
-        if (
-          prev &&
-          next &&
-          prev.id === next.id &&
-          JSON.stringify(prev) === JSON.stringify(next)
-        ) {
-          return prev;
-        }
-        return next;
-      });
-      gravarCache(next);
-      if (next) {
-        void import("@/lib/seeds/garantir-todos").then(
-          ({ garantirTodosSeeds }) => garantirTodosSeeds(next)
-        );
-      }
-      stop({ encontrou: !!next });
+      setEmpresaIdAtiva(escolhida.id);
+      setEmpresa(escolhida);
     } catch (err) {
-      console.error("Falha ao carregar empresa do Dexie:", err);
-      stop({ erro: true });
+      // 401 já é tratado no fetchJson (limpa sessão + redirect). Demais erros:
+      // não derruba o app — fica sem empresa e deixa o guard/telas decidirem.
+      if (!(err instanceof ApiError) || err.status !== 401) {
+        console.error("Falha ao carregar empresas:", err);
+      }
+      setEmpresa(null);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const salvarEmpresa = React.useCallback(async (e: Empresa) => {
-    const db = getDb();
-    await db.empresas.put(e);
-    setEmpresa(e);
-    gravarCache(e);
-  }, []);
-
-  const resetar = React.useCallback(async () => {
-    try {
-      const db = getDb();
-      await db.transaction("rw", db.tables, async () => {
-        await Promise.all(db.tables.map((t) => t.clear()));
-      });
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith("analista-fiscal:"))
-        .forEach((k) => localStorage.removeItem(k));
-    } catch (err) {
-      console.error("Erro ao resetar dados:", err);
-    }
-    setEmpresa(null);
   }, []);
 
   React.useEffect(() => {
     void carregar();
   }, [carregar]);
 
+  /**
+   * Atualiza a empresa ativa em memória + persiste o id ativo. A empresa em si
+   * é criada/atualizada no backend (onboarding/criar). Não há endpoint de
+   * UPDATE de empresa — edições locais (configurações) ficam só no contexto
+   * até o próximo `refresh()` (gap registrado no handoff).
+   */
+  const salvarEmpresa = React.useCallback(async (e: Empresa) => {
+    setEmpresaIdAtiva(e.id);
+    setEmpresa(e);
+  }, []);
+
+  const resetar = React.useCallback(async () => {
+    setEmpresaIdAtiva(null);
+    setEmpresa(null);
+  }, []);
+
   const value = React.useMemo<EmpresaContextValue>(
     () => ({ empresa, loading, refresh: carregar, salvarEmpresa, resetar }),
     [empresa, loading, carregar, salvarEmpresa, resetar]
   );
 
-  return <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>;
+  return (
+    <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>
+  );
 }
 
 export function useEmpresaAtual(): EmpresaContextValue {

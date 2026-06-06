@@ -1,19 +1,27 @@
 """Plano de contas referencial mínimo brasileiro (Sprint 9 PR1).
 
 Inspirado no Plano de Contas Referencial PJ da Receita Federal (publicado no
-SPED ECD). 36 contas (sintéticas + analíticas) que cobrem o MVP:
+SPED ECD). Contas sintéticas + analíticas cobrindo o MVP:
 
 * Ativo circulante (caixa, banco, clientes, estoque).
 * Ativo não-circulante (imobilizado + depreciação acumulada).
-* Passivo (fornecedores, salários, INSS, FGTS, provisões trabalhistas).
-* PL (capital, lucros acumulados, resultado do exercício).
-* Receitas (vendas serviços, vendas mercadorias).
-* Despesas (CMV, salários, encargos, depreciação, impostos).
+* Passivo circulante (fornecedores, salários, INSS, FGTS, provisões trabalhistas,
+  impostos a recolher: ICMS, ISS, PIS, Cofins, IRPJ, CSLL).
+* Passivo não-circulante (empréstimos e financiamentos LP).
+* PL (capital, lucros acumulados, resultado do exercício, lucros distribuídos).
+* Receitas (vendas serviços, vendas mercadorias, deduções da receita bruta,
+  receitas financeiras).
+* Despesas (CMV, salários, encargos, depreciação, impostos, despesas financeiras,
+  provisão IRPJ/CSLL).
 
 Cada item: ``(codigo, descricao, parent_codigo, natureza, tipo, aceita_lancamento, codigo_ecd)``.
 
 O motor de lançamentos automáticos (PR2) usa códigos específicos como
 "1.1.1.02" (banco) ou "4.1.01.01" (CMV) — manter chaves estáveis.
+
+⚠ PENDÊNCIA: empresas já existentes (criadas antes desta revisão) não recebem
+as novas contas retroativamente — backfill via migration dedicada fica como
+follow-up (clonar-padrão cobre apenas novas empresas).
 """
 
 from __future__ import annotations
@@ -197,6 +205,93 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         "2.01.04.99.01.01",
         4,
     ),
+    # Impostos separados por tributo (Lucro Presumido / regimes específicos).
+    # ECD RFB: grupo 2.01.04 — Impostos e Contribuições a Recolher.
+    ItemPlano(
+        "2.1.4.02",
+        "ICMS a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.01.01.01",
+        4,
+    ),
+    ItemPlano(
+        "2.1.4.03",
+        "ISS a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.02.01.01",
+        4,
+    ),
+    ItemPlano(
+        "2.1.4.04",
+        "PIS a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.03.01.01",
+        4,
+    ),
+    ItemPlano(
+        "2.1.4.05",
+        "COFINS a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.04.01.01",
+        4,
+    ),
+    ItemPlano(
+        "2.1.4.06",
+        "IRPJ a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.05.01.01",
+        4,
+    ),
+    ItemPlano(
+        "2.1.4.07",
+        "CSLL a Recolher",
+        "2.1.4",
+        "C",
+        "passivo",
+        True,
+        "2.01.04.06.01.01",
+        4,
+    ),
+    # ── 2.2 PASSIVO NÃO CIRCULANTE ─────────────────────────────────────────
+    # ECD RFB: 2.02 Passivo Não Circulante.
+    ItemPlano(
+        "2.2", "PASSIVO NÃO CIRCULANTE", "2", "C", "passivo", False, "2.02", 2
+    ),
+    ItemPlano(
+        "2.2.1",
+        "Empréstimos e Financiamentos",
+        "2.2",
+        "C",
+        "passivo",
+        False,
+        "2.02.01",
+        3,
+    ),
+    ItemPlano(
+        "2.2.1.01",
+        "Empréstimos e Financiamentos a Longo Prazo",
+        "2.2.1",
+        "C",
+        "passivo",
+        True,
+        "2.02.01.01.01.01",
+        4,
+    ),
     # ── 3. PATRIMÔNIO LÍQUIDO (natureza C) ──────────────────────────────────
     ItemPlano(
         "3", "PATRIMÔNIO LÍQUIDO", None, "C", "patrimonio_liquido", False, "3", 1
@@ -234,6 +329,17 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         "3.07.01.01.01.01",
         3,
     ),
+    # Lucros distribuídos: natureza D (redutora do PL) — ECD RFB 3.07.02.
+    ItemPlano(
+        "3.9.02",
+        "Lucros Distribuídos",
+        "3.9",
+        "D",
+        "patrimonio_liquido",
+        True,
+        "3.07.02.01.01.01",
+        3,
+    ),
     # ── 4. RECEITAS (natureza C) ────────────────────────────────────────────
     ItemPlano("4", "RECEITAS", None, "C", "receita", False, "4", 1),
     ItemPlano(
@@ -259,6 +365,19 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         "4.01.01.02.01.01",
         3,
     ),
+    # Deduções da Receita Bruta — natureza D (retificadora), tipo receita.
+    # Lei 6.404/76 art. 187 I: ROB → (-) devoluções/abatimentos/cancelamentos
+    # → Receita Líquida. ECD RFB: 4.01.03 Deduções da Receita Bruta.
+    ItemPlano(
+        "4.1.03",
+        "(-) Deduções da Receita Bruta",
+        "4.1",
+        "D",
+        "receita",
+        True,
+        "4.01.03.01.01.01",
+        3,
+    ),
     ItemPlano(
         "4.9",
         "Outras Receitas",
@@ -268,6 +387,17 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         False,
         "4.01.99",
         2,
+    ),
+    # Receitas Financeiras — ECD RFB: 4.01.02 Receitas Financeiras.
+    ItemPlano(
+        "4.9.01",
+        "Receitas Financeiras",
+        "4.9",
+        "C",
+        "receita",
+        True,
+        "4.01.02.01.01.01",
+        3,
     ),
     ItemPlano(
         "4.9.99",
@@ -354,6 +484,53 @@ PLANO_REFERENCIAL: tuple[ItemPlano, ...] = (
         "4.02.99.01.01.01",
         3,
     ),
+    # ── 5.2 DESPESAS FINANCEIRAS ────────────────────────────────────────────
+    # ECD RFB: 4.03 Despesas Financeiras (fora do resultado operacional).
+    ItemPlano(
+        "5.2",
+        "Despesas Financeiras",
+        "5",
+        "D",
+        "despesa",
+        False,
+        "4.03",
+        2,
+    ),
+    ItemPlano(
+        "5.2.01",
+        "Juros e Encargos Financeiros",
+        "5.2",
+        "D",
+        "despesa",
+        True,
+        "4.03.01.01.01.01",
+        3,
+    ),
+    # ── 5.3 PROVISÃO IRPJ / CSLL (resultado antes do lucro líquido) ─────────
+    # Lei 6.404/76 art. 189 + IN RFB: provisão de IRPJ e CSLL é dedução do
+    # resultado, fora do lucro operacional. ECD RFB: 4.05 IRPJ / CSLL Diferidos
+    # (grupo correto para lucro presumido / real). Coloca-se fora de 5.1
+    # (operacional) para manter DRE conforme art. 187.
+    ItemPlano(
+        "5.3",
+        "Provisão para IRPJ e CSLL",
+        "5",
+        "D",
+        "despesa",
+        False,
+        "4.05",
+        2,
+    ),
+    ItemPlano(
+        "5.3.01",
+        "Provisão IRPJ / CSLL do Exercício",
+        "5.3",
+        "D",
+        "despesa",
+        True,
+        "4.05.01.01.01.01",
+        3,
+    ),
 )
 
 
@@ -387,7 +564,71 @@ CODIGOS_PADRAO_LANCAMENTO_AUTO: dict[str, str] = {
     "fgts_recolher": "2.1.3.02",
     # Sprint 19.7 PR1 (#10) — IRRF retido na folha (contrapartida do desconto).
     "irrf_funcionarios_recolher": "2.1.3.03",
+    # DAS Simples Nacional a Recolher.
+    "das_recolher": "2.1.4.01",
+    # Impostos a Recolher por tributo (Lucro Presumido / regimes específicos).
+    "icms_recolher": "2.1.4.02",
+    "iss_recolher": "2.1.4.03",
+    "pis_recolher": "2.1.4.04",
+    "cofins_recolher": "2.1.4.05",
+    "irpj_recolher": "2.1.4.06",
+    "csll_recolher": "2.1.4.07",
+    # Despesa de imposto sobre receita (DAS / ICMS / ISS / PIS / Cofins).
+    "impostos_sobre_receita": "5.1.05",
+    # Provisão IRPJ / CSLL do exercício.
+    "provisao_irpj_csll": "5.3.01",
+    # Passivo Não-Circulante.
+    "emprestimos_lp": "2.2.1.01",
+    # PL — Lucros Distribuídos.
+    "lucros_distribuidos": "3.9.02",
+    # Receitas — Deduções da Receita Bruta (retificadora).
+    "deducoes_receita": "4.1.03",
+    # Resultado Financeiro.
+    "receitas_financeiras": "4.9.01",
+    "despesas_financeiras": "5.2.01",
 }
+
+# ── Conjuntos de chaves por contexto ────────────────────────────────────────
+# _CHAVES_CORE: as 20 chaves usadas pelo motor automático de lançamentos
+# (nfe/transacao/depreciacao/provisao/folha). Iteradas explicitamente em
+# resolver_contas() para que novas entradas no dict (icms_recolher etc.)
+# nunca quebrem empresas que clonaram o plano antes de sua criação.
+_CHAVES_CORE: tuple[str, ...] = (
+    "clientes",
+    "fornecedores",
+    "banco",
+    "receita_servicos",
+    "receita_vendas",
+    "outras_receitas",
+    "outras_despesas",
+    "despesa_depreciacao",
+    "depreciacao_acumulada",
+    "despesa_pessoal",
+    "encargos_sociais",
+    "provisao_ferias",
+    "provisao_13",
+    "inss_recolher",
+    "fgts_recolher",
+    "irrf_funcionarios_recolher",
+    "salarios_pagar",
+    "estoques",
+    "imobilizado",
+    "despesa_servicos",
+)
+
+# _CHAVES_IMPOSTOS: chaves resolvidas exclusivamente para lote_impostos().
+# Ausência de qualquer uma destas NÃO quebra os outros lotes.
+_CHAVES_IMPOSTOS: tuple[str, ...] = (
+    "das_recolher",
+    "icms_recolher",
+    "iss_recolher",
+    "pis_recolher",
+    "cofins_recolher",
+    "irpj_recolher",
+    "csll_recolher",
+    "impostos_sobre_receita",
+    "provisao_irpj_csll",
+)
 
 
 def codigo(chave: str) -> str:

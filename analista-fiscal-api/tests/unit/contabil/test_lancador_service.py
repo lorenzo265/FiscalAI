@@ -17,6 +17,7 @@ from app.modules.contabil.lancador_auto import (
 from app.modules.contabil.lancador_service import LancadorService
 from app.modules.contabil.plano_referencial import (
     CODIGOS_PADRAO_LANCAMENTO_AUTO,
+    _CHAVES_CORE,
 )
 from app.shared.exceptions import (
     EmpresaNaoEncontrada,
@@ -53,12 +54,14 @@ async def test_resolver_contas_tudo_existe() -> None:
             session, uuid.uuid4(), date(2026, 5, 1)
         )
 
-    # Verifica que todas as 16 chaves foram resolvidas (15 listadas + 1 outras_receitas adicionada)
+    # resolver_contas agora itera _CHAVES_CORE (20 chaves fixas), NÃO o dict
+    # inteiro — garante que contas de imposto adicionadas ao dict não quebrem
+    # empresas antigas.
     assert contas.banco is not None
     assert contas.provisao_ferias is not None
     assert contas.outras_receitas is not None
-    # Foi chamado uma vez por chave do mapa
-    assert repo.por_codigo.await_count == len(CODIGOS_PADRAO_LANCAMENTO_AUTO)
+    # Chamado exatamente uma vez por chave de _CHAVES_CORE.
+    assert repo.por_codigo.await_count == len(_CHAVES_CORE)
 
 
 @pytest.mark.asyncio

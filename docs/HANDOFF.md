@@ -33,6 +33,13 @@ O `reviewer` registra o veredito assim:
 
 ## Log
 
+### 2026-06-05 · orquestrador · Integração Front-Back (workstream separado)
+- Fez: ligou o frontend Arkan ao backend FastAPI real (10 domínios) via camada anticorrupção — `src/lib/http.ts` (Bearer + snake↔camel), token store em `auth.ts`, `getEmpresaIdAtiva`, split do `api-client` em `src/lib/api/<dominio>.ts`, login real com `tenant_slug`. Orquestrado em 2 ondas de subagentes + revisor de contexto fresco.
+- Arquivos tocados: `analista-fiscal-web/src/lib/http.ts`, `src/lib/auth.ts`, `src/lib/empresa-ativa.ts`, `src/lib/api/*`, `src/lib/*/db-service.ts`, `src/components/auth/login-card.tsx`, `src/components/layout/empresa-provider.tsx`; backend: CORS, `seed_dev.py`, migrations 0034/0056, `FiscalService` commit, `pessoal/service.py`.
+- Build/lint: `npm run build` VERDE (48 páginas) · Gates/Invariantes: revisor aprovou com ressalvas (zero bloqueadores); assinaturas/hooks preservados, sem dado inventado.
+- **Registro detalhado (fonte de verdade deste workstream): `hadoff-front-back.md` na raiz.**
+- Pendências: re-wire eSocial; credenciais reais Focus/Pluggy/Ollama; `PUT /v1/empresas/{id}`; robustez de input no backend.
+
 ### 2026-06-01 · orquestrador · setup
 - Fez: criado o bootstrap da frota — `CLAUDE.md` atualizado, 7 subagentes em `.claude/agents/`, contratos de design em `docs/`, e este HANDOFF.
 - Arquivos tocados: `CLAUDE.md`, `.claude/agents/*.md`, `docs/*.md`.

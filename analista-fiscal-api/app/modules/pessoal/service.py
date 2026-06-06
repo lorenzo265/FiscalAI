@@ -246,6 +246,12 @@ class PessoalService:
                 session, tenant_id, empresa_id, folha
             )
         except Exception as exc:  # noqa: BLE001
+            # Fail-soft real: a folha já foi comitada acima. Se o lançamento
+            # automático falhar (ex.: plano de contas incompleto), a transação
+            # do lançamento fica abortada — `rollback()` a limpa para que o
+            # endpoint responda 200 (a folha continua fechada). Sem o rollback,
+            # a sessão envenenada propagava 500 mesmo com a folha persistida.
+            await session.rollback()
             log.warning(
                 "pessoal.folha.lancamento_auto_falhou",
                 empresa_id=str(empresa_id),

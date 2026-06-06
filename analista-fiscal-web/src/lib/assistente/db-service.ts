@@ -1,8 +1,16 @@
+/**
+ * db-service do assistente — agora SÓ histórico LOCAL (Dexie).
+ *
+ * A geração de resposta migrou para o backend real (ver `src/lib/api/assistente.ts`,
+ * que persiste pergunta+resposta via `adicionarMensagem`). O backend não expõe
+ * endpoint de histórico de chat (o módulo `memoria` é grafo de fatos, não
+ * transcrição) → a transcrição vive aqui. O seed (`mensagemSaudacao`) é uma
+ * saudação local, não um fato fiscal fabricado.
+ */
 import { getDb } from "@/lib/db";
 import type { Empresa } from "@/lib/schemas/empresa";
 import type { MensagemAssistente } from "@/lib/schemas/assistente";
-import { gerarResposta, mensagemSaudacao } from "@/lib/mocks/assistente";
-import { pseudoUuid } from "@/lib/mocks/utils";
+import { mensagemSaudacao } from "@/lib/mocks/assistente";
 
 const SEED_KEY = "analista-fiscal:assistente-seeded";
 
@@ -33,25 +41,4 @@ export async function adicionarMensagem(
 export async function limparMensagens(): Promise<void> {
   const db = getDb();
   await db.mensagensAssistente.clear();
-}
-
-export async function enviarPergunta(
-  empresa: Empresa,
-  pergunta: string
-): Promise<{ pergunta: MensagemAssistente; resposta: MensagemAssistente }> {
-  const usuario: MensagemAssistente = {
-    id: `msg-${pseudoUuid().slice(0, 10)}`,
-    role: "user",
-    texto: pergunta.trim(),
-    blocos: [],
-    citacoes: [],
-    sugestoes: [],
-    criadoEm: new Date().toISOString(),
-  };
-  await adicionarMensagem(usuario);
-
-  const resposta = await gerarResposta(pergunta, empresa);
-  await adicionarMensagem(resposta);
-
-  return { pergunta: usuario, resposta };
 }

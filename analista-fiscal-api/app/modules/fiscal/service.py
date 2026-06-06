@@ -173,6 +173,7 @@ class FiscalService:
         )
 
         salva = await self._apuracao_repo.salvar(apuracao)
+        await self._session.commit()
 
         log.info(
             "fiscal.das.calculou",

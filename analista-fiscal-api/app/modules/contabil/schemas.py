@@ -38,6 +38,9 @@ class OrigemLancamento(StrEnum):
     PROVISAO = "provisao"
     ENCERRAMENTO = "encerramento"
     AJUSTE = "ajuste"
+    IMPORTACAO = "importacao"
+    FOLHA = "folha"
+    APURACAO = "apuracao"
 
 
 # ── Plano de contas ─────────────────────────────────────────────────────────
@@ -135,6 +138,7 @@ class TipoFatoAuto(StrEnum):
     TRANSACAO = "transacao"
     DEPRECIACAO = "depreciacao"
     PROVISAO = "provisao"
+    APURACAO = "apuracao"
 
 
 class LoteAutoOut(BaseModel):

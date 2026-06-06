@@ -16,11 +16,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   );
 
   React.useEffect(() => {
-    if (process.env.NEXT_PUBLIC_PERF_BYPASS === "1") {
-      perfRecord("auth-guard:verificado", mountedAtRef.current);
-      setVerificado(true);
-      return;
-    }
     if (loading) return;
     if (!isLogado()) {
       router.replace("/login");

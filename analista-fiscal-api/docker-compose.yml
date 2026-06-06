@@ -29,18 +29,22 @@ services:
       timeout: 3s
       retries: 10
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: fiscal_ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # Ollama agora roda no HOST (GPU) — o backend o acessa via host.docker.internal.
+  # Para voltar ao Ollama containerizado (CPU, self-contained), restaure este
+  # serviço + o volume `ollama_data` e aponte OLLAMA_URL para http://ollama:11434.
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: fiscal_ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   healthcheck:
+  #     test: ["CMD", "ollama", "list"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   api:
     build:
@@ -53,7 +57,9 @@ services:
       LOG_LEVEL: INFO
       DATABASE_URL: postgresql+asyncpg://fiscal:fiscal@postgres:5432/fiscal
       REDIS_URL: redis://redis:6379/0
-      OLLAMA_URL: http://ollama:11434
+      # Ollama no host (GPU). gemma3:4b (3.3GB) cabe inteiro na VRAM → rápido.
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: gemma3:4b
     ports:
       - "8000:8000"
     volumes:
@@ -69,4 +75,3 @@ services:
 
 volumes:
   postgres_data:
-  ollama_data:

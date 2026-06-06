@@ -7,6 +7,7 @@ from app.shared.types import JsonObject
 import redis.asyncio as redis_async
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -207,6 +208,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(RateLimitMiddleware)
+# CORS adicionado por último → roda OUTERMOST (trata preflight OPTIONS e injeta
+# os headers Access-Control-* antes do rate-limit). Origens vêm de settings;
+# `allow_credentials=True` exige lista explícita (sem wildcard "*").
+_cors_settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+)
 
 app.include_router(auth_router)
 app.include_router(empresa_router)

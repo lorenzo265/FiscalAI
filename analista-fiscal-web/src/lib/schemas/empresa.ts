@@ -57,10 +57,17 @@ export const empresaSchema = z.object({
   inscricaoEstadual: z.string().optional(),
   inscricaoMunicipal: z.string().optional(),
   faturamento12m: z.number(),
-  socios: z.array(socioSchema),
+  // Campos sem correspondência direta no backend `EmpresaOut` (ver
+  // `mapearEmpresa` em `src/lib/api/empresa.ts`): default seguro no mapper.
+  socios: z.array(socioSchema).default([]),
   certificadoA1: certificadoA1Schema.optional(),
-  bancosConectados: z.array(bancoConectadoSchema),
-  modulosAtivos: z.array(z.string()),
+  bancosConectados: z.array(bancoConectadoSchema).default([]),
+  modulosAtivos: z.array(z.string()).default([]),
   criadoEm: z.string(),
+  // Campos que o backend fornece e que ajudam a UI (perfil + IBGE):
+  perfilUi: z.string().optional(),
+  codigoMunicipioIbge: z.string().optional(),
+  ativa: z.boolean().optional(),
+  aliquotaIssValidada: z.boolean().optional(),
 });
 export type Empresa = z.infer<typeof empresaSchema>;

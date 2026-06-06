@@ -21,6 +21,8 @@ from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 
 getcontext().prec = 28
 
+ALGORITMO_VERSAO = "mora.sicalc.v2"
+
 
 @dataclass(frozen=True)
 class ResultadoMora:
@@ -34,6 +36,7 @@ class ResultadoMora:
     meses_selic: int               # meses completos entre vencimento e pagamento
     aliquota_multa: Decimal        # multa efetiva aplicada (max 20%)
     aliquota_juros_acumulada: Decimal  # SELIC somada sem composição (metodologia Sicalc)
+    algoritmo_versao: str = ALGORITMO_VERSAO
 
 
 def calcular_mora(
@@ -115,8 +118,19 @@ def calcular_mora(
     )
 
     # ── Acréscimo do mês de pagamento: 1% fixo (Sicalc) ─────────────────────
-    # Aplica-se sempre que há atraso (mesmo se pagamento no mesmo mês do vencimento)
-    acrescimo_mes = (valor * Decimal("0.01")).quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
+    # Lei 9.430/1996 art. 61 §3º + metodologia Sicalc: os juros de mora
+    # (SELIC acumulada + 1% do mês de pagamento) só incidem a partir do 1º dia
+    # do mês SUBSEQUENTE ao vencimento.  Pagamento dentro do mesmo mês do
+    # vencimento → apenas multa de mora (0,33%/dia); juros = 0.
+    pagamento_mes_1 = date(data_pagamento.year, data_pagamento.month, 1)
+    vencimento_mes_1 = date(data_vencimento.year, data_vencimento.month, 1)
+    if pagamento_mes_1 > vencimento_mes_1:
+        acrescimo_mes = (valor * Decimal("0.01")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_EVEN
+        )
+    else:
+        # Mesmo mês: sem juros (1% nem SELIC — não há mês subsequente fechado)
+        acrescimo_mes = Decimal("0")
 
     total_acrescimos = multa_mora + juros_selic + acrescimo_mes
     valor_atualizado = valor + total_acrescimos

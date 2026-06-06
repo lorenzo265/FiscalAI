@@ -249,6 +249,10 @@ async def gerar_auto(
         resultado = await service.lote_depreciacao(
             session, ctx.tenant_id, empresa_id, comp_date
         )
+    elif tipo is TipoFatoAuto.APURACAO:
+        resultado = await service.lote_impostos(
+            session, ctx.tenant_id, empresa_id, comp_date
+        )
     else:  # PROVISAO
         resultado = await service.lote_provisao(
             session, ctx.tenant_id, empresa_id, comp_date

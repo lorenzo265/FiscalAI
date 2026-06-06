@@ -8,6 +8,7 @@ import type {
   Socio,
 } from "@/lib/schemas/empresa";
 import type { CnpjLookupResponse } from "@/lib/schemas/cnpj-lookup";
+import type { Empresa } from "@/lib/schemas/empresa";
 
 export interface BancoConectandoState {
   id: string;
@@ -22,6 +23,8 @@ export interface OnboardingState {
   // Passo 1
   cnpj: string;
   dadosReceita: CnpjLookupResponse | null;
+  // Empresa já criada no backend pelo onboarding (POST /v1/empresas/onboarding).
+  empresaCriada: Empresa | null;
   // Passo 2
   regime: RegimeTributario | null;
   anexoSimples: AnexoSimples | null;
@@ -39,6 +42,7 @@ export interface OnboardingState {
   voltar: () => void;
   setCnpj: (v: string) => void;
   setDadosReceita: (r: CnpjLookupResponse | null) => void;
+  setEmpresaCriada: (e: Empresa | null) => void;
   setRegime: (r: RegimeTributario) => void;
   setAnexoSimples: (a: AnexoSimples) => void;
   setFaturamento12m: (v: number) => void;
@@ -56,6 +60,7 @@ const estadoInicial = {
   passo: 1,
   cnpj: "",
   dadosReceita: null,
+  empresaCriada: null,
   regime: null,
   anexoSimples: null,
   faturamento12m: 0,
@@ -80,6 +85,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           dadosReceita: r,
           socios: r?.socios ?? [],
         }),
+      setEmpresaCriada: (e) => set({ empresaCriada: e }),
       setRegime: (r) => set({ regime: r }),
       setAnexoSimples: (a) => set({ anexoSimples: a }),
       setFaturamento12m: (v) => set({ faturamento12m: v }),
