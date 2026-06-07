@@ -462,8 +462,26 @@ sem commit; (3) cadeia de migrations travada (0041 CONCURRENTLY+pg8000 → DB a 
 - **Reverter p/ Ollama no container (CPU, self-contained):** descomentar o serviço `ollama` + volume no compose e voltar `OLLAMA_URL=http://ollama:11434`.
 
 **Pendências p/ "100%" pleno (não-bloqueantes):** credenciais reais de Focus/Pluggy
-p/ dado vivo dessas integrações; re-wire do adapter eSocial; `PUT/PATCH /v1/empresas/{id}`
-p/ persistir edição de empresa; o bug pg8000+CONCURRENTLY no `env.py` (infra de backend).
+p/ dado vivo dessas integrações; re-wire do adapter eSocial; o bug pg8000+CONCURRENTLY
+no `env.py` (infra de backend).
+
+### 2026-06-06 · Orquestrador · `PUT /v1/empresas/{id}` (RESOLVIDO)
+- **Endpoint de edição de empresa entregue.** `PUT /v1/empresas/{id}` com `EmpresaUpdateIn`
+  (atualização parcial; `extra="forbid"` rejeita `cnpj`/`id`/`tenant_id`/`ativa`/
+  `aliquota_iss_validada`). Mudar `regime_tributario` re-deriva `perfil_ui`. 404
+  `EmpresaNaoEncontrada` em uuid inexistente. Verificado: 5 testes de integração + live.
+- **Re-wire do front:** `salvarEmpresa` no `empresa-provider.tsx` (hoje só em memória)
+  agora pode chamar `PUT /v1/empresas/{id}` com **apenas os campos editáveis**:
+  `razao_social, nome_fantasia, regime_tributario, anexo_simples, cnae_principal,
+  municipio, codigo_municipio_ibge (7 díg), uf, ie, im, faturamento_12m (string decimal)`.
+  **NÃO** enviar `cnpj` nem campos de controle (→ 422). Resposta = `EmpresaOut` (mesmo
+  shape do GET) → mapear com o `mapearEmpresa()` existente.
+- **⚠️ Drift descoberto (gap de backend, ainda aberto):** `codigo_municipio_ibge` é
+  **NOT NULL** no banco (migration 0049), mas o model/`EmpresaIn` o tratam como opcional e
+  o onboarding fail-open pode deixá-lo `None` → **criar empresa sem IBGE estoura 500**
+  (`IntegrityError`). O `POST /v1/empresas/onboarding` resolve IBGE na maioria dos casos,
+  mas quando o resolver falha o cadastro quebra. O PUT já está protegido (ignora null);
+  o caminho de criação precisa de fix próprio (model nullable→required + 422 limpo).
 
 ### 2026-06-06 · Orquestrador · Robustez de input — competência mensal (RESOLVIDO)
 - **Balancete mês-inválido → 500 RESOLVIDO.** `GET …/contabil/balancete/2026-13` (e `2026-00`,

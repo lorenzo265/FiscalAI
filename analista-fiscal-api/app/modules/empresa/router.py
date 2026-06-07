@@ -15,6 +15,7 @@ from app.modules.empresa.onboarding_bundle import OnboardingBundleService
 from app.modules.empresa.schemas import (
     EmpresaIn,
     EmpresaOut,
+    EmpresaUpdateIn,
     MunicipioIbgeIn,
     OnboardingBundleIn,
     OnboardingBundleOut,
@@ -63,6 +64,26 @@ async def listar_empresas(session: SessionDep) -> list[EmpresaOut]:
 )
 async def buscar_empresa(empresa_id: UUID, session: SessionDep) -> EmpresaOut:
     empresa = await _service.buscar(session, empresa_id)
+    return EmpresaOut.model_validate(empresa)
+
+
+@router.put(
+    "/{empresa_id}",
+    response_model=EmpresaOut,
+    summary="Atualiza dados cadastrais da empresa (RLS ativo)",
+    description=(
+        "Atualização parcial dos campos de negócio (razão social, nome "
+        "fantasia, regime, anexo, CNAE, município/IBGE/UF, IE/IM, faturamento "
+        "12m). Campos omitidos ficam inalterados. O CNPJ é imutável e não é "
+        "aceito. Mudança de regime re-deriva o perfil_ui automaticamente."
+    ),
+)
+async def atualizar_empresa(
+    empresa_id: UUID,
+    payload: EmpresaUpdateIn,
+    session: SessionDep,
+) -> EmpresaOut:
+    empresa = await _service.atualizar(session, empresa_id, payload)
     return EmpresaOut.model_validate(empresa)
 
 

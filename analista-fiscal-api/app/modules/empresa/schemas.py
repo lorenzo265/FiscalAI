@@ -75,6 +75,39 @@ class EmpresaIn(BaseModel):
         return v.upper() if v else v
 
 
+class EmpresaUpdateIn(BaseModel):
+    """Edição dos dados cadastrais da empresa (``PUT /v1/empresas/{id}``).
+
+    Atualização parcial: campos omitidos permanecem inalterados. O ``cnpj`` é
+    identidade imutável e **não** é aceito aqui (``extra="forbid"``); ``ativa`` e
+    ``aliquota_iss_validada`` têm endpoints próprios. Quando ``regime_tributario``
+    muda, ``perfil_ui`` é re-derivado no service.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    razao_social: str | None = Field(default=None, min_length=3, max_length=255)
+    nome_fantasia: str | None = Field(default=None, max_length=255)
+    regime_tributario: RegimeTributario | None = None
+    anexo_simples: AnexoSimples | None = None
+    cnae_principal: str | None = Field(default=None, max_length=10)
+    municipio: str | None = Field(default=None, max_length=100)
+    codigo_municipio_ibge: str | None = Field(
+        default=None,
+        pattern=r"^\d{7}$",
+        description="Código IBGE 7-dígitos do município.",
+    )
+    uf: str | None = Field(default=None, min_length=2, max_length=2)
+    ie: str | None = Field(default=None, max_length=20)
+    im: str | None = Field(default=None, max_length=20)
+    faturamento_12m: Decimal | None = Field(default=None, ge=0)
+
+    @field_validator("uf")
+    @classmethod
+    def _normalizar_uf(cls, v: str | None) -> str | None:
+        return v.upper() if v else v
+
+
 class EmpresaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

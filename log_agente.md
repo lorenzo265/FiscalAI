@@ -4,10 +4,40 @@
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores claude-sonnet-4-6
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `hardening-fiscal-2026-06`
-**Suite atual:** **2509 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Suite atual:** **2520 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · +5 integração (PUT empresa, requer Docker)
 **mypy strict:** ✅ 0 erros em 357 arquivos
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅
+
+---
+
+## PUT /v1/empresas/{id} — edição cadastral (2026-06-06)
+
+Pendência do handoff front-back: não havia endpoint de UPDATE de empresa, então o
+`salvarEmpresa` do frontend só atualizava o contexto em memória (edição perdida no
+`refresh()`). Implementado:
+
+- **`EmpresaUpdateIn`** (`app/modules/empresa/schemas.py`) — campos de negócio editáveis,
+  todos opcionais (atualização parcial via `exclude_unset`); `extra="forbid"` rejeita
+  `cnpj` (identidade imutável), `id`, `tenant_id`, `ativa`, `aliquota_iss_validada`.
+- **`EmpresaService.atualizar`** — aplica só os campos enviados; re-deriva `perfil_ui`
+  quando `regime_tributario` muda (mesma regra do `criar`); ignora `null` em colunas
+  NOT NULL (`razao_social`, `regime_tributario`, `codigo_municipio_ibge`) em vez de
+  estourar; commit no service (convenção); 404 `EmpresaNaoEncontrada`.
+- **`EmpresaRepo.atualizar`** — `por_id` (RLS + ativa) → setattr dos campos → flush.
+- **`PUT /v1/empresas/{id}`** (router) — thin; RLS via sessão (como o GET).
+- **Testes:** `tests/unit/empresa/test_update_schema.py` (11 casos de contrato/validação,
+  no gate rápido) + `tests/integration/test_empresa_update.py` (5 casos: update+persist,
+  regime→perfil_ui, cnpj 422, ibge-null preservado, 404).
+
+**Verificado:** integração 5/5 verdes contra Postgres real; ao vivo PUT-cnpj → 422
+`extra_forbidden`, PUT-inexistente → 404. **Suite:** 2520 passed / 3 skipped · mypy 0 erros.
+
+**Drift descoberto (pré-existente, NÃO corrigido aqui — registrado p/ PR própria):**
+a migration **0049** tornou `empresa.codigo_municipio_ibge` **NOT NULL**, mas o model
+SQLAlchemy e `EmpresaIn` ainda o marcam nullable e o onboarding fail-open pode deixá-lo
+`None` → `criar` estoura `IntegrityError`/500 em vez de 422. O PUT já está protegido; o
+caminho de **criação/onboarding** continua vulnerável (fora do escopo desta PR).
 
 ---
 

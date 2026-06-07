@@ -6,7 +6,11 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.empresa.repo import EmpresaRepo
-from app.modules.empresa.schemas import EmpresaIn, _derivar_perfil_ui
+from app.modules.empresa.schemas import (
+    EmpresaIn,
+    EmpresaUpdateIn,
+    _derivar_perfil_ui,
+)
 from app.shared.auth.jwt import TenantContext
 from app.shared.db.models import Empresa
 from app.shared.exceptions import CnpjJaCadastrado, EmpresaNaoEncontrada
@@ -62,6 +66,43 @@ class EmpresaService:
         empresa = await EmpresaRepo(session).por_id(empresa_id)
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+        return empresa
+
+    async def atualizar(
+        self,
+        session: AsyncSession,
+        empresa_id: UUID,
+        payload: EmpresaUpdateIn,
+    ) -> Empresa:
+        """Atualiza dados cadastrais da empresa (PUT — atualização parcial).
+
+        Só aplica os campos enviados pelo cliente (``exclude_unset``). Quando
+        ``regime_tributario`` muda, re-deriva ``perfil_ui`` (mesma regra do
+        cadastro). ``razao_social``, ``regime_tributario`` e
+        ``codigo_municipio_ibge`` são NOT NULL no banco (este último desde a
+        migration 0049) — uma tentativa de limpá-los (``null`` explícito) é
+        ignorada, não estoura.
+        """
+        dados = payload.model_dump(exclude_unset=True)
+        for nao_nulo in ("razao_social", "regime_tributario", "codigo_municipio_ibge"):
+            if nao_nulo in dados and dados[nao_nulo] is None:
+                del dados[nao_nulo]
+
+        perfil_ui: str | None = None
+        if payload.regime_tributario is not None and "regime_tributario" in dados:
+            perfil_ui = _derivar_perfil_ui(payload.regime_tributario).value
+
+        empresa = await EmpresaRepo(session).atualizar(
+            empresa_id, dados, perfil_ui=perfil_ui
+        )
+        if empresa is None:
+            raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
+        await session.commit()
+        log.info(
+            "empresa.atualizou",
+            empresa_id=str(empresa_id),
+            campos=sorted(dados.keys()),
+        )
         return empresa
 
     async def atualizar_municipio_ibge(

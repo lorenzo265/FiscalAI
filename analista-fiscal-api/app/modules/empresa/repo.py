@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -117,6 +118,29 @@ class EmpresaRepo:
             faturamento_12m=faturamento_12m,
         )
         self._s.add(empresa)
+        await self._s.flush()
+        return empresa
+
+    async def atualizar(
+        self,
+        empresa_id: UUID,
+        campos: Mapping[str, object],
+        *,
+        perfil_ui: str | None = None,
+    ) -> Empresa | None:
+        """Aplica ``campos`` (atributos editáveis) na empresa ativa.
+
+        As chaves de ``campos`` são restritas pelo schema ``EmpresaUpdateIn`` —
+        nunca entrada arbitrária. ``perfil_ui`` é passado à parte porque é
+        derivado de ``regime_tributario`` no service, não enviado pelo cliente.
+        """
+        empresa = await self.por_id(empresa_id)
+        if empresa is None:
+            return None
+        for campo, valor in campos.items():
+            setattr(empresa, campo, valor)
+        if perfil_ui is not None:
+            empresa.perfil_ui = perfil_ui
         await self._s.flush()
         return empresa
 
