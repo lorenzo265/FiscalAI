@@ -18,9 +18,9 @@
  * Dono na integração: agente de domínio pessoal.
  */
 import {
-  adicionarEventoEsocial,
   adicionarFuncionario,
   atualizarStatusEvento,
+  gerarEventoAdmissao,
   gerarHoleritesDoMes,
   listarEventosEsocial,
   listarFuncionarios,
@@ -78,16 +78,16 @@ export const pessoal = {
   listarFuncionarios: (): Promise<Funcionario[]> => listarFuncionarios(),
   obterFuncionario: (id: string): Promise<Funcionario | undefined> =>
     obterFuncionario(id),
-  adicionarFuncionario: (f: Funcionario): Promise<void> =>
+  adicionarFuncionario: (f: Funcionario): Promise<Funcionario> =>
     adicionarFuncionario(f),
+  gerarEventoAdmissao: (funcionarioId: string): Promise<void> =>
+    gerarEventoAdmissao(funcionarioId),
   listarHolerites: (): Promise<Holerite[]> => listarHolerites(),
   listarHoleritesDoMes: (ano: number, mes: number): Promise<Holerite[]> =>
     listarHoleritesDoMes(ano, mes),
   gerarHoleritesDoMes: (ano: number, mes: number): Promise<Holerite[]> =>
     gerarHoleritesDoMes(ano, mes),
   listarEventosEsocial: (): Promise<EventoEsocial[]> => listarEventosEsocial(),
-  adicionarEventoEsocial: (evento: EventoEsocial): Promise<void> =>
-    adicionarEventoEsocial(evento),
   atualizarStatusEvento: (
     id: string,
     status: StatusEventoEsocial,

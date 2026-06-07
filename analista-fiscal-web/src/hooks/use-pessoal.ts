@@ -8,7 +8,6 @@ import {
 import { api } from "@/lib/api-client";
 import { garantirSeedPessoal } from "@/lib/pessoal/db-service";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
-import { gerarEventoAdmissaoMock } from "@/lib/mocks/pessoal";
 import type { EventoEsocial, Funcionario } from "@/lib/schemas/pessoal";
 
 export function useFuncionarios() {
@@ -41,10 +40,11 @@ export function useAdicionarFuncionario() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (funcionario: Funcionario) => {
-      await api.pessoal.adicionarFuncionario(funcionario);
-      const evento = gerarEventoAdmissaoMock(funcionario);
-      await api.pessoal.adicionarEventoEsocial(evento);
-      return { funcionario, evento };
+      // Cria no backend e recebe o id REAL; com ele gera o evento eSocial S-2200
+      // (admissão) a partir da referência correta. A geração é fail-soft.
+      const criado = await api.pessoal.adicionarFuncionario(funcionario);
+      await api.pessoal.gerarEventoAdmissao(criado.id);
+      return { funcionario: criado };
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["pessoal"] });

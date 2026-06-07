@@ -74,7 +74,7 @@ export function WizardAdmissao() {
     }
     const id = `func-${empresa.id}-${pseudoUuid().slice(0, 8)}`;
     const cpfLimpo = input.cpf.replace(/\D/g, "");
-    const novo = await adicionar.mutateAsync({
+    await adicionar.mutateAsync({
       id,
       nome: input.nome.trim(),
       cpf: cpfLimpo,
@@ -94,9 +94,8 @@ export function WizardAdmissao() {
     });
     setAdmitido(true);
     toast.success("Admissão registrada", {
-      description: `Evento eSocial S-2200 transmitido (recibo: ${
-        novo.evento.recibo ?? "—"
-      }).`,
+      description:
+        "Evento eSocial S-2200 (admissão) gerado. A transmissão ocorre após habilitar o certificado digital.",
     });
     setTimeout(() => router.push("/pessoal/funcionarios"), 1200);
   }

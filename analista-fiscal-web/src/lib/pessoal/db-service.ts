@@ -260,7 +260,7 @@ export async function obterFuncionario(
   return lista.find((f) => f.id === id);
 }
 
-export async function adicionarFuncionario(f: Funcionario): Promise<void> {
+export async function adicionarFuncionario(f: Funcionario): Promise<Funcionario> {
   const empresaId = empresaIdOuErro();
   const body = {
     nome: f.nome,
@@ -272,11 +272,36 @@ export async function adicionarFuncionario(f: Funcionario): Promise<void> {
     salario_base: Number(f.salario).toFixed(2),
     dependentes_irrf: 0,
   };
-  await fetchJson(`/empresas/${empresaId}/funcionarios`, funcionarioOutSchema, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const criado = await fetchJson(
+    `/empresas/${empresaId}/funcionarios`,
+    funcionarioOutSchema,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  // Devolve o funcionário com o id REAL do backend (necessário p/ gerar o
+  // evento eSocial S-2200 a partir da referência correta).
+  return mapearFuncionario(criado);
+}
+
+/**
+ * Gera o evento eSocial S-2200 (admissão) a partir do id REAL do funcionário.
+ * Fail-soft: 409 (já gerado) ou qualquer outro erro não pode quebrar a admissão
+ * — o funcionário já foi criado; o evento é um efeito secundário.
+ */
+export async function gerarEventoAdmissao(funcionarioId: string): Promise<void> {
+  const empresaId = empresaIdOuErro();
+  try {
+    await fetchJson(`/empresas/${empresaId}/esocial/eventos`, z.unknown(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo_evento: "S-2200", referencia_id: funcionarioId }),
+    });
+  } catch {
+    // não bloqueia a admissão (estado honesto: o evento simplesmente não é gerado).
+  }
 }
 
 // ── Holerites / folha (API real) ────────────────────────────────────────────
@@ -537,19 +562,6 @@ export async function atualizarStatusEvento(
     z.unknown(),
     { method: "POST" }
   );
-}
-
-/**
- * Admissão (S-2200): no-op por ora. O backend gera o evento a partir do id REAL
- * do funcionário, mas o fluxo de admissão do front ainda passa um id client-side
- * (ver useAdicionarFuncionario) — re-ligar exige o id do backend (follow-up).
- * No-op para não quebrar o hook nem inventar um evento local invisível na lista
- * (que agora vem só do backend).
- */
-export async function adicionarEventoEsocial(
-  _evento: EventoEsocial
-): Promise<void> {
-  return Promise.resolve();
 }
 
 async function cnpjDaEmpresa(empresaId: string): Promise<string> {
