@@ -462,8 +462,14 @@ sem commit; (3) cadeia de migrations travada (0041 CONCURRENTLY+pg8000 → DB a 
 - **Reverter p/ Ollama no container (CPU, self-contained):** descomentar o serviço `ollama` + volume no compose e voltar `OLLAMA_URL=http://ollama:11434`.
 
 **Pendências p/ "100%" pleno (não-bloqueantes):** credenciais reais de Focus/Pluggy
-p/ dado vivo dessas integrações; re-wire do adapter eSocial; o bug pg8000+CONCURRENTLY
-no `env.py` (infra de backend).
+p/ dado vivo dessas integrações; re-wire do adapter eSocial.
+
+### 2026-06-06 · Orquestrador · Infra migration driver (RESOLVIDO)
+- **`alembic upgrade head` agora roda inteiro.** O bug pg8000 + `CREATE INDEX CONCURRENTLY`
+  (travava no 0041 com 25001) foi corrigido trocando o driver de migration do `env.py` para
+  **psycopg v3** (`postgresql+psycopg`), que honra o `autocommit_block()`. Verificado num DB
+  do zero até head (0057). Não afeta o app (asyncpg). DB de dev segue em 0056; rodar
+  `alembic upgrade head` quando quiser aplicar a 0057.
 
 ### 2026-06-06 · Orquestrador · `PUT /v1/empresas/{id}` (RESOLVIDO)
 - **Endpoint de edição de empresa entregue.** `PUT /v1/empresas/{id}` com `EmpresaUpdateIn`

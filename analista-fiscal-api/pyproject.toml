@@ -36,8 +36,10 @@ ruff = "^0.7"
 mypy = "^1.13"
 types-redis = "^4.6"
 asgi-lifespan = "^2.1"
-pg8000 = "^1.31"
 bandit = { extras = ["toml"], version = "^1.8" }
+# Driver sync de migrations (Alembic). psycopg v3 binário embute libpq e honra
+# o autocommit_block() — necessário p/ CREATE INDEX CONCURRENTLY (migration 0041).
+psycopg = { extras = ["binary"], version = "^3.2" }
 
 # Sprint 19.6 PR3 (#1, #41, #2) — grupos opcionais para deploy:
 #

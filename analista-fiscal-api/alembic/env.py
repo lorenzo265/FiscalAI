@@ -1,9 +1,14 @@
-"""Alembic env — conexão síncrona (psycopg2) para migrations.
+"""Alembic env — conexão síncrona (psycopg v3) para migrations.
 
-O app usa asyncpg em produção; Alembic usa psycopg2 só aqui porque:
+O app usa asyncpg em produção; Alembic usa psycopg (v3) só aqui porque:
   - migrations são DDL puro, não precisam de async
   - asyncpg tem bug de socket no Windows com Docker Desktop
-  - psycopg2 funciona em qualquer ambiente sem ajustes
+  - psycopg ``[binary]`` embute a própria libpq — sem dependência de libpq do
+    sistema nem problema de path encoding no Windows
+  - psycopg honra o ``autocommit_block()`` do Alembic, então
+    ``CREATE INDEX CONCURRENTLY`` (migration 0041) roda fora de transação.
+    O driver anterior (pg8000) NÃO escapava a transação no ``autocommit_block``
+    e travava ``alembic upgrade head`` no 0041 com erro 25001.
 
 Base.metadata é importado normalmente para o autogenerate detectar mudanças.
 """
@@ -24,9 +29,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Converte postgresql+asyncpg:// → postgresql+pg8000:// para Alembic.
-# pg8000 é Python puro — sem libpq nativa, sem problemas de path encoding no Windows.
-_db_url = get_settings().DATABASE_URL.replace("+asyncpg", "+pg8000", 1)
+# Converte postgresql+asyncpg:// → postgresql+psycopg:// para Alembic (ver docstring).
+_db_url = get_settings().DATABASE_URL.replace("+asyncpg", "+psycopg", 1)
 config.set_main_option("sqlalchemy.url", _db_url)
 
 target_metadata = Base.metadata

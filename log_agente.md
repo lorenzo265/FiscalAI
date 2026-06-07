@@ -11,6 +11,33 @@
 
 ---
 
+## Infra: migration driver pg8000 → psycopg v3 (CONCURRENTLY) (2026-06-06)
+
+Último item de robustez do handoff: `alembic upgrade head` **nunca rodava inteiro** num
+ambiente limpo — travava na **0041** (`CREATE INDEX CONCURRENTLY`) com
+`25001 cannot run inside a transaction block`. Bug latente que atingiria prod/CI.
+
+**Diagnóstico (reproduzido em DB scratch):** o `alembic/env.py` forçava o driver **pg8000**.
+O `op.get_context().autocommit_block()` da 0041 comuta a conexão para AUTOCOMMIT mas chama
+`connection.begin()` — e o **pg8000 abre uma transação real mesmo em AUTOCOMMIT**
+(`in_transaction()` segue `True` dentro do bloco), então CONCURRENTLY roda dentro de
+transação e estoura 25001. Confirmado: `transaction_per_migration=True` **não** resolve
+(testado); o swap de driver resolve.
+
+**Fix:** `env.py` passou a converter a URL para **`postgresql+psycopg`** (psycopg v3) em vez
+de `+pg8000`. psycopg `[binary]` embute a própria libpq (sem o problema de path encoding
+não-ASCII no Windows que motivou o pg8000) **e** honra o `autocommit_block()`. Dependência
+dev trocada: `+psycopg[binary] ^3.2`, `-pg8000`. Docstring/comentário do `env.py` corrigidos
+(diziam "psycopg2", que nem estava instalado).
+
+**Verificado:** `alembic upgrade head` num DB **do zero** roda limpo passando pela 0041
+(CONCURRENTLY) até **0057 (head)** — com e sem `transaction_per_migration`. Gate **2520
+passed / 3 skipped** (app usa asyncpg, intacto) · mypy 0 erros (357 arq.) · `poetry check` ok.
+Regressão guardada pelo passo de migration do CI (que provisiona DB fresco). DB de dev segue
+em 0056 (não mexido); `upgrade head` agora funciona quando quiserem aplicar 0057.
+
+---
+
 ## Criação de empresa sem IBGE → 422 limpo (2026-06-06)
 
 Corrige o drift descoberto na PR do PUT: a migration **0049** tornou
