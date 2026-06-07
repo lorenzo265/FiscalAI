@@ -476,12 +476,13 @@ no `env.py` (infra de backend).
   municipio, codigo_municipio_ibge (7 díg), uf, ie, im, faturamento_12m (string decimal)`.
   **NÃO** enviar `cnpj` nem campos de controle (→ 422). Resposta = `EmpresaOut` (mesmo
   shape do GET) → mapear com o `mapearEmpresa()` existente.
-- **⚠️ Drift descoberto (gap de backend, ainda aberto):** `codigo_municipio_ibge` é
-  **NOT NULL** no banco (migration 0049), mas o model/`EmpresaIn` o tratam como opcional e
-  o onboarding fail-open pode deixá-lo `None` → **criar empresa sem IBGE estoura 500**
-  (`IntegrityError`). O `POST /v1/empresas/onboarding` resolve IBGE na maioria dos casos,
-  mas quando o resolver falha o cadastro quebra. O PUT já está protegido (ignora null);
-  o caminho de criação precisa de fix próprio (model nullable→required + 422 limpo).
+- **Drift do IBGE — RESOLVIDO (PR seguinte, 2026-06-06):** criar empresa sem
+  `codigo_municipio_ibge` (NOT NULL desde 0049) agora devolve **422 `MunicipioIbgeAusente`**
+  (não mais 500). O `POST /v1/empresas/onboarding` **degrada graciosamente** quando o IBGE
+  não resolve: `empresa_criada=null` + `aviso` orientando o cadastro manual — o wizard do
+  front deve, nesse caso, pedir o código IBGE (7 díg) ao usuário e refazer o cadastro via
+  `POST /v1/empresas` com o campo preenchido (ou usar `PATCH …/municipio-ibge` depois).
+  **Para o front:** ao criar empresa manualmente, `codigo_municipio_ibge` é obrigatório.
 
 ### 2026-06-06 · Orquestrador · Robustez de input — competência mensal (RESOLVIDO)
 - **Balancete mês-inválido → 500 RESOLVIDO.** `GET …/contabil/balancete/2026-13` (e `2026-00`,

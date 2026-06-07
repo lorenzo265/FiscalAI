@@ -13,7 +13,11 @@ from app.modules.empresa.schemas import (
 )
 from app.shared.auth.jwt import TenantContext
 from app.shared.db.models import Empresa
-from app.shared.exceptions import CnpjJaCadastrado, EmpresaNaoEncontrada
+from app.shared.exceptions import (
+    CnpjJaCadastrado,
+    EmpresaNaoEncontrada,
+    MunicipioIbgeAusente,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -26,6 +30,14 @@ class EmpresaService:
         payload: EmpresaIn,
     ) -> Empresa:
         repo = EmpresaRepo(session)
+
+        # codigo_municipio_ibge é NOT NULL no banco (migration 0049). Validar aqui
+        # devolve 422 MunicipioIbgeAusente em vez de deixar o INSERT estourar 500.
+        if payload.codigo_municipio_ibge is None:
+            raise MunicipioIbgeAusente(
+                "Empresa não pode ser cadastrada sem o código IBGE do município. "
+                "Informe o código IBGE de 7 dígitos."
+            )
 
         if await repo.cnpj_existe(ctx.tenant_id, payload.cnpj):
             raise CnpjJaCadastrado(f"CNPJ {payload.cnpj} já cadastrado para este tenant")

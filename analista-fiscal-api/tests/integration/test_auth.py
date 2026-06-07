@@ -112,6 +112,7 @@ async def test_token_autentica_endpoint_empresa(live_client: AsyncClient) -> Non
             "cnpj": "12345678000195",
             "razao_social": "Empresa Integração Ltda",
             "regime_tributario": "simples_nacional",
+            "codigo_municipio_ibge": "3550308",
         },
         headers={"Authorization": f"Bearer {token}"},
     )

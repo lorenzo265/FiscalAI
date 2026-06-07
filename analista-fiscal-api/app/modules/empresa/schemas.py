@@ -55,7 +55,11 @@ class EmpresaIn(BaseModel):
     codigo_municipio_ibge: str | None = Field(
         default=None,
         pattern=r"^\d{7}$",
-        description="Código IBGE 7-dígitos do município (exigido por Focus NFe e SERPRO PGDAS-D).",
+        description=(
+            "Código IBGE 7-dígitos do município. Obrigatório para persistir "
+            "(NOT NULL desde a migration 0049); omiti-lo resulta em 422 "
+            "MunicipioIbgeAusente. Exigido por Focus NFe e SERPRO PGDAS-D."
+        ),
     )
     uf: str | None = Field(default=None, min_length=2, max_length=2)
     ie: str | None = Field(default=None, max_length=20)

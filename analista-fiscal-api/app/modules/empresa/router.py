@@ -145,7 +145,7 @@ async def onboarding_por_cnpj(
     request: Request,
 ) -> OnboardingResultadoOut:
     """Onboarding via CNPJ: BrasilAPI → regime sugerido → IBGE → cria empresa."""
-    from app.shared.exceptions import CnpjJaCadastrado
+    from app.shared.exceptions import CnpjJaCadastrado, MunicipioIbgeAusente
 
     brasil_api = getattr(request.app.state, "brasil_api_client", None)
     if brasil_api is None:
@@ -221,6 +221,15 @@ async def onboarding_por_cnpj(
         resultado.empresa_criada = EmpresaOut.model_validate(empresa)
     except CnpjJaCadastrado:
         resultado.aviso = "CNPJ já cadastrado neste tenant — empresa existente mantida."
+    except MunicipioIbgeAusente:
+        # IBGE não resolvido automaticamente (homônimo / divergência BrasilAPI vs IBGE).
+        # Degrada sem 500: devolve os dados consultados e orienta o cadastro manual.
+        resultado.empresa_criada = None
+        resultado.aviso = (
+            f"Não foi possível resolver o código IBGE do município "
+            f"{nome_municipio or '—'}/{uf or '—'} automaticamente. Cadastre a empresa "
+            "informando o código IBGE de 7 dígitos do município."
+        )
 
     return resultado
 

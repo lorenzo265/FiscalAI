@@ -4,10 +4,35 @@
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores claude-sonnet-4-6
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `hardening-fiscal-2026-06`
-**Suite atual:** **2520 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · +5 integração (PUT empresa, requer Docker)
+**Suite atual:** **2520 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · +7 integração de empresa (PUT/create, requer Docker)
 **mypy strict:** ✅ 0 erros em 357 arquivos
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅
+
+---
+
+## Criação de empresa sem IBGE → 422 limpo (2026-06-06)
+
+Corrige o drift descoberto na PR do PUT: a migration **0049** tornou
+`empresa.codigo_municipio_ibge` **NOT NULL**, o model SQLAlchemy já refletia isso
+(`Mapped[str]`), mas `EmpresaIn`/`repo.criar`/onboarding ainda permitiam `None` →
+INSERT estourava `IntegrityError`/**500** em vez de um erro de domínio.
+
+- **`EmpresaService.criar`** — valida `codigo_municipio_ibge is None` no início e levanta
+  `MunicipioIbgeAusente` (422, `{codigo, mensagem}`) antes de tocar o banco.
+- **`EmpresaRepo.criar`** — `codigo_municipio_ibge` virou keyword-only **obrigatório**
+  (`str`), alinhado ao model; impede regressão futura.
+- **`POST /v1/empresas/onboarding`** — passou a capturar `MunicipioIbgeAusente`: quando o
+  resolver de IBGE falha (homônimo / divergência BrasilAPI vs IBGE), **degrada sem 500** —
+  devolve `OnboardingResultadoOut` com `empresa_criada=None` + `aviso` orientando o cadastro
+  manual do código IBGE (mesmo mecanismo do "CNPJ já cadastrado").
+- **`EmpresaIn`** — descrição do campo agora avisa que é obrigatório para persistir.
+- **Testes:** `tests/integration/test_empresa_create.py` (sem IBGE → 422; com IBGE → 201);
+  `test_auth.py` ajustado (criava empresa sem IBGE — passava antes de 0049, hoje 422).
+
+**Verificado:** integração empresa 15/15 verdes; ao vivo `POST /v1/empresas` sem IBGE → 422
+`MunicipioIbgeAusente`. **Suite:** 2520 passed / 3 skipped · mypy 0 erros (357 arq.). Drift
+**resolvido** (criação e edição agora ambos blindados).
 
 ---
 
