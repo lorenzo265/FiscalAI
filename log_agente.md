@@ -11,6 +11,36 @@
 
 ---
 
+## 🏁 FECHAMENTO DO PLANO (2026-06-06)
+
+Decisão do usuário: "fechar o plano". Estado consolidado:
+
+- **Backend** — Sprints 0–22 concluídas (2520 testes, mypy 0 erros). Das 40 pendências
+  conscientes, **38 ✅ resolvidas ou ⏳ estruturadas** (código pronto, gate operacional de deploy).
+- **Frontend Arkan + integração front-back** — 10 domínios ligados ao backend real; build verde.
+  eSocial (último gap) fechado: lista real + S-1200 gerado na folha + S-2200 na admissão +
+  transmissão honesta (412 sem cert A1).
+- **Branch `hardening-fiscal-2026-06`** — 9 PRs (hardening + integração + 6 fixes desta rodada):
+  robustez de competência, PUT empresa, criar-sem-IBGE→422, driver psycopg v3, eSocial real.
+
+**Único item em aberto e acionável (`[risco-cliente]`):**
+- **#9 — Tabelas INSS/IRRF/FGTS 2026.** Seed atual é 2025 (Portaria 6/2025); estamos em 2026 →
+  folha calcula errado. É um INSERT de nova vigência SCD (`valid_from='2026-01-01'`). **Aguarda
+  os valores oficiais da Portaria Interministerial MPS/MF 2026 + tabela IRRF 2026** — não pode
+  ser hardcodado sem fonte oficial (§ proibido). Fluxo: `/atualizar-aliquota` (para em aprovação).
+
+**Deferido por design (aguardando terceiro — `[externo-runbook]`):** Reforma CBS/IBS (#19–24:
+alíquotas IBS por UF, Imposto Seletivo, split payment 2027, Bloco K, NFC-e/CT-e) → dependem de
+RFB/Comitê Gestor publicar regulamentação/leiautes (escopo Fase 5, em
+`docs/pendencias/runbook-ativacao-externos.md`). Operacionais (#1/#2/#3/#11/#40): Celery
+worker/beat, storage S3, scrapers CRF/CNDT → decisões de deploy. Credenciais reais Focus/Pluggy
++ certificado A1 do eSocial → ativação consciente (§8.11–8.12).
+
+**Conclusão:** o plano de produto está **completo e endurecido**. O que resta é (a) a atualização
+fiscal temporal #9 (aguarda valores oficiais) e (b) ativações gated por terceiros, já documentadas.
+
+---
+
 ## Infra: migration driver pg8000 → psycopg v3 (CONCURRENTLY) (2026-06-06)
 
 Último item de robustez do handoff: `alembic upgrade head` **nunca rodava inteiro** num
