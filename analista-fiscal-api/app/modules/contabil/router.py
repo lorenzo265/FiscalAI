@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.modules.contabil.encerramento_service import EncerramentoService
 from app.modules.contabil.lancador_service import LancadorService
@@ -39,18 +38,8 @@ from app.modules.contabil.schemas import (
     TipoFatoAuto,
 )
 from app.modules.contabil.service import ContabilService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 router = APIRouter(prefix="/v1/empresas", tags=["contabil"])
 
@@ -235,7 +224,7 @@ async def gerar_auto(
     ctx: TenantDep,
     session: SessionDep,
 ) -> LoteAutoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     service = LancadorService()
     if tipo is TipoFatoAuto.NFE:
         resultado = await service.lote_nfe(
@@ -283,7 +272,7 @@ async def balancete(
     ctx: TenantDep,
     session: SessionDep,
 ) -> BalanceteOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     linhas_dom = await RelatoriosService().balancete(session, empresa_id, comp_date)
     linhas = [
         LinhaBalanceteOut(
@@ -368,7 +357,7 @@ async def razao(
     ctx: TenantDep,
     session: SessionDep,
 ) -> RazaoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     conta, saldo_inicial, linhas_dom = await RelatoriosService().razao(
         session, empresa_id, conta_id, comp_date
     )
@@ -406,7 +395,7 @@ async def encerrar_mes(
     ctx: TenantDep,
     session: SessionDep,
 ) -> EncerramentoMensalOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     resultado = await EncerramentoService().encerrar_mes(
         session, ctx.tenant_id, empresa_id, comp_date
     )

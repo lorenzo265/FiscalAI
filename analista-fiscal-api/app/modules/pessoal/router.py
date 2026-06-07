@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.modules.pessoal.eventos_service import EventosFolhaService
 from app.modules.pessoal.repo import (
@@ -50,21 +48,11 @@ from app.modules.pessoal.socio_service import (
 from app.modules.pessoal.transmissao_esocial_service import (
     TransmissaoEsocialService,
 )
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 from app.shared.exceptions import FolhaNaoEncontrada
 
 router = APIRouter(prefix="/v1/empresas", tags=["pessoal"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 # ── Funcionários ────────────────────────────────────────────────────────────
@@ -126,7 +114,7 @@ async def fechar_folha(
     ctx: TenantDep,
     session: SessionDep,
 ) -> FecharFolhaOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     return await PessoalService().fechar_folha_mensal(
         session, ctx.tenant_id, empresa_id, comp_date
     )
@@ -158,7 +146,7 @@ async def listar_holerites(
     ctx: TenantDep,
     session: SessionDep,
 ) -> list[HoleriteOut]:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     folha = await FolhaRepo(session).por_competencia(empresa_id, comp_date)
     if folha is None:
         raise FolhaNaoEncontrada(

@@ -1,13 +1,45 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-05
+**Última atualização:** 2026-06-06
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores claude-sonnet-4-6
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `main`
-**Suite atual:** **2433 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
-**mypy strict:** ✅ 0 erros em 356 arquivos
+**Branch:** `hardening-fiscal-2026-06`
+**Suite atual:** **2509 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**mypy strict:** ✅ 0 erros em 357 arquivos
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅
+
+---
+
+## Robustez de input — competência mensal (2026-06-06)
+
+Pendência de robustez do handoff front-back: `GET …/contabil/balancete/{competencia}`
+com mês inválido (`2026-13`, `2026-00`) devolvia **500** — o `_parse_competencia` local
+casava o regex `^\d{4}-\d{2}$` mas `date(int(ano), int(mes), 1)` estourava `ValueError`
+não tratado. O mesmo `_parse_competencia` bugado estava **duplicado em 7 routers**
+(contabil, lucro_presumido, imobilizado, pgdas, provisoes, reinf, pessoal).
+
+Correção (1 PR, hardening de classe inteira de bug):
+
+1. **`app/shared/competencia.py`** (novo) — `parse_competencia_mensal(s) -> date`: helper
+   único que valida formato + intervalo e levanta `CompetenciaInvalida` (422) em vez de
+   propagar `ValueError`. Cobre também `0000-01` (ano 0 → `date()` estoura) via try/except.
+2. **`CompetenciaInvalida(DomainError)`** (`http_status=422`) em `app/shared/exceptions.py` —
+   o handler central já mapeia para `{codigo, mensagem}` (alinha ao contrato do front; o
+   `HTTPException(detail=...)` antigo devolvia `{detail}`, fora do contrato).
+3. Os **7 routers** passaram a importar o helper; removidas as 7 cópias de
+   `_COMPETENCIA_RE`/`_parse_competencia` + imports órfãos (`re`, `HTTPException`, `date`).
+4. **`tests/unit/shared/test_competencia.py`** (novo) — 17 casos: válidas, mês 00/13/99,
+   ano 0000, e formatos malformados.
+
+**Verificado ao vivo:** `balancete/2026-13` e `…/2026-00` → **422 `CompetenciaInvalida`**;
+`balancete/2026-04` → 200; razão e folha (pessoal) também 422 com competência inválida.
+`GET …/lancamentos` sem competência **já respondia 200** (não reproduz o 500 do handoff —
+o `competencia: date | None` do FastAPI valida sozinho; `?competencia=` vazio → 422).
+**Suite:** 2509 passed, 3 skipped · **mypy:** 0 erros em 357 arquivos · **ruff:** módulo novo limpo.
+
+Pendências remanescentes do handoff: `PUT/PATCH /v1/empresas/{id}`; re-wire eSocial;
+bug pg8000+`CREATE INDEX CONCURRENTLY` no `alembic/env.py` (infra).
 
 ---
 

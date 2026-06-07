@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.modules.imobilizado.repo import BemImobilizadoRepo, DepreciacaoRepo
 from app.modules.imobilizado.schemas import (
@@ -19,21 +17,11 @@ from app.modules.imobilizado.schemas import (
     MetodoDepreciacao,
 )
 from app.modules.imobilizado.service import ImobilizadoService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 from app.shared.exceptions import BemNaoEncontrado
 
 router = APIRouter(prefix="/v1/empresas", tags=["imobilizado"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 @router.post(
@@ -156,7 +144,7 @@ async def gerar_depreciacao(
     ctx: TenantDep,
     session: SessionDep,
 ) -> GerarDepreciacaoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     return await ImobilizadoService().gerar_depreciacao_mensal(
         session, ctx.tenant_id, empresa_id, comp_date
     )

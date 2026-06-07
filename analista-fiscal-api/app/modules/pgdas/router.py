@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app.modules.pgdas.repo import TransmissoesPgdasRepo
 from app.modules.pgdas.schemas import (
@@ -16,20 +14,10 @@ from app.modules.pgdas.schemas import (
     TransmitirPgdasOut,
 )
 from app.modules.pgdas.service import PgdasService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["pgdas"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 @router.post(
@@ -51,7 +39,7 @@ async def transmitir(
     session: SessionDep,
     request: Request,
 ) -> TransmitirPgdasOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     serpro_client = getattr(request.app.state, "serpro_client", None)
     return await PgdasService().transmitir(
         session,
@@ -74,7 +62,7 @@ async def listar(
     session: SessionDep,
     competencia: str | None = None,
 ) -> list[TransmissaoOut]:
-    comp_date = _parse_competencia(competencia) if competencia else None
+    comp_date = parse_competencia_mensal(competencia) if competencia else None
     rows = await TransmissoesPgdasRepo(session).listar(empresa_id, competencia=comp_date)
     return [
         TransmissaoOut(

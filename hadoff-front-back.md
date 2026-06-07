@@ -462,6 +462,17 @@ sem commit; (3) cadeia de migrations travada (0041 CONCURRENTLY+pg8000 → DB a 
 - **Reverter p/ Ollama no container (CPU, self-contained):** descomentar o serviço `ollama` + volume no compose e voltar `OLLAMA_URL=http://ollama:11434`.
 
 **Pendências p/ "100%" pleno (não-bloqueantes):** credenciais reais de Focus/Pluggy
-p/ dado vivo dessas integrações; re-wire do adapter eSocial; robustez de input no backend
-(`GET …/lancamentos` sem competência e balancete mês-inválido → 500); `PUT/PATCH /v1/empresas/{id}`
+p/ dado vivo dessas integrações; re-wire do adapter eSocial; `PUT/PATCH /v1/empresas/{id}`
 p/ persistir edição de empresa; o bug pg8000+CONCURRENTLY no `env.py` (infra de backend).
+
+### 2026-06-06 · Orquestrador · Robustez de input — competência mensal (RESOLVIDO)
+- **Balancete mês-inválido → 500 RESOLVIDO.** `GET …/contabil/balancete/2026-13` (e `2026-00`,
+  razão, e os demais endpoints com competência na rota) devolvia 500 (`ValueError` de
+  `date(2026,13,1)` não tratado no `_parse_competencia`). Extraído helper compartilhado
+  `app/shared/competencia.py::parse_competencia_mensal` → levanta `CompetenciaInvalida` (422,
+  contrato `{codigo,mensagem}`). Removidas 7 cópias duplicadas do parser (contabil,
+  lucro_presumido, imobilizado, pgdas, provisoes, reinf, pessoal). +17 testes. Live: 422 ok.
+- **`GET …/lancamentos` sem competência: NÃO reproduz 500** — responde **200** (o
+  `competencia: date | None` do FastAPI valida sozinho; `?competencia=` vazio → 422). O 500
+  do handoff anterior não se confirma no estado atual; sem fix necessário.
+- **Suite:** 2509 passed / 3 skipped · mypy 0 erros (357 arq.). Detalhe em `log_agente.md`.

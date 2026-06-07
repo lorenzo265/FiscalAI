@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.modules.lucro_presumido.repo import ApuracaoLpRepo
 from app.modules.lucro_presumido.schemas import (
@@ -20,20 +19,10 @@ from app.modules.lucro_presumido.schemas import (
     SaudeLpOut,
 )
 from app.modules.lucro_presumido.service import LpChecklistService, LucroPresumidoService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["lucro_presumido"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 @router.post(
@@ -144,7 +133,7 @@ async def resolver_presuncao(
     session: SessionDep,
     em: str | None = None,
 ) -> PresuncaoResolvidaOut:
-    em_date = _parse_competencia(em) if em else date.today().replace(day=1)
+    em_date = parse_competencia_mensal(em) if em else date.today().replace(day=1)
     resolvida = await LucroPresumidoService().resolver_presuncao(
         session, empresa_id, em_date
     )
@@ -217,7 +206,7 @@ async def gerar_darf_pis(
     ctx: TenantDep,
     session: SessionDep,
 ) -> GuiaPagamentoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     guia = await LucroPresumidoService().gerar_darf_pis(
         session, ctx.tenant_id, empresa_id, comp_date
     )
@@ -237,7 +226,7 @@ async def gerar_darf_cofins(
     ctx: TenantDep,
     session: SessionDep,
 ) -> GuiaPagamentoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     guia = await LucroPresumidoService().gerar_darf_cofins(
         session, ctx.tenant_id, empresa_id, comp_date
     )

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.modules.reinf.repo import EfdReinfRepo
 from app.modules.reinf.schemas import (
@@ -15,20 +13,10 @@ from app.modules.reinf.schemas import (
     TipoEventoReinfIn,
 )
 from app.modules.reinf.service import ReinfService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["efd_reinf"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 @router.post(
@@ -70,7 +58,7 @@ async def listar_eventos_reinf(
     limite: int = 100,
 ) -> list[EventoReinfOut]:
     tipo_str = tipo.value if tipo else None
-    periodo_date = _parse_competencia(periodo) if periodo else None
+    periodo_date = parse_competencia_mensal(periodo) if periodo else None
     rows = await EfdReinfRepo(session).listar_empresa(
         empresa_id,
         tipo_evento=tipo_str,

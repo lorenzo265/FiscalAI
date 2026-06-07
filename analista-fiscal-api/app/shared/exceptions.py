@@ -16,6 +16,15 @@ class DomainError(Exception):
         self.codigo = codigo or self.__class__.__name__
 
 
+# ── Validação de entrada (cross-cutting) ─────────────────────────────────────
+
+
+class CompetenciaInvalida(DomainError):
+    """Competência mensal fora do formato AAAA-MM ou com mês/ano inválido."""
+
+    http_status = 422
+
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 

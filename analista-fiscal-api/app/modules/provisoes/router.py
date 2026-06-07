@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.modules.provisoes.repo import ProvisoesRepo
 from app.modules.provisoes.schemas import (
@@ -16,20 +14,10 @@ from app.modules.provisoes.schemas import (
     TipoProvisao,
 )
 from app.modules.provisoes.service import ProvisoesService
+from app.shared.competencia import parse_competencia_mensal
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["provisoes"])
-
-_COMPETENCIA_RE = re.compile(r"^\d{4}-\d{2}$")
-
-
-def _parse_competencia(competencia: str) -> date:
-    if not _COMPETENCIA_RE.match(competencia):
-        raise HTTPException(
-            status_code=422, detail="Competência deve estar no formato AAAA-MM"
-        )
-    ano, mes = competencia.split("-")
-    return date(int(ano), int(mes), 1)
 
 
 @router.post(
@@ -51,7 +39,7 @@ async def gerar_provisao(
     ctx: TenantDep,
     session: SessionDep,
 ) -> GerarProvisaoOut:
-    comp_date = _parse_competencia(competencia)
+    comp_date = parse_competencia_mensal(competencia)
     return await ProvisoesService().gerar_provisao_mensal(
         session, ctx.tenant_id, empresa_id, comp_date, payload
     )
@@ -69,7 +57,7 @@ async def listar(
     competencia: str | None = Query(default=None),
     tipo: TipoProvisao | None = Query(default=None),
 ) -> list[ProvisaoMensalOut]:
-    comp_date = _parse_competencia(competencia) if competencia else None
+    comp_date = parse_competencia_mensal(competencia) if competencia else None
     tipo_str = tipo.value if tipo else None
     rows = await ProvisoesRepo(session).listar(
         empresa_id, competencia=comp_date, tipo=tipo_str
