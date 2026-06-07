@@ -7,8 +7,10 @@
  *   - Funcionários / folha / holerites → endpoints reais
  *     (`/v1/empresas/{id}/funcionarios`, `…/folhas/{competencia}/fechar`,
  *     `…/folhas/{competencia}/holerites`).
- *   - Eventos eSocial → Dexie local com fail-soft (o domínio eSocial do
- *     backend está quebrado neste ambiente — ver NOTA DE GAP no db-service).
+ *   - Eventos eSocial → endpoints reais (`…/esocial/eventos`, `…/assinar`,
+ *     `…/transmissao/lotes`). Gerados ao fechar a folha (S-1200 por holerite).
+ *     Transmissão real é gated (sem cert A1 → 412) e tratada com mensagem
+ *     honesta — nunca simula sucesso.
  *
  * `mensagemAmigavelPessoal` traduz `ApiError.codigo` em texto para o dono da
  * PME — nunca vaza o código cru nem expõe CPF/dado sensível.
@@ -57,6 +59,13 @@ export function mensagemAmigavelPessoal(err: unknown): string {
       return "Cadastre ao menos um funcionário ativo antes de fechar a folha.";
     case "TabelaTributariaAusente":
       return "Tabela de INSS/IRRF indisponível para esta competência.";
+    case "EsocialAssinaturaIndisponivel":
+    case "EsocialTransmissaoDesativada":
+      return "A transmissão ao eSocial ainda não está habilitada — requer certificado digital A1. Os eventos ficam preparados até a habilitação.";
+    case "EsocialEventoNaoEncontrado":
+      return "Evento do eSocial não encontrado.";
+    case "EsocialLoteInvalido":
+      return "Não há eventos prontos para transmitir ao eSocial.";
     default:
       return (
         err.mensagem ||

@@ -115,6 +115,7 @@ export const tipoEventoEsocialSchema = z.enum([
   "S-1210",
   "S-1299",
   "S-2230",
+  "S-2300",
 ]);
 export type TipoEventoEsocial = z.infer<typeof tipoEventoEsocialSchema>;
 
@@ -125,6 +126,7 @@ export const TIPO_EVENTO_ESOCIAL_LABEL: Record<TipoEventoEsocial, string> = {
   "S-1210": "Pagamentos diversos",
   "S-1299": "Fechamento da folha",
   "S-2230": "Afastamento temporário",
+  "S-2300": "Início de sócio (pró-labore)",
 };
 
 export const statusEventoEsocialSchema = z.enum([

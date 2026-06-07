@@ -34,6 +34,7 @@ import {
   useEventosEsocial,
   useReenviarEvento,
 } from "@/hooks/use-pessoal";
+import { mensagemAmigavelPessoal } from "@/lib/api/pessoal";
 import {
   TIPO_EVENTO_ESOCIAL_LABEL,
   type EventoEsocial,
@@ -157,12 +158,16 @@ export default function EsocialPage() {
             className="shrink-0"
             disabled={reenviar.isPending}
             onClick={async () => {
-              for (const evt of erros) {
-                await reenviar.mutateAsync(evt);
+              try {
+                for (const evt of erros) {
+                  await reenviar.mutateAsync(evt);
+                }
+                toast.success(
+                  `${erros.length} evento${erros.length === 1 ? "" : "s"} reenviado${erros.length === 1 ? "" : "s"}`
+                );
+              } catch (err) {
+                toast.error(mensagemAmigavelPessoal(err));
               }
-              toast.success(
-                `${erros.length} evento${erros.length === 1 ? "" : "s"} reenviado${erros.length === 1 ? "" : "s"}`
-              );
             }}
           >
             {reenviar.isPending ? (
@@ -283,10 +288,14 @@ export default function EsocialPage() {
                 key={e.id}
                 evento={e}
                 aoReenviar={async () => {
-                  await reenviar.mutateAsync(e);
-                  toast.success("Evento reenviado", {
-                    description: "eSocial confirmou o recebimento.",
-                  });
+                  try {
+                    await reenviar.mutateAsync(e);
+                    toast.success("Evento reenviado", {
+                      description: "eSocial confirmou o recebimento.",
+                    });
+                  } catch (err) {
+                    toast.error(mensagemAmigavelPessoal(err));
+                  }
                 }}
                 reenviando={
                   reenviar.isPending && reenviar.variables?.id === e.id

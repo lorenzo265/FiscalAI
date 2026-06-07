@@ -1,9 +1,8 @@
 /**
  * Serviço de dados do módulo pessoal (Onda 2 / Fase E — integração com a API
- * real). Substitui o CRUD-Dexie/mock anterior. As funções de funcionários,
- * folha e holerites falam com o backend FastAPI via `fetchJson` +
- * `getEmpresaIdAtiva()`; os eventos eSocial são tratados pelo adapter
- * (`@/lib/api/pessoal`) com fail-soft local — ver a NOTA DE GAP abaixo.
+ * real). Substitui o CRUD-Dexie/mock anterior. Funcionários, folha, holerites E
+ * eventos eSocial falam com o backend FastAPI via `fetchJson` +
+ * `getEmpresaIdAtiva()`. Nada mais é Dexie local neste módulo.
  *
  * Endpoints reais (descobertos por curl — ver handoff):
  *   - `GET  /v1/empresas/{id}/funcionarios?somente_ativos=`        → lista.
@@ -11,6 +10,9 @@
  *   - `GET  /v1/empresas/{id}/folhas?limite=`                      → folhas mensais.
  *   - `POST /v1/empresas/{id}/folhas/{competencia}/fechar`         → fecha (200/409).
  *   - `GET  /v1/empresas/{id}/folhas/{competencia}/holerites`      → holerites da folha.
+ *   - `GET/POST /v1/empresas/{id}/esocial/eventos`                 → lista / gera (S-1200).
+ *   - `POST /v1/empresas/{id}/esocial/eventos/{eid}/assinar`       → assina (412 sem cert A1).
+ *   - `POST /v1/empresas/{id}/esocial/transmissao/lotes`           → transmite (412 se flag off).
  *
  * Mapeamentos honestos (backend é a fonte de verdade; campos do front sem
  * correspondência viram default/derivado determinístico — NUNCA inventados):
@@ -37,6 +39,7 @@ import { fetchJson, ApiError } from "@/lib/http";
 import { getEmpresaIdAtiva } from "@/lib/empresa-ativa";
 import type { Empresa } from "@/lib/schemas/empresa";
 import {
+  eventoEsocialSchema,
   funcionarioSchema,
   holeriteSchema,
   type EventoEsocial,
@@ -44,7 +47,6 @@ import {
   type Holerite,
   type StatusEventoEsocial,
 } from "@/lib/schemas/pessoal";
-import { getDb } from "@/lib/db";
 import { chaveCompetencia } from "@/lib/pessoal/calculo-folha";
 
 // ── Alíquotas patronais estatutárias (Lei 8.212/1991) ───────────────────────
@@ -383,6 +385,7 @@ export async function gerarHoleritesDoMes(
         funcsChk
       );
       if (persistidos.length === 0) throw err;
+      await gerarEventosFolha(empresaId, persistidos);
       return persistidos;
     }
   }
@@ -391,78 +394,212 @@ export async function gerarHoleritesDoMes(
   // Se o fechamento falhou de forma não recuperável E não há holerites, algo
   // está errado — não devolvemos lista vazia silenciosa mascarando o erro.
   if (holerites.length === 0 && erroFechar) throw erroFechar;
+  // Fechou a folha → gera os eventos S-1200 (remuneração) no eSocial, um por
+  // holerite. Fail-soft: nunca quebra o fechamento (ver gerarEventosFolha).
+  await gerarEventosFolha(empresaId, holerites);
   return holerites;
 }
 
-// ── eSocial (Dexie local — gap agora trivialmente fechável) ─────────────────
-// NOTA DE GAP: estes eventos seguem no Dexie local. O motivo original (módulo
-// eSocial do backend quebrado por migration 0051 não-aplicada) FOI RESOLVIDO
-// pelo orquestrador — o DB foi a head (0055) e os endpoints reais
-// `GET/POST /v1/empresas/{id}/esocial/eventos` e
-// `…/esocial/transmissao/lotes` já respondem 200 (ver handoff). Falta apenas
-// re-ligar este adapter aos endpoints reais (mapeando os eventos S-1xxx/S-2xxx
-// → EventoEsocial) — follow-up trivial. Até lá, mantemos o caminho local para
-// não regredir a tela.
+// ── eSocial (API real) ──────────────────────────────────────────────────────
+// Eventos vêm do backend. A geração acontece ao fechar a folha (S-1200 por
+// holerite, ver gerarEventosFolha). A transmissão real é gated: sem certificado
+// digital A1 o backend responde 412 (EsocialAssinaturaIndisponivel) e, com a
+// flag de transmissão desligada, 412 (EsocialTransmissaoDesativada). Tratamos o
+// 412 com mensagem honesta na UI — NUNCA simulamos sucesso nem inventamos recibo.
 
-export async function listarEventosEsocial(): Promise<EventoEsocial[]> {
-  const db = getDb();
-  const lista = await db.eventosEsocial.toArray();
-  return lista.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
+const eventoEsocialOutSchema = z.object({
+  id: z.string(),
+  empresaId: z.string(),
+  tipoEvento: z.string(),
+  referenciaTipo: z.string(),
+  referenciaId: z.string(),
+  periodoApuracao: z.string().nullable(),
+  payload: z.record(z.unknown()),
+  status: z.string(),
+  protocolo: z.string().nullable(),
+  algoritmoVersao: z.string(),
+  criadoEm: z.string(),
+  transmitidoEm: z.string().nullable(),
+  processadoEm: z.string().nullable(),
+});
+type EventoEsocialOut = z.infer<typeof eventoEsocialOutSchema>;
+const eventosEsocialOutSchema = z.array(eventoEsocialOutSchema);
+
+const TIPOS_ESOCIAL_CONHECIDOS = [
+  "S-1200",
+  "S-1210",
+  "S-2200",
+  "S-2299",
+  "S-2300",
+  "S-1299",
+  "S-2230",
+] as const;
+
+/** Status do backend → vocabulário da tela (mantém cor + ícone + palavra). */
+function mapearStatusEsocial(status: string): StatusEventoEsocial {
+  switch (status) {
+    case "aceito":
+      return "transmitido";
+    case "assinado":
+    case "em_lote":
+      return "pendente";
+    case "rejeitado":
+    case "rejeitado_xsd":
+      return "erro";
+    default: // "preparado" e demais estados iniciais
+      return "rascunho";
+  }
 }
 
-export async function adicionarEventoEsocial(
-  evento: EventoEsocial
-): Promise<void> {
-  const db = getDb();
-  await db.eventosEsocial.put(evento);
+/** "YYYY-MM" a partir de uma data ISO "YYYY-MM-DD" (ou "" se nula). */
+function competenciaDeDataIso(data: string | null): string {
+  if (!data) return "";
+  const [ano, mes] = data.split("-");
+  return ano && mes ? `${ano}-${mes}` : "";
 }
 
-export async function atualizarStatusEvento(
-  id: string,
-  status: StatusEventoEsocial,
-  extras: { recibo?: string; motivoErro?: string } = {}
-): Promise<void> {
-  const db = getDb();
-  const evento = await db.eventosEsocial.get(id);
-  if (!evento) return;
-  await db.eventosEsocial.put({
-    ...evento,
+function tipoEsocialConhecido(t: string): EventoEsocial["tipo"] {
+  return (TIPOS_ESOCIAL_CONHECIDOS as readonly string[]).includes(t)
+    ? (t as EventoEsocial["tipo"])
+    : "S-1200";
+}
+
+function mapearEventoEsocial(out: EventoEsocialOut): EventoEsocial {
+  const status = mapearStatusEsocial(out.status);
+  return eventoEsocialSchema.parse({
+    id: out.id,
+    tipo: tipoEsocialConhecido(out.tipoEvento),
+    // O backend não devolve o nome do trabalhador no evento (é join) → omitido.
+    funcionarioId: undefined,
+    funcionarioNome: undefined,
+    competencia: competenciaDeDataIso(out.periodoApuracao),
     status,
-    recibo: extras.recibo ?? evento.recibo,
+    recibo: out.protocolo ?? undefined,
     motivoErro:
-      status === "erro" ? extras.motivoErro ?? evento.motivoErro : undefined,
-    transmitidoEm:
-      status === "transmitido"
-        ? new Date().toISOString()
-        : evento.transmitidoEm,
+      status === "erro"
+        ? "Evento rejeitado pelo eSocial. Revise os dados e reenvie."
+        : undefined,
+    transmitidoEm: out.transmitidoEm ?? undefined,
+    criadoEm: out.criadoEm,
   });
 }
 
+export async function listarEventosEsocial(): Promise<EventoEsocial[]> {
+  const empresaId = empresaIdOuErro();
+  const rows = await fetchJson(
+    `/empresas/${empresaId}/esocial/eventos?limite=200`,
+    eventosEsocialOutSchema
+  );
+  return rows
+    .map(mapearEventoEsocial)
+    .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
+}
+
+/**
+ * Gera um evento S-1200 (remuneração) por holerite ao fechar a folha. Fail-soft:
+ * a geração é idempotente no backend (409 EventoESocialJaExiste se já existe) e
+ * qualquer falha é engolida — nunca quebra o fechamento da folha. Os eventos
+ * gerados aparecem na tela do eSocial.
+ */
+async function gerarEventosFolha(
+  empresaId: string,
+  holerites: Holerite[]
+): Promise<void> {
+  await Promise.all(
+    holerites.map(async (h) => {
+      try {
+        await fetchJson(`/empresas/${empresaId}/esocial/eventos`, z.unknown(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo_evento: "S-1200", referencia_id: h.id }),
+        });
+      } catch {
+        // 409 (já gerado) ou qualquer outro erro: não pode quebrar a folha —
+        // apenas não gera o evento (estado honesto, sem dado fabricado).
+      }
+    })
+  );
+}
+
+/**
+ * "Reenviar"/avançar um evento. A ação real sem lote é assinar — sem certificado
+ * digital A1 o backend responde 412 (EsocialAssinaturaIndisponivel), que
+ * propagamos para a tela traduzir com mensagem honesta (não simulamos sucesso).
+ */
+export async function atualizarStatusEvento(
+  id: string,
+  _status: StatusEventoEsocial,
+  _extras: { recibo?: string; motivoErro?: string } = {}
+): Promise<void> {
+  const empresaId = empresaIdOuErro();
+  await fetchJson(
+    `/empresas/${empresaId}/esocial/eventos/${id}/assinar`,
+    z.unknown(),
+    { method: "POST" }
+  );
+}
+
+/**
+ * Admissão (S-2200): no-op por ora. O backend gera o evento a partir do id REAL
+ * do funcionário, mas o fluxo de admissão do front ainda passa um id client-side
+ * (ver useAdicionarFuncionario) — re-ligar exige o id do backend (follow-up).
+ * No-op para não quebrar o hook nem inventar um evento local invisível na lista
+ * (que agora vem só do backend).
+ */
+export async function adicionarEventoEsocial(
+  _evento: EventoEsocial
+): Promise<void> {
+  return Promise.resolve();
+}
+
+async function cnpjDaEmpresa(empresaId: string): Promise<string> {
+  const emp = await fetchJson(
+    `/empresas/${empresaId}`,
+    z.object({ cnpj: z.string() })
+  );
+  return emp.cnpj;
+}
+
+/**
+ * Transmite os eventos preparados da competência: assina cada um e envia o lote.
+ * Sem certificado A1 / com a flag de transmissão desligada, o backend responde
+ * 412 — propagamos para a tela exibir mensagem honesta (sem fingir transmissão).
+ */
 export async function transmitirEventosDoMes(
   ano: number,
   mes: number
 ): Promise<{ transmitidos: number }> {
-  const db = getDb();
-  const competencia = chaveCompetencia(ano, mes);
-  const eventos = await db.eventosEsocial
-    .where("competencia")
-    .equals(competencia)
-    .toArray();
-  const pendentes = eventos.filter(
-    (e) => e.status === "pendente" || e.status === "rascunho"
+  const empresaId = empresaIdOuErro();
+  const comp = competenciaApi(ano, mes);
+  const rows = await fetchJson(
+    `/empresas/${empresaId}/esocial/eventos?limite=200`,
+    eventosEsocialOutSchema
+  );
+  const pendentes = rows.filter(
+    (e) =>
+      competenciaDeDataIso(e.periodoApuracao) === comp &&
+      (e.status === "preparado" || e.status === "assinado")
   );
   if (pendentes.length === 0) return { transmitidos: 0 };
-  await db.eventosEsocial.bulkPut(
-    pendentes.map((e) => ({
-      ...e,
-      status: "transmitido" as const,
-      recibo: `R-${cryptoLikeId()}`,
-      transmitidoEm: new Date().toISOString(),
-    }))
-  );
-  return { transmitidos: pendentes.length };
-}
 
-function cryptoLikeId(): string {
-  return Math.random().toString(36).slice(2, 10).toUpperCase();
+  // Assina os que ainda estão "preparado" (412 sem cert A1 → propaga honesto).
+  for (const e of pendentes.filter((p) => p.status === "preparado")) {
+    await fetchJson(
+      `/empresas/${empresaId}/esocial/eventos/${e.id}/assinar`,
+      z.unknown(),
+      { method: "POST" }
+    );
+  }
+  // Envia o lote (precisa do CNPJ do empregador; 412 se transmissão off).
+  const cnpj = await cnpjDaEmpresa(empresaId);
+  const lote = await fetchJson(
+    `/empresas/${empresaId}/esocial/transmissao/lotes?cnpj_empregador=${cnpj}`,
+    z.object({
+      protocolo: z.string().nullable(),
+      estado: z.number().nullable(),
+      eventos: z.number(),
+    }),
+    { method: "POST" }
+  );
+  return { transmitidos: lote.eventos };
 }

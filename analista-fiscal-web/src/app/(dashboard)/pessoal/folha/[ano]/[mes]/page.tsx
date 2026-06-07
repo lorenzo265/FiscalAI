@@ -40,6 +40,7 @@ import {
   useTransmitirEventosDoMes,
 } from "@/hooks/use-pessoal";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import { mensagemAmigavelPessoal } from "@/lib/api/pessoal";
 import {
   TIPO_CONTRATO_LABEL,
   type Funcionario,
@@ -139,6 +140,8 @@ export default function FolhaMensalPage() {
           }
         );
       }
+    } catch (err) {
+      toast.error(mensagemAmigavelPessoal(err));
     } finally {
       setTransmitindo(false);
     }

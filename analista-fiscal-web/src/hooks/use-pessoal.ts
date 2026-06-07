@@ -9,11 +9,7 @@ import { api } from "@/lib/api-client";
 import { garantirSeedPessoal } from "@/lib/pessoal/db-service";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { gerarEventoAdmissaoMock } from "@/lib/mocks/pessoal";
-import type {
-  EventoEsocial,
-  Funcionario,
-  StatusEventoEsocial,
-} from "@/lib/schemas/pessoal";
+import type { EventoEsocial, Funcionario } from "@/lib/schemas/pessoal";
 
 export function useFuncionarios() {
   const { empresa } = useEmpresaAtual();
@@ -107,13 +103,10 @@ export function useReenviarEvento() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (evento: EventoEsocial) => {
-      // simula latência da transmissão
-      await new Promise((r) => setTimeout(r, 1500));
-      const status: StatusEventoEsocial = "transmitido";
-      await api.pessoal.atualizarStatusEvento(evento.id, status, {
-        recibo: `R-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-      });
-      return { ...evento, status };
+      // Avança o evento no backend real (assina). Sem certificado A1, o backend
+      // responde 412 e a tela mostra mensagem honesta — sem simular sucesso.
+      await api.pessoal.atualizarStatusEvento(evento.id, "transmitido");
+      return evento;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["pessoal"] });
@@ -124,10 +117,8 @@ export function useReenviarEvento() {
 export function useTransmitirEventosDoMes() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ano, mes }: { ano: number; mes: number }) => {
-      await new Promise((r) => setTimeout(r, 3000));
-      return api.pessoal.transmitirEventosDoMes(ano, mes);
-    },
+    mutationFn: ({ ano, mes }: { ano: number; mes: number }) =>
+      api.pessoal.transmitirEventosDoMes(ano, mes),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["pessoal"] });
     },

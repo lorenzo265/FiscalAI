@@ -438,7 +438,7 @@ rota). Login real com `tenant_slug`. Build front **VERDE**; DB em **head (0055+0
 | Agenda | ✅ real (geração sob demanda; dados reais) |
 | Notas | ✅ listagem (documentos) + emissão NFS-e real (emissão depende de **Focus sandbox**); CRUD auxiliar local |
 | Controles | ✅ Open Finance real (contas/transações/conciliação); pagar-receber/fluxo = local (sem endpoint); dado vivo depende de **Pluggy** |
-| Pessoal | ✅ funcionários + folha/holerites reais; **folha→lançamento contábil** real (fix 0056); eSocial = local (endpoints prontos, re-wire pendente) |
+| Pessoal | ✅ funcionários + folha/holerites reais; **folha→lançamento contábil** real (fix 0056); **eSocial real** (S-1200 gerado na folha; transmissão honesta 412 sem cert A1) |
 | Contábil | ✅ real (lançamentos/plano/balancete; partidas dobradas) |
 | Relatórios | ✅ cálculo no servidor (DRE/Balanço/DFC/indicadores); estado vazio honesto sem lançamentos |
 | Compliance | ✅ certidões/parcelamentos reais; intimações/painel = local (sem endpoint) |
@@ -462,7 +462,32 @@ sem commit; (3) cadeia de migrations travada (0041 CONCURRENTLY+pg8000 → DB a 
 - **Reverter p/ Ollama no container (CPU, self-contained):** descomentar o serviço `ollama` + volume no compose e voltar `OLLAMA_URL=http://ollama:11434`.
 
 **Pendências p/ "100%" pleno (não-bloqueantes):** credenciais reais de Focus/Pluggy
-p/ dado vivo dessas integrações; re-wire do adapter eSocial.
+p/ dado vivo dessas integrações.
+
+### 2026-06-06 · Orquestrador (frontend) · Re-wire eSocial (RESOLVIDO)
+- **eSocial deixou de ser Dexie local — agora 100% backend real.**
+  - `listarEventosEsocial` → `GET …/esocial/eventos` (mapeado `EventoESocialOut` →
+    `EventoEsocial`: status `preparado→rascunho`, `assinado|em_lote→pendente`,
+    `aceito→transmitido`, `rejeitado*→erro`; `protocolo→recibo`; `periodo_apuracao`
+    (data) → competência `YYYY-MM`).
+  - **Geração na folha:** ao fechar a folha (`gerarHoleritesDoMes`), gera 1 evento
+    **S-1200** por holerite via `POST …/esocial/eventos` (idempotente — 409
+    `EventoESocialJaExiste` engolido; fail-soft, nunca quebra o fechamento).
+  - **Transmissão honesta:** "Reenviar" → `…/{id}/assinar`; "Transmitir" →
+    assinar + `…/transmissao/lotes`. Sem certificado A1 o backend responde **412**
+    (`EsocialAssinaturaIndisponivel`/`EsocialTransmissaoDesativada`) → traduzido por
+    `mensagemAmigavelPessoal` ("transmissão requer certificado A1"). **Nunca** simula
+    sucesso nem inventa recibo (removidas as latências/recibos falsos dos hooks).
+  - Schema do front ganhou o tipo `S-2300` (sócio) p/ mapear todos os tipos do backend.
+  - **Admissão (S-2200): no-op documentado** — o backend gera a partir do id REAL do
+    funcionário, mas `useAdicionarFuncionario` ainda passa um id client-side; re-ligar
+    exige devolver o id do backend no `adicionarFuncionario` (follow-up trivial).
+- **Arquivos:** `src/lib/schemas/pessoal.ts`, `src/lib/pessoal/db-service.ts`,
+  `src/lib/api/pessoal.ts`, `src/hooks/use-pessoal.ts`,
+  `src/app/(dashboard)/pessoal/{esocial,folha/[ano]/[mes]}/page.tsx`.
+- **Verificado:** `npm run build` VERDE (exit 0). Contrato ao vivo: gerar S-1200 de
+  holerite real → 201; re-gerar → 409; assinar → 412 `EsocialAssinaturaIndisponivel`.
+  4 eventos S-1200 reais semeados na demo (1/holerite das 3 folhas fechadas).
 
 ### 2026-06-06 · Orquestrador · Infra migration driver (RESOLVIDO)
 - **`alembic upgrade head` agora roda inteiro.** O bug pg8000 + `CREATE INDEX CONCURRENTLY`
