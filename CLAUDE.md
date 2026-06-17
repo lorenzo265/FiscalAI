@@ -332,7 +332,7 @@ Atalho que executa esse write-back: comando `/fechar-sprint` (`.claude/commands/
 > **Workstream de design ATIVO.** Agente de frontend/design: leia **esta seção + `docs/HANDOFF.md`** antes de tudo. O app está sendo **rebatizado "Arkan"** (empresa: Arkan Fiscal Technologies) e revestido com uma identidade nova. **A arquitetura e as funções ficam; muda a pele.**
 
 ### Energia-alvo
-*Uma ferramenta de precisão na mão de um artesão com anos de experiência.* Séria, exata, calma, lindamente desenhada: papel quente + tinta + **um verde** (marca = saúde fiscal), camada técnica de **blueprint** (crop marks, rótulos "Fig.", régua de medição, esquemas que se desenham), tipografia editorial (serifa display + **mono nos dados**) e motion premium. **Nunca** dark/neon nem o look genérico de IA.
+*O instrumento de precisão, agora leve na mão* — identidade **v2 "Arkan Claro"** (Instrumento × Apple). Séria, exata, calma, lindamente desenhada: papel quente + tinta + **um verde** (marca = saúde fiscal), **um número-herói** em mono no centro de cada tela, **respiro** (≤3 blocos acima da dobra), tipografia editorial (**Fraunces só em momentos-marca** + **mono em todo dado**) e motion premium (springs, count-up). A camada técnica de **blueprint** (crop marks, "Fig.", régua) **recua para assinatura rara** — telas de detalhe, confirmações, PDF — **não** é mais a moldura de todo painel. **Nunca** dark/neon nem o look genérico de IA. → contrato completo e tokens em **`docs/arkan-claro-identidade-v2.md`** (estilo §2, componente §3, gates §5), que **vence sobre a v1** "Instrumento".
 
 ### Fontes de verdade (em `docs/`)
 | Arquivo | É o contrato de… |
@@ -356,8 +356,9 @@ Stack (Next 15 + React 19 + Tailwind v4 + shadcn) é boa e **fica**. O tema é d
   `globals.css` (`@theme`) · fontes em `layout.tsx` (**Fraunces + Hanken Grotesk + Spline Sans Mono** via `next/font`) · `components/ui/*` + `components/shared/*` revestidos · `components/blueprint/*` (`Framed`, `CropMarks`, `Fig`, `Ruler`, `BlueprintSchematic`, `Carimbo`) · `lib/motion/*` (variants, `LenisProvider`, hooks).
 
 ### Gates anti-AI-slop (todo PR de tela)
-**Reprova** com: coluna central + cards arredondados flutuando; sombras suaves por toda parte; botões-pílula; ícone em quadradinho de fundo lavado; tudo sans/genérico.
-**Aprova** com: serifa display + mono nos dados; estrutura com fios 1px + crop marks; **um** acento (verde); conteúdo enxuto. Regra-mãe: **detalhe no craft, calma no conteúdo.**
+Gates **v2** (de `docs/arkan-claro-identidade-v2.md §5` — vencem sobre a v1):
+**Reprova** com: tudo-sans sem a serifa nos momentos-marca; dado em fonte proporcional (não-mono); 2º acento de cor; botão-pílula ou radius grande em controle; sombra suave difusa como profundidade (aqui profundidade = material translúcido/plano); ícone em quadradinho lavado; saudação "Olá, fulano 👋"; **mais de 3 blocos acima da dobra**; **painel comum com crop marks** (inflação da assinatura).
+**Aprova** com: 1 pergunta respondida em 5s; **1 número-herói** (mono 56–72px); 1 ação primária; respiro ≥ escala; **mono em todo dado**; verde só onde significa saúde/ação. Regra-mãe: **detalhe no craft, calma no conteúdo.**
 
 ### Invariantes de função (não quebrar ao revestir)
 Toda rota e item de navegação acessível; hooks (`use-*`), providers (Query/Empresa/Auth), Dexie/mock e lógica fiscal **inalterados**; wizards mantêm passos + validação (RHF+Zod); DANFE/PDF/QR/barcode funcionando; charts (Recharts) re-tematizados com os **mesmos dados**; status sempre **cor + ícone + palavra**; **nunca** expor CFOP/CST/NCM crus ao dono de PME — traduzir.
