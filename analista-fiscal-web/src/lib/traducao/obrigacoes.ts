@@ -69,7 +69,7 @@ export const OBRIGACOES = {
   },
   DCTFWEB: {
     titulo: "Declaração dos impostos da folha",
-    descricaoCurta: "Declara ao governo os impostos descontados dos funcionários (INSS, IRRF).",
+    descricaoCurta: "Declara ao governo as contribuições previdenciárias e o imposto de renda retido na folha de pagamento.",
     termoTecnico: "DCTFWeb",
   },
   DCTF: {
@@ -83,8 +83,8 @@ export const OBRIGACOES = {
     termoTecnico: "DASN-SIMEI",
   },
   REINF: {
-    titulo: "Declaração de pagamentos a terceiros",
-    descricaoCurta: "Informa ao governo os pagamentos feitos a prestadores de serviço.",
+    titulo: "Declaração de retenções sobre serviços",
+    descricaoCurta: "Declara ao governo os impostos retidos quando sua empresa paga por serviços com retenção obrigatória (ex.: limpeza, segurança, TI contratados de outras empresas).",
     termoTecnico: "EFD-Reinf",
   },
   SPED_ECD: {
@@ -171,8 +171,8 @@ export type ChaveTributo = keyof typeof TRIBUTOS;
 // ─── Fator R ──────────────────────────────────────────────────────────────────
 
 export const FATOR_R: EntradaFatorR = {
-  titulo: "Seu desconto por ter folha de pagamento",
-  descricaoCurta: "Quanto mais você paga de salário em relação ao que fatura, menor é a sua alíquota.",
+  titulo: "Alíquota menor por ter folha de pagamento",
+  descricaoCurta: "Se sua folha de pagamento representar pelo menos 28% do que você fatura, você se enquadra em uma faixa de imposto menor.",
   efeito:
     "Quando sua folha de pagamento ultrapassa 28% do faturamento dos últimos 12 meses, você paga a alíquota menor (Anexo III em vez do Anexo V).",
   termoTecnico: "Fator R",
@@ -198,7 +198,7 @@ export const ANEXOS = {
   },
   IV: {
     titulo: "Serviços especiais",
-    descricaoCurta: "Categoria do Simples Nacional para algumas atividades específicas de serviço (advocacia, engenharia, etc.).",
+    descricaoCurta: "Categoria do Simples Nacional para atividades como construção civil, vigilância e limpeza. Não é afetado pelo Fator R.",
     termoTecnico: "Anexo IV",
   },
   V: {
