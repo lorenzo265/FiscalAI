@@ -1,0 +1,32 @@
+# .gitleaks.toml — configuração de exclusões para o projeto Analista Fiscal
+# Documentação: https://github.com/gitleaks/gitleaks#configuration
+
+title = "Analista Fiscal — Gitleaks Config"
+
+[extend]
+# Herda todas as regras padrão do gitleaks
+useDefault = true
+
+[allowlist]
+description = "Falsos positivos conhecidos neste repositório"
+
+# Arquivos que contêm exemplos/placeholders propositais
+paths = [
+  '''analista-fiscal-api/\.env\.example''',
+  '''analista-fiscal-api/tests/.*''',
+  '''analista-fiscal-api/alembic/versions/.*''',
+  '''analista-fiscal-web/src/lib/mock/.*''',
+  '''analista-fiscal-web/src/lib/fixtures/.*''',
+  '''docs/.*''',
+  '''\.claude/.*'''
+]
+
+# Regras específicas para suprimir por conteúdo
+regexes = [
+  # JWT placeholder no CI yml (não é segredo real)
+  '''ci_test_secret_key_32_chars_minimum''',
+  # Chaves de exemplo em documentação
+  '''EXEMPLO''',
+  '''example''',
+  '''placeholder'''
+]

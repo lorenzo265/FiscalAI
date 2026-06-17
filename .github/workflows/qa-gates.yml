@@ -1,0 +1,212 @@
+# qa-gates.yml — Pipeline de QA complementar (Onda 1.5)
+#
+# Jobs: a11y (Lighthouse CI + axe), visual (Playwright screenshot regression),
+#        security (Semgrep + Gitleaks).
+#
+# ESTADO ATUAL: todos os jobs têm continue-on-error: true.
+# Para promover um job a bloqueante, remova ou altere para `false`
+# a linha `continue-on-error: true` do job correspondente APÓS:
+#   - job a11y:    ajustar os budgets em lighthouserc.json ao baseline real
+#   - job visual:  fazer o commit inicial das screenshots em
+#                  analista-fiscal-web/tests/visual/snapshots/
+#   - job security: confirmar que não há falsos positivos na baseline Semgrep/Gitleaks
+#
+# Dependências adicionais (instalar no projeto antes de ativar):
+#   analista-fiscal-web:
+#     npm i -D @lhci/cli@0.15 @playwright/test @axe-core/playwright
+#     npx playwright install --with-deps chromium
+#
+# Secrets necessários no GitHub:
+#   GITLEAKS_LICENSE  — obrigatório apenas para repos de organização
+
+name: QA Gates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "analista-fiscal-web/**"
+      - ".github/workflows/qa-gates.yml"
+      - "lighthouserc.json"
+  pull_request:
+    paths:
+      - "analista-fiscal-web/**"
+      - ".github/workflows/qa-gates.yml"
+      - "lighthouserc.json"
+
+defaults:
+  run:
+    shell: bash
+
+# ─────────────────────────────────────────────────────────────
+# JOB 1 — A11Y: Lighthouse CI + axe-core via Playwright
+# ─────────────────────────────────────────────────────────────
+jobs:
+  a11y:
+    name: A11y — Lighthouse CI + axe-core
+    runs-on: ubuntu-latest
+    # PROMOVER: remova a linha abaixo após estabilizar baseline
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: analista-fiscal-web
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # LHCI precisa de histórico para ancestor detection
+          fetch-depth: 20
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: analista-fiscal-web/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          # Desabilitar telemetria no CI
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      # Lighthouse CI — audita perf + a11y com budgets definidos em lighthouserc.json
+      - name: Install LHCI
+        run: npm install -g @lhci/cli@0.15
+
+      - name: Run Lighthouse CI
+        # lighthouserc.json está na raiz do repo; --config aponta para lá
+        run: lhci autorun --config=../lighthouserc.json
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      # axe-core via Playwright — detecta violações WCAG na renderização real
+      - name: Install Playwright (chromium apenas)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run axe accessibility tests
+        run: npx playwright test tests/a11y/ --reporter=list
+        env:
+          PLAYWRIGHT_BASE_URL: "http://localhost:3000"
+        # O servidor é iniciado dentro do playwright.config.ts (webServer)
+
+      - name: Upload LHCI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lhci-results
+          path: analista-fiscal-web/.lighthouseci/
+          retention-days: 14
+
+# ─────────────────────────────────────────────────────────────
+# JOB 2 — VISUAL: Playwright screenshot regression
+# ─────────────────────────────────────────────────────────────
+  visual:
+    name: Visual — Playwright screenshot regression
+    runs-on: ubuntu-latest
+    # PROMOVER: remova a linha abaixo após commit do baseline de screenshots
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: analista-fiscal-web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: analista-fiscal-web/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual regression tests
+        run: npx playwright test tests/visual/ --reporter=list
+        env:
+          PLAYWRIGHT_BASE_URL: "http://localhost:3000"
+
+      # Em PR: faz diff e sobe o relatório como artifact para revisão humana
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-report
+          path: analista-fiscal-web/playwright-report/
+          retention-days: 14
+
+      - name: Upload diff screenshots (falhas)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-diffs
+          path: analista-fiscal-web/test-results/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────
+# JOB 3 — SECURITY: Semgrep SAST + Gitleaks secret scan
+# ─────────────────────────────────────────────────────────────
+  security:
+    name: Security — Semgrep + Gitleaks
+    runs-on: ubuntu-latest
+    # PROMOVER: remova a linha abaixo após confirmar ausência de falsos positivos
+    continue-on-error: true
+
+    permissions:
+      # Semgrep pode publicar resultados como SARIF no Security tab
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks precisa do histórico completo para detectar segredos em commits antigos
+          fetch-depth: 0
+
+      # ── Semgrep SAST ──────────────────────────────────────
+      # Usa a CLI do semgrep instalada via pip — não depende da semgrep-action (deprecated).
+      # SEMGREP_APP_TOKEN é opcional: sem ele roda offline com as regras locais.
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Semgrep — security-audit + python + typescript
+        run: |
+          semgrep \
+            --config p/security-audit \
+            --config p/python \
+            --config p/typescript \
+            --sarif \
+            --output semgrep.sarif \
+            --error \
+            .
+        env:
+          # SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}  # opcional: envia para semgrep.dev
+          SEMGREP_VERSION_CHECK_TIMEOUT: "0"
+
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      # ── Gitleaks secret scan ──────────────────────────────
+      # v3 exigido a partir de 2026-09-16 (Node 24 nos runners)
+      - name: Gitleaks — detect secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Descomente e configure se o repo pertencer a uma organização:
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_CONFIG: .gitleaks.toml
