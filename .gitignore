@@ -19,6 +19,12 @@ next-env.d.ts
 # Testing / coverage
 coverage/
 
+# Playwright — artefatos de CI (não commitar; baseline fica em tests/visual/snapshots/)
+playwright-report/
+test-results/
+# LHCI — resultados temporários de run (não baseline)
+.lighthouseci/
+
 # Bundle analyzer outputs
 **/.next/analyze/
 

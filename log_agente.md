@@ -980,3 +980,34 @@ PATH necessário porque o Device Guard da máquina bloqueia `poetry.exe` direto 
 5. **Cuidado com Sprint 10 — tabelas INSS/IRRF/FGTS 2026:** verificar valores oficiais vigentes (Portaria Interministerial MPS/MF 6/2026 para INSS; última tabela IRRF mensal RFB).
 6. **PathContas referencial:** ao gerar lançamento auto na Sprint 10, mapear "Salários a Pagar" (`2.1.2.01`), "INSS a Recolher" (`2.1.3.01`), "FGTS a Recolher" (`2.1.3.02`), "Despesa com Pessoal" (`5.1.02`). Já existem no `plano_referencial.py`.
 7. **Integração com `provisoes`:** quando folha é fechada, a provisão acumulada (Sprint 8) deve ser **baixada** (D Provisão / C INSS/FGTS a recolher quando recolhe efetivamente). Iteração futura.
+
+---
+
+## Infra — QA Gates (Onda 1.5) — 2026-06-16
+
+**Branch:** `feat/ci-qa-gates` | **Agente:** ci-gates-agent
+
+Criado novo workflow `.github/workflows/qa-gates.yml` com 3 jobs complementares ao `ci.yml` existente:
+
+| Job | Ferramentas | Estado | Promoção a bloqueante |
+|---|---|---|---|
+| `a11y` | Lighthouse CI (`@lhci/cli@0.15`) + axe-core (`@axe-core/playwright`) | `continue-on-error: true` | Após ajustar budgets ao baseline real |
+| `visual` | Playwright `toHaveScreenshot` (regressão de screenshot) | `continue-on-error: true` | Após commitar baseline em `tests/visual/snapshots/` |
+| `security` | Semgrep (`p/security-audit + p/python + p/typescript`) + Gitleaks v3 | `continue-on-error: true` | Após confirmar zero falsos positivos |
+
+**Arquivos criados:**
+- `.github/workflows/qa-gates.yml` — workflow principal
+- `lighthouserc.json` — budgets LHCI (a11y ≥ 0.90, perf ≥ 0.75, LCP ≤ 4s, CLS ≤ 0.1)
+- `.gitleaks.toml` — allowlist de falsos positivos conhecidos (testes, fixtures, docs)
+- `analista-fiscal-web/playwright.config.ts` — config Playwright (visual + a11y)
+- `analista-fiscal-web/tests/visual/homepage.spec.ts` — spec de regressão visual mínima
+- `analista-fiscal-web/tests/a11y/axe.spec.ts` — spec axe-core (bloqueia apenas critical/serious)
+- `.gitignore` — adicionadas entradas para `playwright-report/`, `test-results/`, `.lighthouseci/`
+
+**Dependências a instalar no frontend antes de ativar:**
+```bash
+npm i -D @lhci/cli@0.15 @playwright/test @axe-core/playwright
+npx playwright install --with-deps chromium
+```
+
+**Não mexeu** em `ci.yml` existente nem em nenhum arquivo de backend. Jobs QA são disparados apenas em paths `analista-fiscal-web/**`.
