@@ -904,6 +904,51 @@ Migration 0021 + 1 algoritmo puro + 14 testes + 11 endpoints + 3 módulos novos 
 
 ---
 
+## S1 Plataforma — Celery real + Webhook Pluggy→sync (2026-06-16)
+
+Branch: `feat/plataforma-celery` (worktree isolado — sem push/PR automático; revisar antes de mergear).
+Agente: `claude-sonnet-4-6` (F3 — Squad Plataforma, Onda 1).
+
+### O que entrou
+
+**1. Pyproject.toml (confirmado — nenhuma mudança necessária)**
+Grupo `[tool.poetry.group.workers]` com `celery = { extras = ["redis"], version = "^5.4" }` já existia e estava correto. `celery_app.py` com dual-mode stub/real já funcionava. Nenhum ajuste de config necessário.
+
+**2. `app/modules/open_finance/webhook_service.py` — enqueue com idempotência**
+- Adicionado campo `enfileirado: bool` em `WebhookResultado.__slots__`.
+- Imports de `enqueue` e `processar_webhook_events_pendentes` movidos para nível de módulo (antes eram lazy-import dentro da função) — necessário para testabilidade via `patch`.
+- Nova função `_enfileirar_sync(*, event_id, item_pluggy_id) -> bool` separada de `persistir` para isolar o teste do enqueue sem precisar de sessão DB.
+- `WebhookService.persistir` chama `_enfileirar_sync` após INSERT bem-sucedido; define `resultado.enfileirado`.
+- Celery real (`apply_async` presente): usa `apply_async(kwargs={"pluggy_item_id": item_pluggy_id}, task_id=f"webhook-sync-{event_id}")` — idempotency key deriva do event_id (§8.9); broker descarta re-enqueue com mesmo task_id.
+- Celery stub (sem `apply_async`): `enqueue(processar_webhook_events_pendentes)` → no-op + log estruturado; beat schedule `open_finance.processar_webhook_events` (a cada 5min) drena como fallback.
+- `apply_async` levantando (Redis down): retorna False sem re-propagar — evento já está no DB, beat schedule drena depois.
+- RLS/tenant (§8.7): tenant_id NÃO propagado no webhook (cross-tenant por design); routing é feito pela task como admin.
+
+**3. `app/workers/tasks/sync_pluggy.py` — task com pluggy_item_id + estrutura real**
+- `processar_webhook_events_pendentes` ganhou parâmetro `pluggy_item_id: str | None = None` — quando chamada pelo webhook (trigger imediato), filtra apenas eventos do item específico; quando chamada pelo beat schedule, processa lote de 100 pendentes.
+- Resultado retorna `{"status": "noop", "pluggy_item_id": pluggy_item_id}` — permite assertar no teste.
+- Estrutura de implementação real documentada em comentário (asyncio.run + sessão admin + routing por item + SET LOCAL tenant_id + SyncService + UPDATE processado=True) — ativa quando infra Redis + Docker disponível.
+- `sync_pluggy_empresa` atualizado com docstring mais precisa sobre a pendência de infra.
+
+**4. `tests/unit/open_finance/test_webhook_service_enqueue.py` — 20 testes novos**
+- `TestWebhookService.persistir`: evento novo → `_enfileirar_sync` chamado; duplicado → não chamado; commit em ambos os casos.
+- `_enfileirar_sync stub`: sem `apply_async` → retorna False, chama `enqueue` helper.
+- `_enfileirar_sync real`: `apply_async` chamado com `task_id=webhook-sync-{event_id}` (§8.9); mesmo event_id → mesmo task_id nos dois enqueues (idempotência); event_ids distintos → task_ids distintos; `pluggy_item_id` propagado como kwarg; `apply_async` levantando → retorna False.
+- `processar_webhook_events_pendentes stub`: sem args → `status=noop, pluggy_item_id=None`; com item_id → propaga; chamadas distintas são stateless.
+- `enqueue helper`: sem `.delay` → no-op; com `.delay` → chama delay; `.delay` levanta → silencioso.
+
+### Contagem de testes
+Baseline do worktree (main): 2200 testes. Novos: +20 testes em `test_webhook_service_enqueue.py`.
+**Validação final (pytest + mypy) pendente — rodar no tree principal no merge** (worktree novo, sem venv próprio; ambiente poetry atrelado ao tree original).
+
+### Pendências restantes
+- **Docker + Redis requeridos** para integração real; testes unitários passam sem broker.
+- **Corpo completo da task** (asyncio.run + admin role + routing + SyncService) fica como implementação pendente de infra de deploy (comentário executável no sync_pluggy.py).
+- **`sync_pluggy_empresa`** (beat diário por empresa) continua skeleton — implementação completa quando primeiro cliente piloto exigir.
+- Pendência #4 da lista consciente: ~~Webhook Pluggy → sync inline~~ parcialmente resolvida aqui (enqueue com idempotência); corpo da task como "totalmente resolvida" fica para sprint de infra com Docker real.
+
+---
+
 ## Como rodar localmente
 
 ```powershell
