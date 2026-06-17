@@ -10,6 +10,7 @@ import { AlertasCard } from "@/components/home/alertas-card";
 import { CalendarioMesCard } from "@/components/home/calendario-mes-card";
 import { QuickActions } from "@/components/home/quick-actions";
 import { SimplesNacionalCard } from "@/components/home/simples-nacional-card";
+import { UrgenciaCard } from "@/components/home/urgencia-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import {
@@ -45,6 +46,9 @@ export default function HomePage() {
       initial="hidden"
       animate="show"
     >
+      {/* ── card de urgência (fixo no topo quando há vencimento ≤3 dias) ── */}
+      <UrgenciaCard />
+
       {/* ── cabeçalho ── */}
       <motion.header
         variants={containerVariants}
