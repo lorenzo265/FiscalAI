@@ -35,6 +35,7 @@ import {
   staticVariants,
 } from "@/lib/motion/variants";
 import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
+import { ANEXOS } from "@/lib/traducao/obrigacoes";
 
 const SimuladorBarChart = dynamic(
   () =>
@@ -45,10 +46,10 @@ const SimuladorBarChart = dynamic(
 );
 
 const ATIVIDADES: Array<{ id: AtividadeSimulada; label: string }> = [
-  { id: "comercio", label: "Comércio (Anexo I)" },
-  { id: "industria", label: "Indústria (Anexo II)" },
-  { id: "servicos_anexo3", label: "Serviços — Anexo III" },
-  { id: "servicos_anexo5", label: "Serviços intelectuais — Anexo V" },
+  { id: "comercio", label: `${ANEXOS.I.titulo} · ${ANEXOS.I.termoTecnico}` },
+  { id: "industria", label: `${ANEXOS.II.titulo} · ${ANEXOS.II.termoTecnico}` },
+  { id: "servicos_anexo3", label: `${ANEXOS.III.titulo} · ${ANEXOS.III.termoTecnico}` },
+  { id: "servicos_anexo5", label: `${ANEXOS.V.titulo} · ${ANEXOS.V.termoTecnico}` },
 ];
 
 /**

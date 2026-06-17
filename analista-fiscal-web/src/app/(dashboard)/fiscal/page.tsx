@@ -33,6 +33,7 @@ import {
   staticVariants,
 } from "@/lib/motion/variants";
 import { useReducedMotion } from "@/lib/motion/use-reduced-motion";
+import { FATOR_R, ANEXOS } from "@/lib/traducao/obrigacoes";
 
 const ComposicaoDonut = dynamic(
   () =>
@@ -348,15 +349,28 @@ function FatorRCard({
 }) {
   const pct = (valor * 100).toFixed(1).replace(".", ",");
   const folga = Math.max(0, valor - 0.28);
+  const anexoTraduzido = ANEXOS[anexo];
   return (
     <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Gauge className="size-4 text-[var(--color-ochre)]" aria-hidden />
-          <Fig n="R" titulo="Fator R" size="sm" />
+          {/* Título em PT — termoTecnico em abbr secundário */}
+          <span className="text-sm font-semibold text-[var(--color-ink)]">
+            {FATOR_R.titulo}
+          </span>
+          <abbr
+            title={FATOR_R.termoTecnico}
+            className="mono text-[10px] text-[var(--color-ink-3)] no-underline"
+          >
+            {FATOR_R.termoTecnico}
+          </abbr>
         </div>
         <Pill tom={atencao ? "warn" : "ok"}>
-          {atencao ? "atenção" : `Anexo ${anexo} mantido`}
+          {atencao
+            ? "atenção"
+            : <>{anexoTraduzido.titulo} <abbr title={anexoTraduzido.termoTecnico} className="no-underline">{anexoTraduzido.termoTecnico}</abbr> mantido</>
+          }
         </Pill>
       </div>
       <div className="flex items-baseline gap-2">
@@ -375,8 +389,8 @@ function FatorRCard({
         tom={atencao ? "amber" : "lime"}
       />
       <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
-        Acima de <strong className="text-[var(--color-ink)]">28%</strong>, sua
-        atividade fica no Anexo III (alíquota cai pela metade). Sua folga atual:{" "}
+        {FATOR_R.efeito}
+        {" "}Sua folga atual:{" "}
         <strong className="text-[var(--color-ink)] mono" style={{ fontVariantNumeric: "tabular-nums" }}>
           {(folga * 100).toFixed(1).replace(".", ",")} pp
         </strong>
@@ -389,10 +403,17 @@ function FatorRCard({
 function SemFatorRCard() {
   return (
     <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3 justify-center">
-      <Fig n="R" titulo="Fator R" size="sm" />
+      <span className="text-sm font-semibold text-[var(--color-ink)]">
+        {FATOR_R.titulo}{" "}
+        <abbr
+          title={FATOR_R.termoTecnico}
+          className="mono text-[10px] font-normal text-[var(--color-ink-3)] no-underline"
+        >
+          {FATOR_R.termoTecnico}
+        </abbr>
+      </span>
       <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
-        Não se aplica ao seu regime. O Fator R é um cálculo do Simples
-        Nacional para atividades que oscilam entre Anexo III e V.
+        Não se aplica ao seu regime. {FATOR_R.descricaoCurta}
       </p>
     </Framed>
   );
