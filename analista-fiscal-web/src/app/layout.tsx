@@ -42,7 +42,10 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${serif.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: extensões (Grammarly, ColorZilla) injetam
+          atributos no <body> antes da hidratação — o React acusaria mismatch.
+          Suprime SÓ neste nó; não mascara divergências reais de conteúdo. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

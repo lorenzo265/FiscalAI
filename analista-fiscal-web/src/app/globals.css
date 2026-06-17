@@ -6,108 +6,126 @@
   --font-sans: var(--font-sans-loaded), system-ui, sans-serif;
   --font-mono: var(--font-mono-loaded), ui-monospace, monospace;
 
-  /* ─── Tokens canônicos Arkan "Instrumento" (§2.1) ───────────────────── */
-  /* Papel quente + tinta + UM verde (marca = saúde fiscal). */
-  --color-paper: #efede3;
-  --color-paper-2: #e7e4d7;
-  --color-card: #f7f5ee;
-  --color-glass: rgba(239, 237, 227, 0.72);
+  /* ─── Tokens canônicos Arkan "Claro" v2 (identidade-v2 §2) ──────────────
+     "O instrumento de precisão, agora leve na mão." Papel 1 passo mais
+     claro, painel branco-quente plano, UM verde (marca = saúde fiscal),
+     radius cresce em superfícies grandes. NOMES de token preservados da
+     v1 — só os VALORES mudam. */
 
-  --color-ink: #1b1a15;
-  --color-ink-2: #59574b;
-  --color-ink-3: #928f7e;
-  --color-graphite: #a7a493;
+  /* Superfícies — papel mais claro, painel branco-quente plano. */
+  --color-paper: #f7f5ef;   /* era #efede3 */
+  --color-paper-2: #f1eee4; /* wells, hover de linha */
+  --color-card: #fdfcf8;    /* painel: plano, sem sombra */
+  --color-glass: rgba(252, 251, 246, 0.72); /* chrome translúcido */
 
-  --color-rule: #d4d0c0;
-  --color-rule-2: #c1bca9;
+  /* Tinta. */
+  --color-ink: #1c1b16;
+  --color-ink-2: #5a5749; /* secundário, AA sobre paper e card */
+  --color-ink-3: #908c7b; /* APENAS decorativo/disabled — nunca dado */
+  /* graphite — alias de compat (linhas técnicas/ícones decorativos do
+     blueprint, donut, empty-state, scrollbar). Re-derivado p/ o paper
+     mais claro: entre ink-3 e rule-2. */
+  --color-graphite: #a29e8c;
+
+  /* Fios — mais claros: estrutura recua, conteúdo avança. */
+  --color-rule: #e6e3d6;
+  --color-rule-2: #d5d1c1;
 
   /* Único acento cromático: verde. */
-  --color-green: #136a41;
-  --color-green-deep: #0c4327;
+  --color-green: #0e6b43;
+  --color-green-deep: #0a4e31;
+  --color-green-wash: #e9f2ec;
+  /* green-bright — alias de compat (variação clara do MESMO verde em
+     charts/donut). Mantido coerente com o acento único v2. */
   --color-green-bright: #1b8a55;
-  --color-green-wash: #dde8de;
 
   /* Mundo quente: atenção (ocre) e erro (danger) — não são acentos de marca. */
-  --color-ochre: #a8650f;
-  --color-danger: #b23a33;
-  /* Washes do mundo quente — análogos a --color-green-wash, para fundos
-     de alerta/erro sem precisar de color-mix pontual nas telas. */
-  --color-ochre-wash: #efe4d2;
-  --color-danger-wash: #f1ddd9;
+  --color-ochre: #96660d;
+  --color-ochre-wash: #f7eedb;
+  --color-danger: #b3382e;
+  --color-danger-wash: #f9e9e6;
 
-  /* Shape — precisão, não fofura. */
-  --radius-md: 2px;
-  --radius-sm: 2px;
+  /* Geometria — radius cresce em superfícies grandes (nunca pílula). */
+  --radius-sm: 6px;  /* inputs, badges, pills */
+  --radius-md: 10px; /* painéis, botões */
+  --radius-lg: 16px; /* sheets, modais, tab bar — NUNCA em botão */
 
-  /* Easings. */
-  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-reveal: cubic-bezier(0.62, 0.05, 0.01, 0.99);
+  /* Motion. */
+  --ease-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
+  /* ease-stamp — overshoot do Carimbo, INTOCADO da v1 (identidade-v2 §3). */
   --ease-stamp: cubic-bezier(0.34, 1.56, 0.4, 1);
+  --dur-fast: 160ms;
+  --dur-base: 320ms;
+  --dur-page: 420ms;
 
-  /* Os aliases de compat (nomes antigos `--color-txt/bg/lime/line/...`) foram
-     REMOVIDOS na Fase 4: nenhum arquivo (fora deste `@theme`) os usa mais.
-     Toda a base consome os tokens canônicos Arkan acima. */
+  /* Os aliases de compat antigos (`--color-txt/bg/lime/line/...`) foram
+     REMOVIDOS na Fase 4 v1: nenhum arquivo (fora deste `@theme`) os usa.
+     graphite/green-bright/ease-stamp acima SÃO consumidos por primitivas —
+     por isso os nomes ficam, com valores re-calibrados p/ a v2. */
 }
 
-/* ─── Dark mode — RE-DERIVADO (não invertido) ────────────────────────────
-   Mantém a família Arkan: papel→tinta profunda QUENTE, tinta→clara quente,
-   UM acento verde (clareado p/ AA no escuro), ocre/danger ajustados.
+/* ─── Dark mode — RE-DERIVADO (não invertido), partindo dos valores v2 ────
+   Mantém a família Arkan Claro: papel→tinta profunda QUENTE, tinta→clara
+   quente, UM acento verde (clareado p/ AA no escuro), ocre/danger ajustados.
+   Não é o claro v2 invertido — é a MESMA família lida no escuro. Radius e
+   motion são compartilhados com o claro (vêm do @theme; não se re-derivam).
    Tema CLARO é o padrão (tokens do @theme acima). O escuro entra por:
      (a) classe `.dark` no <html> — gancho para um futuro toggle;
      (b) `@media (prefers-color-scheme: dark)` — preferência do SO,
          a menos que `.light` seja forçado no <html>.
    Contraste mirado (AA+) em ambos os temas:
-     ink/paper ~13:1, green/paper ~5:1, ink-2/paper ~7:1. */
+     ink/paper ~14:1, green/paper ~5.5:1, ink-2/paper ~7:1. */
 :root.dark,
 .dark {
-  --color-paper: #14120d;
-  --color-paper-2: #1b1812;
-  --color-card: #201d16;
-  --color-glass: rgba(20, 18, 13, 0.72);
+  --color-paper: #141209;
+  --color-paper-2: #1c1910;
+  --color-card: #221f15;
+  --color-glass: rgba(20, 18, 9, 0.72);
 
-  --color-ink: #ece9dd;
-  --color-ink-2: #b6b1a1;
-  --color-ink-3: #8a8675;
-  --color-graphite: #6f6c5e;
+  --color-ink: #efece0;
+  --color-ink-2: #b8b3a2;
+  --color-ink-3: #8c8775;
+  --color-graphite: #716d5e;
 
-  --color-rule: #38352b;
-  --color-rule-2: #4a463a;
+  --color-rule: #38342a;
+  --color-rule-2: #4b473a;
 
-  --color-green: #46b27a;
-  --color-green-deep: #b9e3c8;
-  --color-green-bright: #5cc78d;
-  --color-green-wash: #1b2a22;
+  --color-green: #4cb87f;
+  --color-green-deep: #bfe6cd;
+  --color-green-wash: #15271c;
+  --color-green-bright: #62cb92;
 
-  --color-ochre: #d8943f;
-  --color-danger: #e36c63;
-  --color-ochre-wash: #2a2114;
-  --color-danger-wash: #2c1916;
+  --color-ochre: #d9963f;
+  --color-ochre-wash: #2a2012;
+  --color-danger: #e56e64;
+  --color-danger-wash: #2d1714;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --color-paper: #14120d;
-    --color-paper-2: #1b1812;
-    --color-card: #201d16;
-    --color-glass: rgba(20, 18, 13, 0.72);
+    --color-paper: #141209;
+    --color-paper-2: #1c1910;
+    --color-card: #221f15;
+    --color-glass: rgba(20, 18, 9, 0.72);
 
-    --color-ink: #ece9dd;
-    --color-ink-2: #b6b1a1;
-    --color-ink-3: #8a8675;
-    --color-graphite: #6f6c5e;
+    --color-ink: #efece0;
+    --color-ink-2: #b8b3a2;
+    --color-ink-3: #8c8775;
+    --color-graphite: #716d5e;
 
-    --color-rule: #38352b;
-    --color-rule-2: #4a463a;
+    --color-rule: #38342a;
+    --color-rule-2: #4b473a;
 
-    --color-green: #46b27a;
-    --color-green-deep: #b9e3c8;
-    --color-green-bright: #5cc78d;
-    --color-green-wash: #1b2a22;
+    --color-green: #4cb87f;
+    --color-green-deep: #bfe6cd;
+    --color-green-wash: #15271c;
+    --color-green-bright: #62cb92;
 
-    --color-ochre: #d8943f;
-    --color-danger: #e36c63;
-    --color-ochre-wash: #2a2114;
-    --color-danger-wash: #2c1916;
+    --color-ochre: #d9963f;
+    --color-ochre-wash: #2a2012;
+    --color-danger: #e56e64;
+    --color-danger-wash: #2d1714;
   }
 }
 
@@ -166,7 +184,7 @@
   }
   ::-webkit-scrollbar-thumb {
     background: var(--color-rule-2);
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     border: 2px solid var(--color-paper);
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -188,10 +206,12 @@
   }
 }
 
-/* Texto: variáveis da textura de pauta — claro (padrão) e dark re-derivado. */
+/* Texto: variáveis da textura de pauta — claro (padrão) e dark re-derivado.
+   v2 "lei do respiro": com o paper mais claro, os fios da pauta recuam mais
+   um passo (estrutura recua, conteúdo avança). */
 :root {
-  --texture-line-h: rgba(167, 164, 147, 0.06);
-  --texture-line-v: rgba(167, 164, 147, 0.04);
+  --texture-line-h: rgba(160, 156, 142, 0.05);
+  --texture-line-v: rgba(160, 156, 142, 0.035);
 }
 :root.dark,
 .dark {
