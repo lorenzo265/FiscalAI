@@ -191,3 +191,27 @@ O `reviewer` registra o veredito assim:
 - Estado: **Re-engenharia Arkan (Fases 0–4) CONCLUÍDA** — 5 branches stacked empurradas (fase-0-1 → fase-2-shell → fase-3-lote-b-notas → fase-3-lotes-acde → esta Fase 4). Ordem de merge na main = mesma sequência.
 - Pendências de produto (não bloqueiam): copy "FiscalAI" em lib/pdf/* e lib/mocks/lib/stores (dados/PDF, decisão de produto); button hover dark dedicado; validação humana do dark mode + Lighthouse real; (opcional) toggle de tema usando o gancho .dark/.light já pronto.
 - Próximo: — (re-engenharia concluída; abrir/mergear os PRs no GitHub na ordem stacked).
+
+### 2026-06-10 · frontend-design-architect · [AUDIT] usabilidade pós-re-engenharia
+- Fez: auditoria de UX das ~45 rotas focada no dono de PME (uso sem tutorial, "resposta de 5 segundos"). 12 mudanças priorizadas em 4 blocos: linguagem (traduzir DAS/PGDAS/DEFIS/eSocial/DCTF/Fator R/Anexo — a tradução §7 parou em CFOP/CST/NCM), hierarquia (home = 3 respostas; urgência em 3 níveis com multa automática LC 214/2025; monitores de limite com `Ruler`), fluxo (1 ação primária por tela em verbo do dono; onboarding por CNPJ via BrasilAPI; erros com próxima ação; tabelas→cards no mobile) e confiança (assistente real ou oculto; `Carimbo` como rito pós-ação). Sequência sugerida: 4 PRs.
+- Arquivos tocados: `auditoria-ux-frontend-2026.md` (raiz — relatório completo com gate de aceite por tela). Nenhum código tocado.
+- Build/lint: n/a (só documento) · Gates/Invariantes: n/a
+- Pendências: decisão do usuário sobre ordem/escopo dos 4 PRs.
+- Faltou no design-system: nada novo — `Pill`, `Ruler`, `Carimbo`, `EmptyState/ErrorState` cobrem tudo; faltam apenas mapas de tradução (`lib/traducao/obrigacoes.ts`, `erros.ts`), que são camada de conteúdo, não primitiva.
+- Próximo: `screen-implementer` (PR 1 — linguagem) quando o usuário aprovar.
+
+### 2026-06-11 · frontend-design-architect · [IDENTITY] Arkan Claro v2
+- Fez: autorou o contrato da identidade v2 "Arkan Claro" (Instrumento × Apple) — tese *"o instrumento de precisão, agora leve na mão"*. Tokens v2 (papel mais claro, card branco-quente plano, fios recuados, radius 6/10/16, springs), papéis tipográficos recalibrados (número-herói mono light 56–72px; Fraunces só em momentos-marca), deltas de componente (painel sem crop marks; `Framed technical` vira assinatura rara; tab bar inferior mobile; Régua de limites como assinatura nº 2), motion v2 (count-up, shared-axis, springs), gates anti-slop v2, brand pack (S8) e plano D0–D6 encaixado nas sprints do `PLANO_PRODUCTION_READY.md`.
+- Arquivos tocados: `docs/arkan-claro-identidade-v2.md` (novo contrato), `docs/PLANO_PRODUCTION_READY.md` (§4 referencia). Nenhum código tocado.
+- Build/lint: n/a · Gates/Invariantes: contrato preserva §7 e proíbe regressão de função (§8 do doc).
+- Pendências: D0 (extract de 3 referências) antes de D1; aprovação do PO na direção.
+- Faltou no design-system: `useCountUp`, `Framed variant="technical"`, tab bar mobile — especificados, a criar em D2.
+- Próximo: `frontend-design-architect` (D0, S3) após aprovação.
+
+### 2026-06-16 · orquestrador · [PLAN] fusão auditoria UX × identidade v2
+- Fez: criou `docs/plano-experiencia-ux-v2.md` — **sequência única de PRs do front (X1–X19)** fundindo as 12 mudanças da auditoria UX com as fases D0–D6 da v2, regida pela regra-mãe «conteúdo antes da forma»: Trilha A/B (linguagem + fluxo) entra em S1–S2/S6 sem retrabalho; Trilha C (layout: número-herói, régua, cards mobile, ação primária, Carimbo) só **depois** dos tokens v2 (S3), para não pintar a mesma tela duas vezes. Inclui rastreabilidade 12-mudanças×PR e D0–D6×PR. Em paralelo (workstream backend): alinhou o `CLAUDE.md` ao estado real (sprints 0–22, 56 migrations, 33 módulos, 2520 testes), fechando a ressalva 3.2 da `Auditoria-Profunda-2026-05-31.md`.
+- Arquivos tocados: `docs/plano-experiencia-ux-v2.md` (novo), `docs/PLANO_PRODUCTION_READY.md` (§4 referencia o detalhamento), `CLAUDE.md` (estado real + v2 nas fontes de verdade do front). Nenhum código tocado.
+- Build/lint: n/a (só documentos) · Gates/Invariantes: o plano preserva os invariantes §7 e a regra-mãe proíbe layout v1 descartável.
+- Pendências: aprovação do PO na sequência X1–X19; PR-X1 (tradução, `lib/traducao/obrigacoes.ts`) é Trilha A — zero dependência externa, pode começar já.
+- Faltou no design-system: — (PR-X1–X3 são camada de conteúdo, não primitiva).
+- Próximo: `screen-implementer` (PR-X1 — tradução de obrigações) quando o PO aprovar.
