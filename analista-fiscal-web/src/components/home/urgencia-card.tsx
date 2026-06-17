@@ -26,9 +26,9 @@ export function UrgenciaCard() {
     .filter((e) => e.status !== "pago" && classificarUrgencia(e.data, hoje).nivel === "danger")
     .sort((a, b) => a.data.localeCompare(b.data));
 
-  if (urgentes.length === 0) return null;
-
   const primeiro = urgentes[0];
+  if (!primeiro) return null;
+
   const urg = classificarUrgencia(primeiro.data, hoje);
 
   return (
