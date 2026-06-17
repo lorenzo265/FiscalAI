@@ -1,7 +1,7 @@
 # PLANO PRODUCTION-READY — Arkan
 ## 2026-06-11 | Horizonte: 6 meses (12 sprints de 2 semanas) | Lançamento em 2 fases: beta contadores → público
 
-Fontes de verdade que este plano consolida: `validacao-cobertura-mei-simples-2026.md` (gaps fiscais), `auditoria-ux-frontend-2026.md` (12 mudanças de UX), `docs/HANDOFF.md` (re-engenharia Arkan concluída), `log_agente.md` (pendências conscientes), `docs/PlanoBackend.md` (sprints 0–22 ✅).
+Fontes de verdade que este plano consolida: `legacy/validacao-cobertura-mei-simples-2026.md` (gaps fiscais), `legacy/auditoria-ux-frontend-2026.md` (12 mudanças de UX), `docs/HANDOFF.md` (re-engenharia Arkan concluída), `log_agente.md` (pendências conscientes), `docs/PlanoBackend.md` (sprints 0–22 ✅).
 
 ---
 

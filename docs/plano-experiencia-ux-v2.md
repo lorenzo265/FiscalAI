@@ -3,7 +3,7 @@
 
 Funde dois contratos que se sobrepõem nas **mesmas telas**:
 
-- **`auditoria-ux-frontend-2026.md`** — 12 mudanças de usabilidade (linguagem, hierarquia, fluxo, confiança), pensadas sobre a pele v1 "Instrumento".
+- **`legacy/auditoria-ux-frontend-2026.md`** — 12 mudanças de usabilidade (linguagem, hierarquia, fluxo, confiança), pensadas sobre a pele v1 "Instrumento".
 - **`arkan-claro-identidade-v2.md`** — fases D0–D6 que **recalibram os tokens** para a v2 "Arkan Claro" (clareza Apple: número-herói, mais respiro, blueprint vira assinatura rara).
 
 Sem conciliação, há retrabalho garantido: pintar a home "3 respostas" na pele v1 (S2) e repintá-la com número-herói na v2 (S6) é construir a mesma tela duas vezes. Este doc define a ordem que evita isso. **Não substitui** o plano-mãe — refina o nível PR-a-PR; em conflito, `PLANO_PRODUCTION_READY.md` vence.
