@@ -11,7 +11,7 @@ Sistema fiscal-contábil multi-tenant para PMEs brasileiras (Simples Nacional + 
 - **`analista-fiscal-api/`** — Backend (FastAPI + Postgres + Redis). Source of truth: `docs/PlanoBackend.md`.
 - **`analista-fiscal-web/`** — Frontend (Next.js 15 + React 19 + Tailwind v4 + shadcn/ui). **Em re-engenharia de design** (rebrand do app → **Arkan**; identidade "Instrumento"). Escopo de produto: `analista-fiscal-web/Plano.md`. Re-engenharia/design: seção «Frontend — Re-engenharia Arkan» (abaixo) + `docs/PLANO_REENGENHARIA_FRONTEND_ARKAN.md`.
 
-Dois workstreams ativos: **backend** (sprints 0–12 completas; 13–22 pendentes) e **frontend** (re-engenharia de design "Arkan" — ver seção própria).
+Dois workstreams ativos: **backend** (sprints 0–22 concluídas — roadmap completo, ver «Estado atual») e **frontend** (re-engenharia de design "Arkan", agora em identidade v2 "Arkan Claro" — ver seção própria).
 
 ---
 
@@ -31,14 +31,16 @@ Dois workstreams ativos: **backend** (sprints 0–12 completas; 13–22 pendente
 
 4. **Consultar `docs/README.md`** — hub do knowledge graph (Obsidian vault). Contém wikilinks `[[ ]]` para princípios, sprints, módulos, ADRs e pendências. Use como mapa de navegação rápido. Se uma nota referenciada (`[[x]]`) ainda não existir, ela é uma **pendência de documentação** — não criar sem confirmar com o usuário.
 
+5. **Frota de agentes (devs + business)** — a equipe de subagentes que executa validação fiscal, atualização de alíquota, gates e tarefas de negócio está definida em `docs/time_arkan.md` + `.claude/agents/`. O orquestrador encadeia os agentes (você não chama um por um); freios em ações irreversíveis. Ver `docs/time_arkan.md` §12 (modos de execução).
+
 ---
 
-## Estado atual (2026-05-18)
+## Estado atual (2026-06-06)
 
-- **Sprints 0–12 concluídas.** 980 testes passando, 2 skipped. mypy strict ✅ em 225 arquivos.
-- **22 migrations Alembic** (0001–0022) com RLS multi-tenant em todas as tabelas de domínio.
-- **28 módulos** em `app/modules/`. Estrutura: cada módulo = `models.py` (raros — geralmente em `shared/db/models.py`), `repo.py`, `service.py`, `router.py`, `schemas.py` + arquivos `calcula_*.py` puros.
-- **Próximo:** Sprint 13 (marketplace de contadores) — meta Fase 2 = 50 pagantes + MRR R$10k.
+- **Sprints 0–22 concluídas (roadmap completo).** 2520 testes passando, 3 skipped. mypy strict ✅ em 357 arquivos. bandit ✅ 0 issues.
+- **56 migrations Alembic** com RLS multi-tenant em todas as tabelas de domínio.
+- **33 módulos** em `app/modules/`. Estrutura: cada módulo = `models.py` (raros — geralmente em `shared/db/models.py`), `repo.py`, `service.py`, `router.py`, `schemas.py` + arquivos `calcula_*.py` puros.
+- **Branch:** `hardening-fiscal-2026-06`. **Aberto e acionável:** #9 — tabelas INSS/IRRF/FGTS 2026 (aguarda valores oficiais da Portaria MPS/MF 2026; fluxo `/atualizar-aliquota`, para em aprovação).
 
 ---
 
@@ -178,9 +180,9 @@ op.execute(f"CREATE POLICY x_tenant ON x USING ({_RLS_USING})")
 
 ```
 analista-fiscal-api/
-├── alembic/versions/        # 22 migrations (0001-0022)
+├── alembic/versions/        # 56 migrations (RLS por tabela de domínio)
 ├── app/
-│   ├── modules/             # 28 bounded contexts
+│   ├── modules/             # 33 bounded contexts
 │   │   ├── auth, empresa, ingestao                            (Sprints 1-2)
 │   │   ├── fiscal, multa_juros                                 (Sprints 2-4)
 │   │   ├── llm-related: assistente, memoria                    (Sprint 4)
@@ -193,7 +195,9 @@ analista-fiscal-api/
 │   │   ├── pessoal                                             (Sprint 10)
 │   │   ├── lucro_presumido, icms, reinf, det,
 │   │   │   monitor_cadastral, parcelamentos                    (Sprint 11)
-│   │   └── relatorios                                          (Sprint 12)
+│   │   ├── relatorios                                          (Sprint 12)
+│   │   └── reforma, sped, tabelas_admin, advisor,
+│   │       marketplace, migracao                               (Sprints 13-22)
 │   ├── shared/
 │   │   ├── db/models.py     # ~50 models SQLAlchemy 2.0 (Mapped[])
 │   │   ├── db/deps.py       # get_session com SET LOCAL RLS
@@ -204,7 +208,7 @@ analista-fiscal-api/
 │   ├── workers/             # Celery app + 4 tasks (skeleton + beat schedule)
 │   ├── config.py, main.py
 └── tests/
-    ├── unit/                # ~800 testes (golden por módulo)
+    ├── unit/                # golden por módulo (maior parte da suite)
     ├── eval/                # 166 casos LLM
     └── integration/         # requer Postgres+Redis (Docker)
 ```
@@ -224,7 +228,7 @@ Cada sprint vira tipicamente 3 PRs. PR pattern:
 7. Rodar **pytest + mypy** (zero erros é critério de merge).
 8. **Atualizar `log_agente.md`** com a contagem nova e descrição do que entrou.
 
-Convenção de mensagens de log: contagem final cresce 10-40 testes por PR. Suite atual: 980.
+Convenção de mensagens de log: contagem final cresce 10-40 testes por PR. Suite atual: 2520 (a contagem corrente vive no `log_agente.md`).
 
 ---
 
@@ -274,6 +278,7 @@ Estão documentadas em `log_agente.md` seção "Pendências conscientes". Resumo
 | Padrão de service + idempotência | `app/modules/provisoes/service.py` |
 | Padrão de algoritmo puro | `app/modules/pessoal/calcula_inss.py` ou `app/modules/lucro_presumido/calcula_irpj.py` |
 | Plano referencial de contas (Sprint 9) | `app/modules/contabil/plano_referencial.py` |
+| Equipe de agentes (devs + business) | `docs/time_arkan.md` + `.claude/agents/*.md` |
 
 ---
 
@@ -332,9 +337,12 @@ Atalho que executa esse write-back: comando `/fechar-sprint` (`.claude/commands/
 ### Fontes de verdade (em `docs/`)
 | Arquivo | É o contrato de… |
 |---|---|
-| `docs/PLANO_REENGENHARIA_FRONTEND_ARKAN.md` | plano: fases, frota, invariantes, gates |
-| `docs/arkan-visual-style-merge.md` | **estilo** (tokens, linguagem de componente) |
-| `docs/arkan-motion-extraction.md` | **motion** (Lenis + Framer, receitas de reveal) |
+| `docs/PLANO_PRODUCTION_READY.md` | **plano-mãe** (12 sprints até o lançamento; funde fiscal + UX + identidade v2) |
+| `docs/arkan-claro-identidade-v2.md` | **identidade v2 "Arkan Claro"** (recalibra os tokens v1 para clareza Apple; vence sobre o estilo v1) |
+| `docs/plano-experiencia-ux-v2.md` | **sequência única de PRs do front** (funde a auditoria UX × as fases D0–D6 da v2) |
+| `docs/PLANO_REENGENHARIA_FRONTEND_ARKAN.md` | plano v1: fases, frota, invariantes, gates |
+| `docs/arkan-visual-style-merge.md` | estilo v1 (tokens, linguagem de componente) — **recalibrado pela v2** |
+| `docs/arkan-motion-extraction.md` | motion v1 (Lenis + Framer, receitas de reveal) |
 | `docs/HANDOFF.md` | livro de passagem entre agentes (append-only) |
 
 (O `analista-fiscal-web/Plano.md` segue como fonte de **escopo de produto/feature**.)
