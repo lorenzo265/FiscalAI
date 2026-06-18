@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.modules.empresa.cnpj import validar_cnpj
+from app.modules.empresa.cnpj import normalizar_cnpj, validar_cnpj
 
 
 class RegimeTributario(StrEnum):
@@ -65,6 +65,14 @@ class EmpresaIn(BaseModel):
     ie: str | None = Field(default=None, max_length=20)
     im: str | None = Field(default=None, max_length=20)
     faturamento_12m: Decimal | None = Field(default=None, ge=0)
+
+    @field_validator("cnpj", mode="before")
+    @classmethod
+    def _normalizar_cnpj(cls, v: object) -> object:
+        # Aceita CNPJ com máscara (11.222.333/0001-81) — normaliza para 14
+        # dígitos ANTES das constraints (pattern ^\d{14}$). Não-string passa
+        # adiante para o Pydantic levantar o erro de tipo padrão.
+        return normalizar_cnpj(v) if isinstance(v, str) else v
 
     @field_validator("cnpj")
     @classmethod
@@ -143,6 +151,14 @@ class OnboardingCnpjIn(BaseModel):
         ge=0,
         description="Faturamento dos últimos 12 meses. Usado para sugerir regime.",
     )
+
+    @field_validator("cnpj", mode="before")
+    @classmethod
+    def _normalizar_cnpj(cls, v: object) -> object:
+        # Aceita CNPJ com máscara (11.222.333/0001-81) — normaliza para 14
+        # dígitos ANTES das constraints (pattern ^\d{14}$). Não-string passa
+        # adiante para o Pydantic levantar o erro de tipo padrão.
+        return normalizar_cnpj(v) if isinstance(v, str) else v
 
     @field_validator("cnpj")
     @classmethod

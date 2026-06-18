@@ -13,9 +13,11 @@ Fonte: Decreto anual de fixação do salário mínimo (entra em vigor 1º janeir
   * 2023 — Decreto 11.322/2022 (+ MP 1.172/2023) — R$ 1.320,00
   * 2024 — Decreto 11.864/2023 — R$ 1.412,00
   * 2025 — Decreto 12.342/2024 — R$ 1.518,00
-  * 2026 — placeholder até decreto publicado: usar 2025 + reajuste mínimo
-    legal (INPC + 2,5% real) para travar validação acima do INSS faixa 1
-    sem inventar valor. Atualizar quando decreto sair em dezembro.
+  * 2026 — R$ 1.621,00 — salário mínimo oficial 2026, refletido na primeira
+    faixa do INSS pela Portaria Interministerial MPS/MF nº 13 de 09/01/2026.
+    Confirmado na "Tabela de contribuição mensal" oficial do gov.br/INSS
+    (faixa 1: até R$ 1.621,00 → 7,5%). Substituiu o placeholder conservador
+    de R$ 1.620,00 no PR que postou a tabela INSS 2026 (migration 0058).
 
 Não é tabela tributária stricto sensu — é referência cruzada usada apenas
 para validar plausibilidade do INSS faixa 1 ("primeira faixa precisa cobrir
@@ -32,11 +34,10 @@ _SALARIO_MINIMO_POR_ANO: dict[int, Decimal] = {
     2023: Decimal("1320.00"),
     2024: Decimal("1412.00"),
     2025: Decimal("1518.00"),
-    # Placeholder conservador para 2026 — decreto sai em dezembro/2025.
-    # Sai do reajuste mínimo legal aplicado sobre 2025 (INPC ~3,5% + 2,5% real).
-    # Substituir pelo valor oficial assim que publicado, no mesmo PR que
-    # postar a tabela INSS 2026.
-    2026: Decimal("1620.00"),
+    # Salário mínimo oficial 2026 — refletido na faixa 1 do INSS pela
+    # Portaria Interministerial MPS/MF nº 13 de 09/01/2026 (gov.br/INSS,
+    # "Tabela de contribuição mensal"). Antes era placeholder R$ 1.620,00.
+    2026: Decimal("1621.00"),
 }
 
 

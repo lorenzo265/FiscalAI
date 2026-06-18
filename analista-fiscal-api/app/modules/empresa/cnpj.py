@@ -49,3 +49,14 @@ def validar_cnpj(cnpj: str) -> bool:
     pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
 
     return int(digits[12]) == _digito(digits, pesos1) and int(digits[13]) == _digito(digits, pesos2)
+
+
+def normalizar_cnpj(cnpj: str) -> str:
+    """Remove a máscara do CNPJ — devolve só os dígitos.
+
+    Aceita as formas comuns digitadas/coladas pelo usuário
+    (``11.222.333/0001-81``, ``11222333/0001-81``, com espaços) e retorna
+    apenas os dígitos. NÃO valida tamanho nem dígito verificador — isso é papel
+    de ``validar_cnpj`` e das constraints do schema (``^\\d{14}$``).
+    """
+    return "".join(c for c in cnpj if c.isdigit())

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pill } from "@/components/shared/pill";
 import { Ruler } from "@/components/blueprint/ruler";
-import { mascaraCNPJ, validarCNPJ, apenasDigitos, formatarCNPJ } from "@/lib/format/cnpj";
+import { validarCNPJ, apenasDigitos, formatarCNPJ } from "@/lib/format/cnpj";
 import { api, ApiError } from "@/lib/api-client";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 
@@ -25,20 +25,38 @@ export function PassoCnpj() {
   const [erro, setErro] = React.useState<string | null>(null);
   const [carregando, setCarregando] = React.useState(false);
 
-  const valido = validarCNPJ(cnpj);
+  // Texto livre EXATAMENTE como o usuário digita (aceita `. / -`, espaços ou só
+  // dígitos). NÃO reformatamos a cada tecla — era isso que jogava o cursor pro
+  // fim e impedia apagar um caractere no meio. A máscara bonita entra só no blur.
+  const [texto, setTexto] = React.useState<string>(() =>
+    validarCNPJ(cnpj) ? formatarCNPJ(cnpj) : cnpj
+  );
+
+  const digitos = apenasDigitos(texto);
+  const valido = validarCNPJ(digitos);
+
+  function aoDigitarCnpj(e: React.ChangeEvent<HTMLInputElement>): void {
+    // Permite dígitos + separadores comuns (. / - e espaço); descarta o resto.
+    // Limita a 18 chars (14 dígitos + 4 separadores de "00.000.000/0000-00").
+    const limpo = e.target.value.replace(/[^\d./\-\s]/g, "").slice(0, 18);
+    setTexto(limpo);
+    setCnpj(apenasDigitos(limpo));
+    setErro(null);
+    setDados(null);
+  }
 
   async function buscar() {
     if (!valido) {
-      setErro("CNPJ inválido. Confira os dígitos.");
+      setErro("CNPJ inválido. Confira os 14 dígitos.");
       return;
     }
     setErro(null);
     setCarregando(true);
     try {
       // O onboarding do backend consulta a Receita (BrasilAPI) E já cria a
-      // empresa no tenant — capturamos ambos.
+      // empresa no tenant — capturamos ambos. Enviamos sempre SÓ os dígitos.
       const { dados: r, empresa } = await api.empresa.lookupCnpjComEmpresa(
-        apenasDigitos(cnpj)
+        digitos
       );
       setDados(r);
       setEmpresaCriada(empresa);
@@ -73,16 +91,18 @@ export function PassoCnpj() {
         <div className="flex gap-2">
           <Input
             id="cnpj"
-            inputMode="numeric"
+            inputMode="text"
             placeholder="00.000.000/0000-00"
             className="mono text-base"
             style={{ fontVariantNumeric: "tabular-nums" }}
-            value={mascaraCNPJ(cnpj)}
-            onChange={(e) => {
-              setCnpj(apenasDigitos(e.target.value));
-              setErro(null);
-              setDados(null);
+            value={texto}
+            onChange={aoDigitarCnpj}
+            onBlur={() => {
+              // Formata bonito só quando o CNPJ está completo e válido — sem
+              // atrapalhar a edição no meio enquanto o usuário ainda digita.
+              if (validarCNPJ(digitos)) setTexto(formatarCNPJ(digitos));
             }}
+            aria-invalid={texto.length > 0 && !valido}
           />
           <Button onClick={buscar} disabled={!valido || carregando}>
             <Search className="size-4" />

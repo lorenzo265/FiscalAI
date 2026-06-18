@@ -12,6 +12,7 @@ Ponto de entrada do vault. Use a barra lateral do Obsidian ou clique nos links a
 - [[dashboard]] — painéis vivos (Dataview): pendências, módulos, sprints, ADRs.
 - [[review-checklist]] — rubrica de auto-review de PR derivada dos 12 princípios.
 - [[deploy]] — mapeamento operacional pra subir o sistema (settings, integrações, gates `hard`/`soft`, pendências `[risco-deploy]`).
+- [[time_arkan]] — a **frota de agentes** (devs + business): roster, ferramentas/MCPs, gates e modos de execução.
 
 ---
 
@@ -106,3 +107,4 @@ pytest + golden suite + eval suite.
 2. Leia `log_agente.md` para estado atual.
 3. Use [[PlanoBackend]] como source of truth.
 4. Não invente notas — se uma referência `[[x]]` não existir, ela é uma **pendência de documentação**, não um arquivo a ser criado sem confirmação.
+5. Para trabalhar **via frota de subagentes** (validação fiscal, alíquota, gates, business), veja [[time_arkan]] — o orquestrador encadeia os agentes; você não chama um por um.

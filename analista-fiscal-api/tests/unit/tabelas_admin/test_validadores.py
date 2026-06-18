@@ -80,7 +80,7 @@ def test_inss_aliquota_implausivel_falha() -> None:
 
 
 def test_inss_primeira_faixa_abaixo_salario_minimo_falha() -> None:
-    """Primeira faixa precisa cobrir 1 salário mínimo (R$ 1.620 em 2026)."""
+    """Primeira faixa precisa cobrir 1 salário mínimo (R$ 1.621,00 em 2026)."""
     faixas = faixas_inss_2026()
     faixas[0] = FaixaInssIn(
         tipo="empregado",

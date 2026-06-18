@@ -33,36 +33,41 @@ FONTE_PADRAO = "Portaria MPS/MF 1/2026, DOU 2026-01-15 seção 1 página 42"
 
 
 def faixas_inss_2026() -> list[FaixaInssIn]:
-    """4 faixas empregado + 1 faixa contribuinte individual — válido em 2026."""
+    """4 faixas empregado + 1 faixa contribuinte individual — válido em 2026.
+
+    Valores oficiais da Portaria Interministerial MPS/MF nº 13 de 09/01/2026
+    (SM 2026 = R$ 1.621,00; teto = R$ 8.475,55). Antes eram estimativas
+    ilustrativas; alinhados aos oficiais ao postar a tabela INSS 2026.
+    """
     return [
         FaixaInssIn(
             tipo="empregado",
             faixa=1,
-            valor_ate=Decimal("1620.00"),
+            valor_ate=Decimal("1621.00"),
             aliquota=Decimal("0.075"),
         ),
         FaixaInssIn(
             tipo="empregado",
             faixa=2,
-            valor_ate=Decimal("2966.68"),
+            valor_ate=Decimal("2902.84"),
             aliquota=Decimal("0.09"),
         ),
         FaixaInssIn(
             tipo="empregado",
             faixa=3,
-            valor_ate=Decimal("4450.02"),
+            valor_ate=Decimal("4354.27"),
             aliquota=Decimal("0.12"),
         ),
         FaixaInssIn(
             tipo="empregado",
             faixa=4,
-            valor_ate=Decimal("8530.06"),
+            valor_ate=Decimal("8475.55"),
             aliquota=Decimal("0.14"),
         ),
         FaixaInssIn(
             tipo="contribuinte_individual",
             faixa=1,
-            valor_ate=Decimal("8530.06"),
+            valor_ate=Decimal("8475.55"),
             aliquota=Decimal("0.11"),
         ),
     ]

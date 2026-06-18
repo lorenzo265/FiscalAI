@@ -11,6 +11,47 @@
 
 ---
 
+## #9 (parcial) — INSS 2026 PROPOSTO · IRRF 2026 BLOQUEADO (2026-06-10) · AGUARDANDO APROVAÇÃO
+
+Fluxo `/atualizar-aliquota` (propor + gate). Estado: **preparado localmente, NÃO comitado/push/PR
+ainda** — aguarda aprovação humana.
+
+**INSS 2026 ✅ proposto:**
+- `alembic/versions/0058_inss_2026_nova_vigencia.py` — INSERT de nova vigência SCD
+  `valid_from=2026-01-01, valid_to=NULL` (5 linhas: 4 faixas empregado + CI 11%). O trigger
+  `scd_close_previous_valid_to` (0025) fecha a vigência 2025 em 2025-12-31. **Nenhum UPDATE/DELETE**
+  em linha seedada (respeita o REVOKE).
+- Fonte oficial (primária, citável): **Portaria Interministerial MPS/MF nº 13 de 09/01/2026**,
+  confirmada na "Tabela de contribuição mensal" do gov.br/INSS ("TABELAS VÁLIDAS A PARTIR DA
+  COMPETÊNCIA JANEIRO/2026"). SM 2026 = R$ 1.621,00 · teto = R$ 8.475,55.
+  Faixas: até 1.621,00→7,5% · até 2.902,84→9% · até 4.354,27→12% · até 8.475,55→14%.
+- Golden: `tests/unit/pessoal/test_calcula_inss_2026.py` (centavos conferidos à mão, ROUND_HALF_EVEN;
+  ex.: SM 121,58 · teto 988,09; +1 regressão garantindo que a vigência 2025 segue intacta).
+- Efeito colateral fixado: `app/modules/tabelas_admin/salario_minimo.py` SM 2026 1620→1621 (era
+  placeholder) + helper de teste `tests/unit/tabelas_admin/_helpers.py` `faixas_inss_2026()`
+  alinhado aos valores oficiais (senão o validador `validar_vigencia_inss` quebraria).
+
+**IRRF 2026 ⛔ BLOQUEADO (FREIO acionado — §8.3/§8.8 + decisão de escopo):**
+- A **Lei 15.270/2025** (26/11/2025) instituiu **redutor mensal na retenção na fonte** p/ rendimentos
+  R$ 5.000–7.350 (isenção efetiva até R$ 5.000), além das 5 faixas da **Lei 15.191/2025**. O schema
+  `tabela_irrf_faixa` + `calcula_irrf.py` (5 faixas + parcela_deduzir + desconto simplificado) **não
+  modelam** esse redutor. Inserir só as 5 faixas reteria IRRF **a maior** (multa pro cliente) na faixa
+  5.000–7.350. Não é INSERT cego de alíquota — exige novo mecanismo (schema + algoritmo + golden).
+  **Não escrevi nada de IRRF.** Requer decisão humana de escopo (PR próprio).
+
+**FGTS ✅ sem mudança:** 8% por Lei 8.036/1990 — nenhuma alteração legal 2026, nenhuma vigência nova.
+
+**Validação local:** esta sessão não tinha tool de shell (só leitura/escrita) — `pytest`/`mypy`/
+`alembic upgrade head` **não rodaram aqui**; revisão por inspeção estática (sem `Any`/`float`,
+imports ok, golden com cálculo manual, varredura de testes que tocam os valores alterados → sem
+quebra esperada). fiscal-validator **não invocado** (sem capacidade de subagente nesta sessão).
+Rodar antes de aprovar: `poetry run python -m pytest tests/unit/pessoal tests/unit/tabelas_admin`
++ `poetry run python -m mypy app/` + fiscal-validator.
+
+Pendência `docs/pendencias/tabelas-2026-oficiais.md` → `status: parcial`.
+
+---
+
 ## 🏁 FECHAMENTO DO PLANO (2026-06-06)
 
 Decisão do usuário: "fechar o plano". Estado consolidado:
