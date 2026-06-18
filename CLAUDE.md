@@ -17,6 +17,8 @@ Dois workstreams ativos: **backend** (sprints 0–22 concluídas — roadmap com
 
 ## Antes de começar qualquer trabalho
 
+> **Orquestrador retomando a execução por ondas?** Leia **`docs/HANDOFF-ORQUESTRADOR.md`** PRIMEIRO — onde paramos, as lições operacionais (shell/worktrees variam por sessão) e o guia de início do zero. Método + roadmap de ondas: **`docs/PLANO_ORQUESTRACAO_ONDAS.md`**.
+
 1. **Ativar a skill apropriada:**
    - Backend → `fiscalai-backend`
    - Frontend (código de feature) → `fiscalai-frontend`
