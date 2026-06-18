@@ -34,11 +34,11 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 ---
 
 ## 📍 Estado atual (resumo — detalhe na última entrada do log)
-- **Branch viva:** `main` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
-- **Backend:** roadmap 0–22 completo; em hardening + production-ready.
-- **Frontend:** identidade v2 "Arkan Claro"; Trilha A (conteúdo) + tokens v2 feitos.
-- **Próxima onda:** **Onda 2** — `X7 primitivas v2 → X8 gabarito Notas` (serial, tree principal).
-- **Backlog:** segurança do webhook · teste de integração do webhook · fixtures RLS quebrados por IBGE (alheio).
+- **Branch viva:** `main` @ `0324de1` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
+- **Backend:** roadmap 0–22 completo; em hardening + production-ready. Integração 24/24 (fixtures RLS corrigidos).
+- **Frontend:** identidade v2 "Arkan Claro"; Trilha A + tokens v2 + **primitivas X7 + gabarito Notas X8** feitos. `next build` VERDE.
+- **Próxima onda:** **Onda 3** — lotes de tela D4 (A/C/D/E) em paralelo (1 worktree/lote; base já tem design-system + gabarito) + home v2.
+- **Backlog:** segurança do webhook · teste de integração do webhook · largura da coluna Contraparte na DataTable (tunar no D4) · `tailwindcss-animate` não registrado (motion-polish/D6).
 
 ---
 
@@ -59,3 +59,13 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 - **Consolidou tudo na `main`** via fast-forward: `main` = `hardening-fiscal-2026-06` = `28df342`. Working tree limpo (nada solto). **NÃO pushado** (ato do PO).
 - **Resultado:** o próximo orquestrador agora retoma de **qualquer máquina** (frota + infra + handoffs todos versionados). A próxima onda continua a mesma: **Onda 2 (X7 → X8)**.
 - **Próximo orquestrador → faça:** (0) corrigir os fixtures RLS quebrados pelo IBGE; depois a Onda 2.
+
+### 2026-06-18 · orquestrador · item 0 (fixtures RLS) + Onda 2 (X7 → X8)
+- **Ambiente desta sessão:** o ORQUESTRADOR tem Bash (git/poetry/npm/docker) funcional; os SUBAGENTES seguem **sem shell** (write-only). Padrão mantido: subagente escreve → orquestrador valida/commita. Docker de pé (postgres+redis 25h).
+- **Item 0 — fixtures RLS (`7b71777`):** `tests/integration/test_rls_isolation.py` criava empresa sem `codigo_municipio_ibge` (NOT NULL desde a migration 0049) → 422 antes do 201/409. Corrigido: fixtures e POST duplicado enviam "3550308"; o INSERT cru de `test_with_check...` fornece o IBGE de propósito (única razão de falha = RLS WITH CHECK, não NOT NULL). **Integração: 24 passed** (era o único arquivo quebrado pelo IBGE).
+- **Gate de build do front (`4c442d7`):** descoberto que `next build` falhava para QUALQUER onda — o `tsconfig` incluía `tests/{a11y,visual}` + `playwright.config.ts` (tooling de QA da Onda 1.5, deps só na CI) no typecheck. Excluídos do build da app. **`next build` agora VERDE.**
+- **X7 — primitivas v2 (`d5a08fe`), `design-system`:** recalibração (não rebuild) das primitivas: botão 44px verde + press spring, `DataTable` (tabela→card mobile, NOVA), `RulerGauge` (assinatura nº2, irmão do Ruler intocado), `useCountUp`, `BottomTabBar` mobile fiada no layout. API preservada. Gate `reviewer`: **VERDE**. Ressalva → backlog motion-polish/D6: spring de entrada de dialog/sheet inerte por dívida pré-existente (`tailwindcss-animate` nunca registrado no Tailwind v4) — NÃO regressão.
+- **X8 — gabarito Notas (`0324de1`), `screen-implementer` + correções do orquestrador:** número-herói (faturamento do mês, useCountUp), 1 ação primária 44px, painel SEM crop marks (label Hanken no lugar de "Fig."), DataTable, Carimbo pós-ação já existia. Gate `reviewer`: **VERMELHO** — pegou um blocker real: o stretched-link da `DataTable` capturava o clique do dropdown DANFE/XML (desktop+mobile; no mobile o card era `<a>` com `<button>` aninhado). **Orquestrador corrigiu** a primitiva (flag `interactive`+`relative z-10`; mobile link vira irmão `absolute inset-0`; `getRowLabel` p/ a11y) + limpou nav redundante + baixou o piso do `clamp` do herói (estourava em 360–390px). **Verificação visual (Playwright @ :3000): blocker RESOLVIDO em ambos os layouts**, tab bar mobile + tabela→card + herói OK. Parecer pós-correção: **VERDE**.
+- **Lição operacional nova:** o **code-review (estático) não pega bugs de render** — o stretched-link×dropdown e o overflow do herói só apareceram na **verificação visual (Playwright)**. Para o gabarito (e telas que serão copiadas), rodar o browser vale o custo. Auth do front bate no **backend real :8000** (via `.env.local`, não mock) e o CORS só aceita **:3000**; um dev server em :3001 (porta fallback) é bloqueado por CORS no login. Use a instância :3000 para verificação visual (login demo: `demo`/`demo@arkan.dev`/`arkan1234`).
+- **Estado:** `main` @ `0324de1`, working tree limpo, **NÃO pushado** (ato do PO). Backlog do webhook (segurança + teste de integração) segue aberto, não tocado nesta onda.
+- **Próximo orquestrador → faça:** **Onda 3** = lotes de tela D4 (A/C/D/E) em PARALELO — a base já tem o design-system (X7) + o gabarito (X8), então worktrees de tela enxergam tudo. 1 worktree/lote, `screen-implementer` por lote imitando o gabarito Notas, `reviewer` (gates v2 + **verificação visual Playwright @ :3000**) por PR. Home v2 (número-herói + RulerGauge no monitor do teto do Simples). Ressalva de largura da coluna Contraparte (DataTable) a tunar quando os lotes adotarem. NFS-e Nacional no backend quando o PO credenciar o ADN.

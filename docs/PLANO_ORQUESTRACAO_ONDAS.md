@@ -81,8 +81,8 @@ Bloqueiam *transmissão real*, não o desenvolvimento: credenciamento **ADN** (N
 | **0 — Etapa 0** | recalibrar a frota de design v1 "Instrumento" → v2 "Arkan Claro" | ✅ feito (2026-06-17) |
 | **1** | F1 conteúdo (X1–X3) · F2 tokens v2 (X5–X6) · F3 webhook→Celery | ✅ feito |
 | **1.5** | validação profunda (gates frescos + integração + tooling QA no CI) | ✅ feito |
-| **2** | `X7 primitivas v2 → X8 gabarito Notas` (serial) · começar NFS-e Nacional (estrutura+golden mock; emissão real espera ADN) | 🔜 **próxima** |
-| **3** | lotes de tela v2 (X9–X13, paralelo, 1 worktree/lote — base já com design-system) · onboarding CNPJ (X15) · assistente real (X16) · monitores de limite (X17) | depende de Onda 2 |
+| **2** | `X7 primitivas v2 → X8 gabarito Notas` (serial) | ✅ X7→X8 feito (2026-06-18) · NFS-e Nacional NÃO iniciada (backend, paraleliza depois; espera ADN) |
+| **3** | lotes de tela v2 (X9–X13, paralelo, 1 worktree/lote — base já com design-system) · onboarding CNPJ (X15) · assistente real (X16) · monitores de limite (X17) | 🔜 **próxima** |
 | **4+** | eSocial real · orquestração Reinf→DCTFWeb (S5) · billing · brand pack · polish | conforme credenciais do PO |
 
 **Para a Onda 2 concretamente:** ela é o **gargalo serial** do front (não paralelizável até X8). Rode `design-system` (X7) → `screen-implementer` na tela **Notas** (X8, o gabarito de ouro), no **tree principal**, com `reviewer` (gates v2) entre cada. Só depois de X8 mergeado os lotes de tela explodem em paralelo (Onda 3).
