@@ -18,7 +18,7 @@ const SheetOverlay = React.forwardRef<
   <SheetPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-[var(--color-ink)]/45 backdrop-blur-[2px]",
+      "fixed inset-0 z-50 bg-[var(--color-ink)]/35 backdrop-blur-[2px]",
       "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
@@ -28,7 +28,8 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-[var(--color-card)] text-[var(--color-ink)] p-6 border-[var(--color-ink)] shadow-[0_24px_60px_-30px_rgba(27,26,21,0.45)] transition ease-in-out",
+  // Profundidade v2 = material plano + borda + overlay (sem sombra difusa).
+  "fixed z-50 gap-4 bg-[var(--color-card)] text-[var(--color-ink)] p-6 border-[var(--color-ink)] transition ease-in-out",
   {
     variants: {
       side: {

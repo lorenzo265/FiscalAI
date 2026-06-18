@@ -83,9 +83,11 @@ import {
   Framed,
   Fig,
   Ruler,
+  RulerGauge,
   BlueprintSchematic,
   Carimbo,
 } from "@/components/blueprint";
+import { useCountUp } from "@/lib/motion/use-count-up";
 
 import {
   reveal,
@@ -117,6 +119,16 @@ function Secao({
       </div>
       {children}
     </motion.section>
+  );
+}
+
+/* ── Número-herói demonstrando o hook useCountUp ───────────────────────── */
+function NumeroHeroiDemo() {
+  const n = useCountUp(847_320, { id: "showcase:hero" });
+  return (
+    <span className="mono text-5xl md:text-6xl font-light tabular-nums leading-none tracking-tight text-[var(--color-ink)]">
+      <Moeda valor={n} />
+    </span>
   );
 }
 
@@ -457,6 +469,21 @@ export default function ShowcasePage() {
                 <Ruler />
                 <Ruler majorEvery={4} gap={6} />
               </div>
+
+              {/* Régua de limites (assinatura nº 2) — preenchimento + projeção */}
+              <div className="flex flex-col gap-3">
+                <Fig n={11} titulo="Régua de limites · RulerGauge" size="sm" />
+                <Framed marks={false} surface="card">
+                  <RulerGauge
+                    label="Teto do Simples"
+                    valor={2_640_000}
+                    limite={3_600_000}
+                    projecao={3_200_000}
+                    projecaoLabel="no seu ritmo: outubro"
+                    valorLabel="73% usado"
+                  />
+                </Framed>
+              </div>
             </div>
           </div>
         </Secao>
@@ -502,6 +529,16 @@ export default function ShowcasePage() {
               </motion.div>
             </Framed>
           </div>
+
+          {/* Número-herói com useCountUp (v2 §4) — conta 1× por valor/sessão */}
+          <Framed marks={false} surface="card" className="flex flex-col gap-1">
+            <Fig n={13} titulo="Número-herói · useCountUp" size="sm" />
+            <NumeroHeroiDemo />
+            <span className="text-xs text-[var(--color-ink-2)]">
+              Mono light, conta da base até o valor em 600ms ease-out — só na
+              primeira vez por sessão.
+            </span>
+          </Framed>
 
           <p className="text-xs text-[var(--color-ink-2)] max-w-2xl">
             Receita C (line-mask) está no headline do topo · Receita D (draw-on)

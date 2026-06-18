@@ -5,4 +5,5 @@
 export * from "./variants";
 export { useReveal } from "./use-reveal";
 export { useReducedMotion } from "./use-reduced-motion";
+export { useCountUp } from "./use-count-up";
 export { LenisProvider } from "./lenis-provider";

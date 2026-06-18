@@ -24,11 +24,11 @@ const tons: Record<PillTom, { cls: string; icon: LucideIcon }> = {
     icon: CheckCircle2,
   },
   warn: {
-    cls: "bg-[var(--color-paper-2)] text-[var(--color-ochre)] border-[var(--color-ochre)]/35",
+    cls: "bg-[var(--color-ochre-wash)] text-[var(--color-ochre)] border-[var(--color-ochre)]/35",
     icon: AlertTriangle,
   },
   error: {
-    cls: "bg-[var(--color-paper-2)] text-[var(--color-danger)] border-[var(--color-danger)]/35",
+    cls: "bg-[var(--color-danger-wash)] text-[var(--color-danger)] border-[var(--color-danger)]/35",
     icon: XCircle,
   },
   info: {

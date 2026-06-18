@@ -5,6 +5,7 @@
 export { Framed } from "./framed";
 export { CropMarks } from "./crop-marks";
 export { Fig } from "./fig";
-export { Ruler } from "./ruler";
+export { Ruler, RulerGauge } from "./ruler";
+export type { RulerGaugeProps } from "./ruler";
 export { BlueprintSchematic } from "./blueprint-schematic";
 export { Carimbo } from "./carimbo";
