@@ -20,5 +20,7 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  // Tooling de QA (Playwright/axe, Onda 1.5) roda na CI com deps proprias; nao
+  // faz parte do build da app — fica fora do typecheck do `next build`.
+  "exclude": ["node_modules", "playwright.config.ts", "tests/visual", "tests/a11y"]
 }
