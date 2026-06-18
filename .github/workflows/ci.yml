@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backend-quality:
+    name: Backend — lint, types, golden + eval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analista-fiscal-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install deps
+        run: poetry install --with dev
+      - name: Ruff (lint)
+        run: poetry run ruff check .
+      - name: Mypy (strict)
+        run: poetry run mypy app/
+      - name: Bandit (security)
+        run: poetry run bandit -r app/ -c pyproject.toml
+      - name: Pytest — unit + eval (golden é a barreira)
+        run: poetry run python -m pytest tests/unit tests/eval --tb=short
+
+  backend-integration:
+    name: Backend — integração (RLS, DB real)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: analista-fiscal-api
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fiscal
+          POSTGRES_PASSWORD: fiscal
+          POSTGRES_DB: fiscal
+        ports: ["5434:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fiscal -d fiscal"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      ENVIRONMENT: local
+      DATABASE_URL: postgresql+asyncpg://fiscal:fiscal@localhost:5434/fiscal
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pipx install poetry
+      - run: poetry install --with dev
+      - name: Alembic upgrade head
+        run: poetry run alembic upgrade head
+      - name: Pytest — integração
+        run: poetry run python -m pytest tests/integration --tb=short
+
+  frontend:
+    name: Frontend — build + lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analista-fiscal-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Lint
+        run: npm run lint

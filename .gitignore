@@ -40,10 +40,13 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Claude local config — ignora tudo em .claude/ EXCETO os slash commands versionados
+# Claude local config — ignora tudo em .claude/ EXCETO os comandos e a FROTA de agentes
+# (versionados p/ portabilidade da orquestração; settings.json e worktrees seguem locais)
 .claude/*
 !.claude/commands/
 !.claude/commands/**
+!.claude/agents/
+!.claude/agents/**
 
 # Obsidian — config local do vault (workspace, painéis, hotkeys pessoais)
 # mantemos plugins/, snippets/, themes/ commitados se você quiser sincronizar entre máquinas
