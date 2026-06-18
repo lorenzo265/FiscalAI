@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { useFiscalSaude } from "@/hooks/use-fiscal-saude";
 import { formatarDataBR } from "@/lib/format/data";
 import { traduzirObrigacao } from "@/lib/traducao/obrigacoes";
@@ -40,7 +39,9 @@ export function ProximaObrigacaoCard() {
     <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <FileSignature className="size-4 text-[var(--color-ochre)]" aria-hidden />
-        <Fig n={2} titulo="Próxima obrigação" size="sm" />
+        <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+          Próxima obrigação
+        </span>
         <Pill tom="warn" semIcone>declaração</Pill>
       </div>
       {isLoading || !obrig || !traduzido ? (

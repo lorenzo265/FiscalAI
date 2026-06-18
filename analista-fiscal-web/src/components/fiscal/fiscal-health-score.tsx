@@ -15,7 +15,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { Pill, type PillTom } from "@/components/shared/pill";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -79,7 +78,7 @@ export function FiscalHealthScore() {
       animate="show"
       aria-label="Índice de Saúde Fiscal"
     >
-      <Framed marks tone="ink" surface="card" className="flex flex-col gap-5 md:gap-0 md:flex-row md:items-start">
+      <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-5 md:gap-0 md:flex-row md:items-start">
         {/* ── núcleo do score ── */}
         <motion.div
           className="flex items-center gap-5 md:gap-6"
@@ -102,12 +101,13 @@ export function FiscalHealthScore() {
               >
                 {data.score}
               </span>
-              {/* Fig. 01 no canto superior */}
+              {/* label discreta do quadrado — sem "Fig." (painel comum v2) */}
               <span
                 className="absolute top-1 left-1.5 mono text-[8px] uppercase tracking-[0.12em] font-semibold"
-                style={{ color: paleta.color, opacity: 0.7 }}
+                style={{ color: paleta.color, opacity: 0.55 }}
+                aria-hidden
               >
-                FIG.01
+                ISF
               </span>
             </div>
           </motion.div>
@@ -136,10 +136,10 @@ export function FiscalHealthScore() {
                 value={data.score}
                 tom={
                   data.tom === "ok"
-                    ? "lime"
+                    ? "green"
                     : data.tom === "warn"
-                      ? "amber"
-                      : "red"
+                      ? "ochre"
+                      : "danger"
                 }
               />
             </motion.div>

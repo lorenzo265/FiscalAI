@@ -10,7 +10,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { Ruler } from "@/components/blueprint/ruler";
 
 interface Atalho {
@@ -57,7 +56,9 @@ export function QuickActions() {
     <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
       {/* cabeçalho */}
       <div className="px-5 pt-4 pb-2">
-        <Fig n="A" titulo="Atalhos rápidos" size="sm" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+          Atalhos rápidos
+        </span>
       </div>
       <Ruler />
 

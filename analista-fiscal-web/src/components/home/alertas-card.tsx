@@ -5,7 +5,6 @@ import { AlertTriangle, ArrowRight, Bell, XCircle, Info } from "lucide-react";
 import { Pill } from "@/components/shared/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { useFiscalSaude } from "@/hooks/use-fiscal-saude";
 
 /** Uma ação por alerta — invariante §7. Ícone + cor + palavra por tom. */
@@ -38,7 +37,9 @@ export function AlertasCard() {
     <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Bell className="size-4 text-[var(--color-ink-2)]" aria-hidden />
-        <Fig n={3} titulo="Alertas" size="sm" />
+        <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+          Alertas
+        </span>
         <Pill tom="neutral">{alertas.length}</Pill>
       </div>
 

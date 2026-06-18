@@ -5,7 +5,6 @@ import { CalendarDays } from "lucide-react";
 import { Pill } from "@/components/shared/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { Ruler } from "@/components/blueprint/ruler";
 import { useAgenda } from "@/hooks/use-agenda";
 import { cn } from "@/lib/utils";
@@ -39,7 +38,9 @@ export function CalendarioMesCard() {
       {/* cabeçalho */}
       <div className="flex items-center gap-2 px-5 pt-4 pb-2">
         <CalendarDays className="size-4 text-[var(--color-ink-2)]" aria-hidden />
-        <Fig n={5} titulo={`Calendário fiscal · ${nomeMes(mes)} de ${ano}`} size="sm" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+          Calendário fiscal · {nomeMes(mes)} de {ano}
+        </span>
       </div>
       <Ruler />
 

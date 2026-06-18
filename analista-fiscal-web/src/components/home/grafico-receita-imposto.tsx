@@ -13,7 +13,6 @@ import {
 import { TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { Ruler } from "@/components/blueprint/ruler";
 import { useFiscalHistorico } from "@/hooks/use-fiscal-historico";
 import { formatarMoedaCompacta } from "@/lib/format/moeda";
@@ -33,7 +32,9 @@ export function GraficoReceitaImposto() {
       <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <TrendingUp className="size-4 text-[var(--color-green)]" aria-hidden />
-          <Fig n={6} titulo="Receita × imposto · últimos 6 meses" size="sm" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+            Receita × imposto · últimos 6 meses
+          </span>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-[var(--color-ink-2)]">
           <LegendaItem cor="var(--color-green)" texto="Receita" />
