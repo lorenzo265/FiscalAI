@@ -15,6 +15,11 @@ import { cn } from "@/lib/utils";
  * `paper-2`, sem borda nova. Dados em mono ficam por conta de cada coluna
  * (`mono: true` ou className), conforme o invariante "mono em todo dado".
  *
+ * **Conteúdo interativo dentro da linha** (menus, botões de ação, downloads):
+ * marque a coluna com `interactive: true`. Sem isso, o stretched-link da linha
+ * captura o clique e os controles ficam inacessíveis (regressão de função). A
+ * coluna interativa é içada acima do link (`relative z-10`) no desktop e no card.
+ *
  * Aditivo: não substitui as listas `<ul>`/`Framed` existentes. As telas que hoje
  * usam tabela crua (`<table>`) ou querem o padrão tabela↔card podem adotá-la.
  *
@@ -23,10 +28,12 @@ import { cn } from "@/lib/utils";
  *     data={contas}
  *     getRowKey={(c) => c.id}
  *     getRowHref={(c) => `/controles/${c.id}`}
+ *     getRowLabel={(c) => `Conta ${c.descricao}`}
  *     columns={[
  *       { id: "venc", header: "Vencimento", cell: (c) => <DataBR data={c.vencimento} />, mono: true },
  *       { id: "desc", header: "Descrição", cell: (c) => c.descricao, primary: true },
  *       { id: "valor", header: "Valor", cell: (c) => <Moeda valor={c.valor} />, align: "right", mono: true },
+ *       { id: "acoes", header: "", cell: (c) => <Menu/>, interactive: true },
  *     ]}
  *   />
  */
@@ -45,6 +52,11 @@ export interface DataTableColumn<T> {
   primary?: boolean;
   /** Esconde o rótulo no card mobile (ex.: a coluna primária). */
   hideLabelOnCard?: boolean;
+  /**
+   * A célula contém controles interativos (menus, botões, links de ação) que
+   * NÃO devem ser capturados pelo stretched-link da linha. Içada acima do link.
+   */
+  interactive?: boolean;
   /** Largura fixa da coluna (desktop), ex.: "8rem". */
   width?: string;
   /** className extra na célula. */
@@ -59,6 +71,11 @@ interface DataTableProps<T> {
   getRowHref?: (row: T) => string | undefined;
   /** Linha inteira clicável (mostra chevron). Ignorado se houver href. */
   onRowClick?: (row: T) => void;
+  /**
+   * Nome acessível da linha clicável (vira o `aria-label` do stretched-link).
+   * Importante no card mobile, onde o link não embrulha texto visível.
+   */
+  getRowLabel?: (row: T) => string;
   /** Rótulo acessível da tabela. */
   caption?: string;
   className?: string;
@@ -76,11 +93,15 @@ export function DataTable<T>({
   getRowKey,
   getRowHref,
   onRowClick,
+  getRowLabel,
   caption,
   className,
 }: DataTableProps<T>) {
-  const interactive = Boolean(getRowHref || onRowClick);
+  const rowClickable = Boolean(getRowHref || onRowClick);
   const primaryCol = columns.find((c) => c.primary) ?? columns[0];
+  // Coluna onde o stretched-link ancora (a 1ª não-interativa). Evita pendurar o
+  // link justamente na célula de ações.
+  const navColIndex = columns.findIndex((c) => !c.interactive);
 
   return (
     <div className={cn("w-full", className)}>
@@ -102,13 +123,14 @@ export function DataTable<T>({
                 {col.header}
               </th>
             ))}
-            {interactive ? <th className="w-10" aria-hidden /> : null}
+            {rowClickable ? <th className="w-10" aria-hidden /> : null}
           </tr>
         </thead>
         <tbody>
           {data.map((row, i) => {
             const href = getRowHref?.(row);
             const rowKey = getRowKey(row, i);
+            const label = getRowLabel?.(row);
             const handleClick = onRowClick ? () => onRowClick(row) : undefined;
             return (
               <tr
@@ -117,18 +139,19 @@ export function DataTable<T>({
                 className={cn(
                   "group/row",
                   // `relative` ancora o stretched-link (::after) à LINHA inteira
-                  href && "relative",
-                  interactive && "cursor-pointer hover:bg-[var(--color-paper-2)] transition-colors"
+                  rowClickable && "relative",
+                  rowClickable && "cursor-pointer hover:bg-[var(--color-paper-2)] transition-colors"
                 )}
                 style={{ borderBottom: "1px solid var(--color-rule)" }}
               >
                 {columns.map((col, ci) => {
                   const content = col.cell(row);
                   const cellInner =
-                    href && ci === 0 ? (
+                    href && ci === navColIndex ? (
                       // o link cobre a LINHA via ::after (stretched link)
                       <Link
                         href={href}
+                        aria-label={label}
                         className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-[var(--color-green)]/45 focus-visible:after:ring-inset"
                       >
                         {content}
@@ -142,6 +165,8 @@ export function DataTable<T>({
                       className={cn(
                         "px-4 py-3 align-middle text-[var(--color-ink)]",
                         col.mono && "mono tabular-nums",
+                        // controles interativos sobem acima do stretched-link
+                        col.interactive && "relative z-10",
                         alignClass(col.align),
                         col.className
                       )}
@@ -150,7 +175,7 @@ export function DataTable<T>({
                     </td>
                   );
                 })}
-                {interactive ? (
+                {rowClickable ? (
                   <td className="px-2 text-right align-middle">
                     <ChevronRight className="inline size-4 text-[var(--color-ink-3)] group-hover/row:text-[var(--color-ink-2)] transition-colors" />
                   </td>
@@ -166,20 +191,39 @@ export function DataTable<T>({
         {data.map((row, i) => {
           const href = getRowHref?.(row);
           const rowKey = getRowKey(row, i);
+          const label = getRowLabel?.(row);
           const handleClick = onRowClick ? () => onRowClick(row) : undefined;
 
-          const card = (
-            <div
+          return (
+            <li
+              key={rowKey}
               className={cn(
-                "rounded-[var(--radius-md)] border bg-[var(--color-card)] border-[var(--color-rule)] p-3 flex flex-col gap-2",
-                interactive && "transition-colors hover:bg-[var(--color-paper-2)]"
+                "relative rounded-[var(--radius-md)] border bg-[var(--color-card)] border-[var(--color-rule)] p-3 flex flex-col gap-2",
+                rowClickable && "transition-colors hover:bg-[var(--color-paper-2)]"
               )}
             >
+              {/* stretched-link IRMÃO do conteúdo (não o embrulha) — navega no que
+                  estiver em fluxo; controles interativos ficam acima dele (z-10). */}
+              {href ? (
+                <Link
+                  href={href}
+                  aria-label={label}
+                  className="absolute inset-0 rounded-[var(--radius-md)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/45"
+                />
+              ) : handleClick ? (
+                <button
+                  type="button"
+                  onClick={handleClick}
+                  aria-label={label}
+                  className="absolute inset-0 rounded-[var(--radius-md)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/45"
+                />
+              ) : null}
+
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 text-[var(--color-ink)] text-sm font-medium">
                   {primaryCol ? primaryCol.cell(row) : null}
                 </div>
-                {interactive ? (
+                {rowClickable ? (
                   <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-3)]" />
                 ) : null}
               </div>
@@ -187,7 +231,14 @@ export function DataTable<T>({
                 {columns
                   .filter((c) => c !== primaryCol)
                   .map((col) => (
-                    <div key={col.id} className="flex items-baseline justify-between gap-3">
+                    <div
+                      key={col.id}
+                      className={cn(
+                        "flex items-baseline justify-between gap-3",
+                        // controles interativos sobem acima do stretched-link
+                        col.interactive && "relative z-10"
+                      )}
+                    >
                       {!col.hideLabelOnCard ? (
                         <dt className="mono text-[10px] uppercase tracking-[0.1em] text-[var(--color-ink-2)] shrink-0">
                           {col.header}
@@ -205,22 +256,6 @@ export function DataTable<T>({
                     </div>
                   ))}
               </dl>
-            </div>
-          );
-
-          return (
-            <li key={rowKey}>
-              {href ? (
-                <Link href={href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/45 rounded-[var(--radius-md)]">
-                  {card}
-                </Link>
-              ) : handleClick ? (
-                <button type="button" onClick={handleClick} className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-green)]/45 rounded-[var(--radius-md)]">
-                  {card}
-                </button>
-              ) : (
-                card
-              )}
             </li>
           );
         })}
