@@ -34,7 +34,7 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 ---
 
 ## 📍 Estado atual (resumo — detalhe na última entrada do log)
-- **Branch viva:** `hardening-fiscal-2026-06` (contém tudo; **NÃO pushada**).
+- **Branch viva:** `main` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
 - **Backend:** roadmap 0–22 completo; em hardening + production-ready.
 - **Frontend:** identidade v2 "Arkan Claro"; Trilha A (conteúdo) + tokens v2 feitos.
 - **Próxima onda:** **Onda 2** — `X7 primitivas v2 → X8 gabarito Notas` (serial, tree principal).
@@ -52,3 +52,10 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 - **Estado:** `hardening-fiscal-2026-06` @ `549804d` tem TUDO. **NÃO pushado** (ato do PO). Pendências do PO preservadas no working tree, **não-commitadas**: IBGE (`empresa/cnpj.py`, `schemas.py`, `tabelas_admin/*`, `onboarding/passo-cnpj.tsx`), migration `0058` (INSS 2026) + `test_calcula_inss_2026`, frota (`.github/ci.yml`, `.mcp.json`, `.pre-commit-config.yaml`, `.claude/commands/*`), business (`docs/negocio/`, `docs/time_arkan.md`).
 - **Backlog aberto:** (1) **segurança do webhook** — rate limit no webhook público, cap de body, AES-256 de coluna (PII bancária), ADR do drain cross-tenant antes de ligar Celery real; (2) **teste de integração do webhook F3** (só há unit); (3) **fixtures RLS** (`test_rls_isolation.py`) quebrados porque criam empresa sem IBGE (agora obrigatório) — do workstream IBGE, urgente p/ a CI de integração.
 - **Próximo orquestrador → faça:** **Onda 2** = `X7 primitivas v2 → X8 gabarito Notas` (SERIAL, tree principal — worktree de tela só enxerga o design-system se ele estiver na base). `design-system` (X7) → `screen-implementer` (X8, Notas = gabarito de ouro), `reviewer` (gates v2) entre cada. Só após X8 mergeado os lotes de tela explodem em paralelo (Onda 3). NFS-e Nacional no backend quando o PO credenciar o ADN. Roadmap: `docs/PLANO_ORQUESTRACAO_ONDAS.md §4` + `docs/plano-experiencia-ux-v2.md`.
+
+### 2026-06-17 · orquestrador · fechamento: versiona infra + WIP, consolida na `main`
+- **Versionou a infra de orquestração** (fecha a lacuna de portabilidade detectada na auditoria): a frota `.claude/agents` (24 agentes) saiu do `.gitignore`; entraram `.mcp.json`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml`, os comandos slash, `docs/time_arkan.md`, `docs/negocio`. Varredura de segredos: só credenciais dev/localhost/CI (`postgres:postgres`, `fiscal:fiscal@localhost`) — nada de produção.
+- **Commitou o WIP de feature** antes solto no working tree: IBGE obrigatório (`empresa/cnpj.py`, `schemas`, `passo-cnpj`), `tabelas_admin/salario_minimo` + testes, migration `0058` (INSS 2026) + `test_calcula_inss_2026`. ⚠️ **~5 testes de `tests/integration/test_rls_isolation.py` ficam VERMELHOS** até os fixtures passarem o código IBGE — é o primeiro item a corrigir.
+- **Consolidou tudo na `main`** via fast-forward: `main` = `hardening-fiscal-2026-06` = `28df342`. Working tree limpo (nada solto). **NÃO pushado** (ato do PO).
+- **Resultado:** o próximo orquestrador agora retoma de **qualquer máquina** (frota + infra + handoffs todos versionados). A próxima onda continua a mesma: **Onda 2 (X7 → X8)**.
+- **Próximo orquestrador → faça:** (0) corrigir os fixtures RLS quebrados pelo IBGE; depois a Onda 2.
