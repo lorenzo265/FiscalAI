@@ -50,6 +50,9 @@ async def _criar_tenant_e_empresa(
             "cnpj": cnpj,
             "razao_social": f"Empresa {cnpj}",
             "regime_tributario": "simples_nacional",
+            # codigo_municipio_ibge é NOT NULL desde a migration 0049; omiti-lo
+            # resulta em 422 MunicipioIbgeAusente. "3550308" = São Paulo.
+            "codigo_municipio_ibge": "3550308",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -106,7 +109,13 @@ async def test_cnpj_duplicado_dentro_do_mesmo_tenant_retorna_409(
 
     resp = await live_client.post(
         "/v1/empresas",
-        json={"cnpj": CNPJ_EMPRESA_A, "razao_social": "Duplicada Ltda", "regime_tributario": "mei"},
+        json={
+            "cnpj": CNPJ_EMPRESA_A,
+            "razao_social": "Duplicada Ltda",
+            "regime_tributario": "mei",
+            # IBGE válido para passar da validação 422 e chegar no 409 (CNPJ duplicado).
+            "codigo_municipio_ibge": "3550308",
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 409
@@ -172,10 +181,14 @@ async def test_with_check_bloqueia_insert_cross_tenant(
         # deve falhar pela policy WITH CHECK do Postgres
         await set_tenant_id(session, tenant_id_a)
         with pytest.raises((IntegrityError, ProgrammingError)):
+            # codigo_municipio_ibge é fornecido (NOT NULL desde 0049) DE PROPÓSITO:
+            # assim a ÚNICA razão de a INSERT falhar é a policy RLS WITH CHECK
+            # (cross-tenant), não um NOT NULL violation que mascararia o teste.
             await session.execute(
                 text(
-                    "INSERT INTO empresa (tenant_id, cnpj, razao_social, regime_tributario, perfil_ui) "
-                    "VALUES (:tid, :cnpj, :rs, 'simples_nacional', 'sn_sem_funcionarios')"
+                    "INSERT INTO empresa "
+                    "(tenant_id, cnpj, razao_social, regime_tributario, perfil_ui, codigo_municipio_ibge) "
+                    "VALUES (:tid, :cnpj, :rs, 'simples_nacional', 'sn_sem_funcionarios', '3550308')"
                 ),
                 {
                     "tid": str(tenant_id_b),
