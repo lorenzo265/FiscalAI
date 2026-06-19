@@ -16,8 +16,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pill } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { FiscalSubnav } from "@/components/fiscal/fiscal-subnav";
 import { formatarMoeda, formatarMoedaCompacta } from "@/lib/format/moeda";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
@@ -116,6 +114,7 @@ export default function FiscalSimuladorPage() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-1"
       >
         <motion.span
           variants={itemVariants}
@@ -125,17 +124,10 @@ export default function FiscalSimuladorPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
-          Simulador de regime tributário
+          Simulador de regime
         </motion.h1>
-        <motion.p
-          variants={itemVariants}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Compare quanto sua empresa pagaria em cada regime — sem ter que
-          consultar tabela.
-        </motion.p>
       </motion.header>
 
       <FiscalSubnav />
@@ -143,11 +135,12 @@ export default function FiscalSimuladorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
         {/* ── painel de parâmetros ── */}
         <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden self-start">
-          <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+          <div className="flex items-center gap-2 px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
             <Calculator className="size-4 text-[var(--color-green)]" aria-hidden />
-            <Fig n={1} titulo="Parâmetros" size="sm" />
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Parâmetros
+            </h2>
           </div>
-          <Ruler />
 
           <div className="px-5 py-4 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -162,7 +155,7 @@ export default function FiscalSimuladorPage() {
                 className="mono"
               />
               <span
-                className="text-[11px] text-[var(--color-ink-3)] mono"
+                className="text-[11px] text-[var(--color-ink-2)] mono"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
                 {formatarMoeda(faturamento)}
@@ -240,11 +233,12 @@ export default function FiscalSimuladorPage() {
           </div>
 
           <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
-            <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+            <div className="flex items-center gap-2 px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
               <TrendingDown className="size-4 text-[var(--color-ink-2)]" aria-hidden />
-              <Fig n={2} titulo="Imposto anual estimado por regime" size="sm" />
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Imposto anual estimado por regime
+              </h2>
             </div>
-            <Ruler />
             <div className="h-64 px-3 py-3 -ml-2">
               <SimuladorBarChart pontos={dadosChart} cores={CORES_REGIME} />
             </div>

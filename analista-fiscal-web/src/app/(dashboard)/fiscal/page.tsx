@@ -18,14 +18,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { useApuracaoAtual } from "@/hooks/use-apuracao-atual";
 import { useFiscalHistorico } from "@/hooks/use-fiscal-historico";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { FiscalSubnav } from "@/components/fiscal/fiscal-subnav";
 import { formatarMoeda, formatarMoedaCompacta } from "@/lib/format/moeda";
 import { formatarDataBR } from "@/lib/format/data";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -61,9 +61,18 @@ export default function FiscalApuracaoPage() {
   const itemVariants = reduced ? staticVariants : revealChild;
   const pageReveal = reduced ? staticVariants : reveal;
 
+  /* ── número-herói: valorDAS do mês (resolve "quanto pago agora?") ── */
+  const valorDAS = apuracao.data?.valorDAS ?? 0;
+  const dasCentavos = Math.round(valorDAS * 100);
+  const heroRaw = useCountUp(dasCentavos, {
+    id: "fiscal:valorDAS",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   if (apuracao.isLoading) {
     return (
-      <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants}>
+      <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants} heroFormatado={heroFormatado} heroLoading>
         <LoadingState titulo="Carregando apuração do mês..." />
       </PageShell>
     );
@@ -71,7 +80,7 @@ export default function FiscalApuracaoPage() {
 
   if (apuracao.isError || !apuracao.data) {
     return (
-      <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants}>
+      <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants} heroFormatado={heroFormatado}>
         <ErrorState onTentarNovamente={() => void apuracao.refetch()} />
       </PageShell>
     );
@@ -83,20 +92,27 @@ export default function FiscalApuracaoPage() {
   const usoTeto = Math.min(100, (fat12 / data.tetoSimples) * 100);
 
   return (
-    <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants}>
+    <PageShell reduced={reduced} pageReveal={pageReveal} containerVariants={containerVariants} itemVariants={itemVariants} heroFormatado={heroFormatado} vencimento={data.vencimento} status={data.status}>
       {/* ── apuração principal ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
             <div className="flex items-center gap-2">
               <Receipt className="size-4 text-[var(--color-green)]" aria-hidden />
-              <Fig n={1} titulo={`Apuração de ${nomeMesAno(data.periodo.mes, data.periodo.ano)}`} size="sm" />
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Apuração de {nomeMesAno(data.periodo.mes, data.periodo.ano)}
+              </h2>
             </div>
-            <Pill tom={data.status === "pago" ? "ok" : "info"}>
-              {data.status === "pago" ? "pago" : "em aberto"}
-            </Pill>
+            <div className="flex items-center gap-2">
+              {data.status === "pago" ? (
+                <Carimbo tom="green" sub={data.vencimento ? formatarDataBR(data.vencimento) : undefined}>
+                  Pago
+                </Carimbo>
+              ) : (
+                <Pill tom="info">em aberto</Pill>
+              )}
+            </div>
           </div>
-          <Ruler />
 
           <div className="px-5 py-4 flex flex-col gap-5">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -149,14 +165,15 @@ export default function FiscalApuracaoPage() {
 
       {/* ── composição do DAS ── */}
       <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
-        <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+        <div className="flex items-center gap-2 px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
           <Gauge className="size-4 text-[var(--color-ink-2)]" aria-hidden />
-          <Fig n={2} titulo="Composição do DAS" size="sm" />
-          <span className="text-[11px] text-[var(--color-ink-3)] ml-2">
-            Quanto desses {formatarMoeda(data.valorDAS)} vai para cada tributo
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Composição do DAS
+          </h2>
+          <span className="text-[11px] text-[var(--color-ink-2)] ml-2">
+            como {formatarMoeda(data.valorDAS)} é distribuído entre tributos
           </span>
         </div>
-        <Ruler />
         <div className="px-5 py-4">
           <ComposicaoDonut composicao={data.composicao} total={data.valorDAS} />
         </div>
@@ -184,19 +201,20 @@ export default function FiscalApuracaoPage() {
 
       {/* ── histórico ── */}
       <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
-        <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2">
+        <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
           <div className="flex items-center gap-2">
             <TrendingUp className="size-4 text-[var(--color-green)]" aria-hidden />
-            <Fig n={3} titulo="Histórico · últimos 12 meses" size="sm" />
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Histórico · últimos 12 meses
+            </h2>
           </div>
-          <span className="text-[11px] text-[var(--color-ink-3)]">
-            Barra destacada = mês atual
+          <span className="text-[11px] text-[var(--color-ink-2)]">
+            barra destacada = mês atual
           </span>
         </div>
-        <Ruler />
 
         <div className="px-5 pb-4">
-          <div className="h-64 -ml-2 pt-2">
+          <div className="h-64 -ml-2 pt-4">
             {historico.isLoading ? (
               <Skeleton className="h-full w-full" />
             ) : (
@@ -208,9 +226,7 @@ export default function FiscalApuracaoPage() {
           </div>
         </div>
 
-        <Ruler />
-
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 border-t border-[var(--color-rule)]">
           <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5">
             {(historico.data ?? []).slice(-8).reverse().map((m) => {
               const atual =
@@ -225,10 +241,10 @@ export default function FiscalApuracaoPage() {
                   }}
                 >
                   <div className="flex flex-col">
-                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-[var(--color-ink-3)] font-bold">
+                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-[var(--color-ink-2)] font-bold">
                       {m.rotulo}/{String(m.ano).slice(2)}
                     </span>
-                    <span className="text-[10px] text-[var(--color-ink-3)]">
+                    <span className="text-[10px] text-[var(--color-ink-2)]" style={{ fontVariantNumeric: "tabular-nums" }}>
                       {formatarMoedaCompacta(m.receita)}
                     </span>
                   </div>
@@ -257,12 +273,20 @@ function PageShell({
   pageReveal,
   containerVariants,
   itemVariants,
+  heroFormatado,
+  heroLoading,
+  vencimento,
+  status,
 }: {
   children: React.ReactNode;
   reduced: boolean;
   pageReveal: Variants;
   containerVariants: Variants;
   itemVariants: Variants;
+  heroFormatado: string;
+  heroLoading?: boolean;
+  vencimento?: string;
+  status?: string;
 }) {
   return (
     <motion.div
@@ -271,30 +295,85 @@ function PageShell({
       initial="hidden"
       animate="show"
     >
+      {/* ── Bloco 1: cabeçalho + número-herói + ação primária ── */}
       <motion.header
         variants={containerVariants}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-4"
       >
-        <motion.span
-          variants={itemVariants}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Módulo · Fiscal
-        </motion.span>
-        <motion.h1
-          variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Sua apuração do mês
-        </motion.h1>
-        <motion.p
-          variants={itemVariants}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Tudo o que você precisa pagar e por quê — em uma tela só.
-        </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemVariants}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Módulo · Fiscal
+            </motion.span>
+            <motion.h1
+              variants={itemVariants}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Apuração do mês
+            </motion.h1>
+          </div>
+
+          {/* Ação primária — verde 44px */}
+          <motion.div variants={itemVariants} className="shrink-0 pt-5 md:pt-6">
+            <Button asChild size="default" className="h-11 px-5 gap-2">
+              <Link href="/fiscal/guias">
+                <Download className="size-4" aria-hidden />
+                Gerar guia DAS
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+
+        {/* número-herói: valor do DAS (resolve "quanto pago agora?") */}
+        <motion.div variants={itemVariants} className="flex flex-col gap-1">
+          {heroLoading ? (
+            <>
+              <Skeleton className="h-16 w-52" />
+              <Skeleton className="h-4 w-40 mt-1" />
+            </>
+          ) : (
+            <>
+              <span
+                className="mono leading-none text-[var(--color-ink)] whitespace-nowrap"
+                style={{
+                  fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                  fontWeight: 300,
+                  fontVariantNumeric: "tabular-nums",
+                  letterSpacing: "-0.02em",
+                }}
+                aria-label={`Valor do DAS: ${heroFormatado}`}
+              >
+                {heroFormatado}
+              </span>
+              <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+                imposto do mês (DAS)
+                {vencimento ? (
+                  <>
+                    {" · vence em "}
+                    <span
+                      className="mono font-semibold text-[var(--color-ink)]"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {formatarDataBR(vencimento)}
+                    </span>
+                  </>
+                ) : null}
+              </span>
+              {status === "pago" ? (
+                <span className="text-[11px] text-[var(--color-green)] font-semibold">
+                  Guia quitada
+                </span>
+              ) : null}
+            </>
+          )}
+        </motion.div>
       </motion.header>
+
       <FiscalSubnav />
       {children}
     </motion.div>

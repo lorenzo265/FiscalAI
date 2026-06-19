@@ -11,8 +11,6 @@ import {
 } from "lucide-react";
 import { Pill } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { FiscalSubnav } from "@/components/fiscal/fiscal-subnav";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import {
@@ -132,6 +130,7 @@ export default function FiscalReformaTributariaPage() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-1"
       >
         <motion.span
           variants={itemVariants}
@@ -141,17 +140,10 @@ export default function FiscalReformaTributariaPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Reforma tributária 2026–2033
         </motion.h1>
-        <motion.p
-          variants={itemVariants}
-          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
-        >
-          A maior mudança fiscal em 60 anos. Acompanhamos o calendário pra você
-          não ser pego de surpresa.
-        </motion.p>
       </motion.header>
 
       <FiscalSubnav />
@@ -183,10 +175,11 @@ export default function FiscalReformaTributariaPage() {
 
       {/* ── linha do tempo ── */}
       <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
-        <div className="flex items-center gap-2 px-5 pt-4 pb-2">
-          <Fig n={1} titulo="Linha do tempo da transição" size="sm" />
+        <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Linha do tempo da transição
+          </h2>
         </div>
-        <Ruler />
         <div className="px-5 py-4">
           <ol className="flex flex-col gap-0">
             {TIMELINE.map((m, i) => (
@@ -229,7 +222,9 @@ export default function FiscalReformaTributariaPage() {
         {/* ── impacto estimado ── */}
         <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-2">
-            <Fig n={2} titulo="Impacto estimado pra você" size="sm" />
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Impacto estimado pra você
+            </h2>
             <Pill
               tom={
                 tendencia === "sobe"
@@ -312,10 +307,11 @@ export default function FiscalReformaTributariaPage() {
 
         {/* ── comparativo antes × depois ── */}
         <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={3} titulo="Antes × depois" size="sm" />
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Antes × depois
+            </h2>
           </div>
-          <Ruler />
           <div className="overflow-x-auto px-5 py-4">
             <table className="w-full text-sm">
               <thead>

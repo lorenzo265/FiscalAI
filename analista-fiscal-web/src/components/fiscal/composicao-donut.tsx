@@ -93,7 +93,7 @@ export function ComposicaoDonut({ composicao, total }: Props) {
               {d.apelido}
             </span>
             <span
-              className="mono text-xs text-[var(--color-ink-3)]"
+              className="mono text-xs text-[var(--color-ink-2)]"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {(d.percentual * 100).toFixed(0)}%
