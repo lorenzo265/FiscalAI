@@ -80,7 +80,7 @@ export function ChatFlutuante() {
             style={{ borderColor: "var(--color-rule)" }}
           >
             <span className="text-[10px] mono uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-              Mock · respostas simuladas
+              Respostas com citação da fonte
             </span>
             <Button
               asChild
