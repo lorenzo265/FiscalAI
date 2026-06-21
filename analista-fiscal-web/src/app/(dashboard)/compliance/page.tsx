@@ -18,8 +18,6 @@ import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ComplianceSubnav } from "@/components/compliance/compliance-subnav";
 import {
@@ -83,7 +81,7 @@ export default function CompliancePage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Situação fiscal da empresa
         </motion.h1>
@@ -137,12 +135,13 @@ export default function CompliancePage() {
         </Alert>
       ) : null}
 
-      {/* ── Fig. 01 — Indicadores ── */}
-      <Framed marks tone="rule" surface="card" padded={false}>
-        <div className="px-5 pt-4 pb-2">
-          <Fig n={1} titulo="Indicadores de conformidade" size="sm" />
+      {/* ── Indicadores ── */}
+      <Framed marks={false} tone="rule" surface="card" padded={false}>
+        <div className="px-5 pt-4 pb-2 border-b" style={{ borderColor: "var(--color-rule)" }}>
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Indicadores de conformidade
+          </h2>
         </div>
-        <Ruler />
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x" style={{ borderColor: "var(--color-rule)" }}>
           <CardPainel
             icone={ShieldCheck}
@@ -193,10 +192,11 @@ export default function CompliancePage() {
       {/* ── certidões a renovar ── */}
       {certidoesProximas.length > 0 ? (
         <Framed marks={false} tone="rule" surface="card" padded={false}>
-          <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-            <Fig n={2} titulo="Certidões a renovar" size="sm" />
+          <div className="px-5 pt-4 pb-2 border-b flex items-center justify-between gap-2" style={{ borderColor: "var(--color-rule)" }}>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Certidões a renovar
+            </h2>
           </div>
-          <Ruler />
           <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {certidoesProximas.map((c) => (
               <LinhaCertidaoResumo key={c.id} certidao={c} />
@@ -281,7 +281,7 @@ function LinhaCertidaoResumo({ certidao }: { certidao: Certidao }) {
         <p className="text-sm font-semibold text-[var(--color-ink)] truncate">
           {TIPO_CERTIDAO_LABEL[certidao.tipo]}
         </p>
-        <p className="text-[11px] text-[var(--color-ink-3)] mono"
+        <p className="text-[11px] text-[var(--color-ink-2)] mono"
            style={{ fontVariantNumeric: "tabular-nums" }}>
           Vence em {formatarDataBR(certidao.vencimento)} · {dias} dia{dias === 1 ? "" : "s"}
         </p>

@@ -14,8 +14,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Pill, type PillTom } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { formatarDataHoraBR } from "@/lib/format/data";
@@ -152,7 +150,7 @@ export default function ConfiguracoesIntegracoesPage() {
         </motion.div>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight mt-1"
         >
           Integrações
         </motion.h1>
@@ -167,12 +165,13 @@ export default function ConfiguracoesIntegracoesPage() {
 
       <ConfiguracoesSubnav />
 
-      {/* Fig. 01 — lista de integrações */}
+      {/* lista de integrações */}
       <Framed marks={false} tone="rule" surface="card" padded={false}>
-        <div className="px-5 pt-4 pb-2">
-          <Fig n={1} titulo="Conexões disponíveis" size="sm" />
+        <div className="px-5 pt-4 pb-2 border-b" style={{ borderColor: "var(--color-rule)" }}>
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Conexões disponíveis
+          </h2>
         </div>
-        <Ruler />
         <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
           {INTEGRACOES.map((integ) => (
             <LinhaIntegracao
@@ -243,7 +242,7 @@ function LinhaIntegracao({
           {integ.descricao}
         </p>
         {bancosConectados != null && ligada ? (
-          <p className="text-[11px] text-[var(--color-ink-3)] mt-1.5 mono">
+          <p className="text-[11px] text-[var(--color-ink-2)] mt-1.5 mono">
             {bancosConectados} banco{bancosConectados === 1 ? "" : "s"}{" "}
             conectado{bancosConectados === 1 ? "" : "s"}
             {ultimaSync

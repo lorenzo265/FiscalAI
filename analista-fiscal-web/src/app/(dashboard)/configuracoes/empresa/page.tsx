@@ -23,7 +23,7 @@ export default function ConfiguracoesEmpresaPage() {
           <ArrowLeft className="size-3" />
           Configurações
         </Link>
-        <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1">
+        <h1 className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight mt-1">
           Dados da empresa
         </h1>
         <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">

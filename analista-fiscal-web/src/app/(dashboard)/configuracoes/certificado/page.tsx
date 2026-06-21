@@ -8,8 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { SubstituirCertificadoModal } from "@/components/configuracoes/substituir-certificado-modal";
@@ -44,7 +42,7 @@ export default function ConfiguracoesCertificadoPage() {
           <ArrowLeft className="size-3" />
           Configurações
         </Link>
-        <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1">
+        <h1 className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight mt-1">
           Certificado digital A1
         </h1>
         <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
@@ -86,12 +84,13 @@ export default function ConfiguracoesCertificadoPage() {
           </Framed>
         </>
       ) : (
-        <Framed marks tone="rule" surface="card" padded={false}>
-          {/* Fig. 01 — Certificado instalado */}
-          <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-            <Fig n={1} titulo="Certificado instalado" size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false}>
+          {/* cabeçalho do certificado */}
+          <div className="px-5 pt-4 pb-2 border-b flex items-center justify-between gap-2" style={{ borderColor: "var(--color-rule)" }}>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Certificado instalado
+            </h2>
           </div>
-          <Ruler />
 
           <div className="px-5 py-5 flex flex-col gap-5">
             <div className="flex items-start gap-4">

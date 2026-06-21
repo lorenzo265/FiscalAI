@@ -16,8 +16,6 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ComplianceSubnav } from "@/components/compliance/compliance-subnav";
 import { StatusCertidaoPill } from "@/components/compliance/status-certidao-pill";
@@ -64,7 +62,7 @@ export default function CertidoesPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Certidões negativas
         </motion.h1>
@@ -112,9 +110,9 @@ function CardCertidao({ certidao }: { certidao: Certidao }) {
   const ehVigente = certidao.status === "vigente";
 
   return (
-    <Framed marks tone="rule" surface="card" padded={false} className="flex flex-col">
+    <Framed marks={false} tone="rule" surface="card" padded={false} className="flex flex-col">
       {/* cabeçalho */}
-      <div className="px-5 pt-4 pb-2 flex items-start justify-between gap-2">
+      <div className="px-5 pt-4 pb-2 border-b flex items-start justify-between gap-2" style={{ borderColor: "var(--color-rule)" }}>
         <div className="flex items-center gap-2">
           <ShieldCheck
             className="size-4 shrink-0"
@@ -126,8 +124,6 @@ function CardCertidao({ certidao }: { certidao: Certidao }) {
         </div>
         <StatusCertidaoPill status={certidao.status} />
       </div>
-
-      <Ruler />
 
       <div className="px-5 py-4 flex flex-col gap-4 flex-1">
         <p className="text-xs text-[var(--color-ink-2)] leading-relaxed line-clamp-3">
@@ -166,7 +162,7 @@ function CardCertidao({ certidao }: { certidao: Certidao }) {
                   ? "var(--color-ochre)"
                   : certidao.status === "vencida"
                     ? "var(--color-danger)"
-                    : "var(--color-ink-3)",
+                    : "var(--color-ink-2)",
               fontVariantNumeric: "tabular-nums",
             }}
           >

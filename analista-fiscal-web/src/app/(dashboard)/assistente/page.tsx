@@ -7,7 +7,7 @@ export default function AssistentePage() {
         <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold">
           Assistente
         </span>
-        <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight">
+        <h1 className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight">
           Analista fiscal — sempre disponível
         </h1>
         <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">

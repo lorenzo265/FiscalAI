@@ -8,8 +8,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Moeda } from "@/components/shared/moeda";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ComplianceSubnav } from "@/components/compliance/compliance-subnav";
 import { useParcelamentos } from "@/hooks/use-compliance";
@@ -51,7 +49,7 @@ export default function ParcelamentosPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Parcelamentos fiscais
         </motion.h1>
@@ -82,10 +80,11 @@ export default function ParcelamentosPage() {
         </div>
       ) : (
         <Framed marks={false} tone="rule" surface="card" padded={false}>
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Parcelamentos ativos" size="sm" />
+          <div className="px-5 pt-4 pb-2 border-b" style={{ borderColor: "var(--color-rule)" }}>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Parcelamentos ativos
+            </h2>
           </div>
-          <Ruler />
           <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {data.map((p) => (
               <LinhaParcelamento key={p.id} parcelamento={p} />
@@ -113,7 +112,7 @@ function LinhaParcelamento({ parcelamento }: { parcelamento: Parcelamento }) {
             {parcelamento.assunto}
           </span>
         </div>
-        <p className="text-[11px] mono text-[var(--color-ink-3)] mt-1">
+        <p className="text-[11px] mono text-[var(--color-ink-2)] mt-1">
           {ORGAO_LABEL[parcelamento.orgao]} · <abbr title="Número do processo">Nº</abbr> {parcelamento.numero}
         </p>
         {/* barra de progresso */}
@@ -148,7 +147,7 @@ function LinhaParcelamento({ parcelamento }: { parcelamento: Parcelamento }) {
               style={{ fontVariantNumeric: "tabular-nums" }}>
           <Moeda valor={parcelamento.saldoDevedor} />
         </span>
-        <span className="text-[11px] text-[var(--color-ink-3)] mono"
+        <span className="text-[11px] text-[var(--color-ink-2)] mono"
               style={{ fontVariantNumeric: "tabular-nums" }}>
           Próxima {formatarDataBR(parcelamento.proximoVencimento)}
         </span>

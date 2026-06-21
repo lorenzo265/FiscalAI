@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { Framed } from "@/components/blueprint/framed";
-import { Ruler } from "@/components/blueprint/ruler";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { Moeda } from "@/components/shared/moeda";
@@ -143,7 +142,7 @@ export function PassoConclusao() {
         </Carimbo>
       </div>
 
-      <Ruler />
+      <div className="border-t" style={{ borderColor: "var(--color-rule)" }} />
 
       {/* resumo dos dados confirmados */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -171,7 +170,7 @@ export function PassoConclusao() {
         <Framed marks={false} tone="rule" surface="paper-2" padded>
           <div className="flex items-center gap-2 mb-3">
             <Pill tom="info">próximo DAS estimado</Pill>
-            <span className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]"
+            <span className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-ink-2)]"
                   style={{ fontVariantNumeric: "tabular-nums" }}>
               vence em {formatarDataBR(vencimento)}
             </span>

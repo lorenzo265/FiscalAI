@@ -18,8 +18,6 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ComplianceSubnav } from "@/components/compliance/compliance-subnav";
 import {
   useEnviarIntimacaoAoContador,
@@ -82,7 +80,7 @@ export default function IntimacoesPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Intimações fiscais
         </motion.h1>
@@ -110,10 +108,11 @@ export default function IntimacoesPage() {
         />
       ) : (
         <Framed marks={false} tone="rule" surface="card" padded={false}>
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Intimações recebidas" size="sm" />
+          <div className="px-5 pt-4 pb-2 border-b" style={{ borderColor: "var(--color-rule)" }}>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Intimações recebidas
+            </h2>
           </div>
-          <Ruler />
           <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {data.map((i) => (
               <LinhaIntimacao
@@ -171,7 +170,7 @@ function LinhaIntimacao({
         <span className="text-sm font-semibold text-[var(--color-ink)] truncate">
           {intimacao.assunto}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-3)] mono flex-wrap"
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap"
              style={{ fontVariantNumeric: "tabular-nums" }}>
           <span><abbr title="Número do protocolo">Protocolo</abbr> {intimacao.protocolo}</span>
           <span className="size-1 rounded-full bg-[var(--color-rule-2)]" aria-hidden />

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pill } from "@/components/shared/pill";
-import { Ruler } from "@/components/blueprint/ruler";
 import { validarCNPJ, apenasDigitos, formatarCNPJ } from "@/lib/format/cnpj";
 import { api, ApiError } from "@/lib/api-client";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
@@ -156,7 +155,7 @@ export function PassoCnpj() {
             <Pill tom="ok">{dados.situacao}</Pill>
           </div>
 
-          <Ruler />
+          <div className="border-t" style={{ borderColor: "var(--color-green)" }} />
 
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm px-5 pb-2">
             <ItemDl icone={<Building2 className="size-3.5" />} label="Atividade principal">

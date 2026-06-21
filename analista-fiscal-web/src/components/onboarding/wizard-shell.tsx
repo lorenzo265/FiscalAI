@@ -4,7 +4,6 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/layout/logo";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
 import { useOnboardingStore, ONBOARDING_TOTAL_PASSOS } from "@/lib/stores/onboarding-store";
 import {
   revealChild,
@@ -53,11 +52,13 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
       {/* indicadores de passo — quadrados técnicos em vez de pills */}
       <IndicadoresPassos passo={passo} total={ONBOARDING_TOTAL_PASSOS} />
 
-      {/* painel principal com linguagem Instrumento */}
+      {/* painel principal — tela de confirmação/assinatura do onboarding */}
       <Framed marks tone="rule" surface="card" padded={false}>
-        {/* Fig. rotulando o passo atual */}
+        {/* label de seção em Hanken — passo atual */}
         <div className="px-7 pt-5 pb-4 border-b" style={{ borderColor: "var(--color-rule)" }}>
-          <Fig n={passo} titulo={meta.fig} size="sm" />
+          <span className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            {meta.fig}
+          </span>
         </div>
 
         <div className="px-7 pt-5 pb-2">
@@ -97,15 +98,10 @@ function IndicadoresPassos({ passo, total }: { passo: number; total: number }) {
             key={n}
             className={cn(
               "h-1.5 flex-1 rounded-[var(--radius-sm)] transition-colors duration-300",
-              concluido && "bg-[var(--color-green)]",
+              concluido && "bg-[var(--color-green-deep)]",
               atual && "bg-[var(--color-green)]",
               futuro && "bg-[var(--color-rule)]"
             )}
-            style={
-              atual
-                ? { boxShadow: "0 0 8px rgba(19,106,65,0.35)" }
-                : undefined
-            }
             aria-label={`Passo ${n}${concluido ? " concluído" : atual ? " atual" : ""}`}
           />
         );

@@ -17,8 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { Pill } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { emailLogado } from "@/lib/auth";
 
@@ -61,7 +59,7 @@ export default function ConfiguracoesUsuariosPage() {
           <ArrowLeft className="size-3" />
           Configurações
         </Link>
-        <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight mt-1">
+        <h1 className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight mt-1">
           Usuários e acessos
         </h1>
         <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
@@ -72,16 +70,17 @@ export default function ConfiguracoesUsuariosPage() {
 
       <ConfiguracoesSubnav />
 
-      {/* Fig. 01 — usuários ativos */}
+      {/* usuários ativos */}
       <Framed marks={false} tone="rule" surface="card" padded={false}>
-        <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-          <Fig n={1} titulo="Usuários com acesso" size="sm" />
+        <div className="px-5 pt-4 pb-2 border-b flex items-center justify-between gap-2" style={{ borderColor: "var(--color-rule)" }}>
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Usuários com acesso
+          </h2>
           <Button onClick={() => setConvidando(true)} size="sm">
             <UserPlus className="size-4" />
             Convidar
           </Button>
         </div>
-        <Ruler />
         <ul>
           <li className="flex items-center gap-4 px-5 py-4">
             {/* avatar em quadrado técnico */}
@@ -104,7 +103,7 @@ export default function ConfiguracoesUsuariosPage() {
                   <span className="flex items-center gap-1">você</span>
                 </Pill>
               </div>
-              <p className="text-xs text-[var(--color-ink-3)] mono mt-0.5">
+              <p className="text-xs text-[var(--color-ink-2)] mono mt-0.5">
                 Administrador · acesso total
               </p>
             </div>

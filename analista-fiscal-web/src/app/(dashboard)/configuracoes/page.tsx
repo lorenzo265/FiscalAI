@@ -13,8 +13,6 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Pill, type PillTom } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { ResetDemoButton } from "@/components/configuracoes/reset-demo-button";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
@@ -118,7 +116,7 @@ export default function ConfiguracoesPage() {
         </motion.span>
         <motion.h1
           variants={itemVariants}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+          className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
         >
           Ajustes da conta
         </motion.h1>

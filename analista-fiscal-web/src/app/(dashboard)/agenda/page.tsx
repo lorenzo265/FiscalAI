@@ -11,8 +11,6 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { CalendarioMes } from "@/components/agenda/calendario-mes";
 import {
   COR_STATUS_AGENDA,
@@ -125,7 +123,7 @@ export default function AgendaPage() {
           <span className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block">
             Agenda
           </span>
-          <h1 className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight">
+          <h1 className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight">
             Calendário fiscal
           </h1>
           <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
@@ -231,12 +229,13 @@ export default function AgendaPage() {
           )}
         </div>
 
-        {/* Fig. 01 — próximos vencimentos */}
+        {/* próximos vencimentos */}
         <Framed marks={false} tone="rule" surface="card" padded={false} className="self-start">
-          <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-            <Fig n={1} titulo="Próximos vencimentos" size="sm" />
+          <div className="px-5 pt-4 pb-2 border-b flex items-center justify-between gap-2" style={{ borderColor: "var(--color-rule)" }}>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Próximos vencimentos
+            </h2>
           </div>
-          <Ruler />
           <div className="p-4">
             {proximos7.length === 0 ? (
               <EmptyState
@@ -302,7 +301,7 @@ function LinhaProximo({ evento }: { evento: EventoAgenda }) {
         </span>
         {/* urgência em 3 níveis */}
         <span className="text-[11px] mono" style={{ fontVariantNumeric: "tabular-nums" }}>
-          <span style={{ color: "var(--color-ink-3)" }}>
+          <span style={{ color: "var(--color-ink-2)" }}>
             {formatarDataBR(evento.data)} ·{" "}
           </span>
           <span
