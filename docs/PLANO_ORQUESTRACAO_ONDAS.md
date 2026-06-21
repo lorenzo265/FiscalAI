@@ -82,7 +82,7 @@ Bloqueiam *transmissão real*, não o desenvolvimento: credenciamento **ADN** (N
 | **1** | F1 conteúdo (X1–X3) · F2 tokens v2 (X5–X6) · F3 webhook→Celery | ✅ feito |
 | **1.5** | validação profunda (gates frescos + integração + tooling QA no CI) | ✅ feito |
 | **2** | `X7 primitivas v2 → X8 gabarito Notas` (serial) | ✅ X7→X8 feito (2026-06-18) · NFS-e Nacional NÃO iniciada (backend, paraleliza depois; espera ADN) |
-| **3** | lotes de tela v2 (X9–X13, paralelo, 1 worktree/lote — base já com design-system) · onboarding CNPJ (X15) · assistente real (X16) · monitores de limite (X17) | 🔜 **próxima** |
-| **4+** | eSocial real · orquestração Reinf→DCTFWeb (S5) · billing · brand pack · polish | conforme credenciais do PO |
+| **3 — D4** | telas v2: home (X9) + lotes A/C/D/E (X10–X13) — **SERIAL** no tree principal (não paralelo: validação é serial), `reviewer`+visual por lote | ✅ feito (2026-06-20) · `next build` 48/48 |
+| **4** | X15 onboarding CNPJ-first (lógica) · X16 assistente real (backend) · X17 monitores de limite · X18 brand pack · X19 motion polish (D6) · X14 "fechar o mês" (backend S5) | conforme credenciais/backends do PO |
 
-**Para a Onda 2 concretamente:** ela é o **gargalo serial** do front (não paralelizável até X8). Rode `design-system` (X7) → `screen-implementer` na tela **Notas** (X8, o gabarito de ouro), no **tree principal**, com `reviewer` (gates v2) entre cada. Só depois de X8 mergeado os lotes de tela explodem em paralelo (Onda 3).
+**Lição de execução (Ondas 2–3):** a frase acima ("explodem em paralelo") foi **revista na prática**. Com subagentes **write-only** + validação **serial** (1 dev server, login só em :3000 por CORS, sem `next build` com dev vivo, worktree do harness nasce de base antiga sem o design-system), o paralelismo de telas **não compensa** — o gargalo é a validação, não a escrita. **Rode 1 agente focado por lote, EM SÉRIE**, cada um validado (tsc + verificação visual Playwright @ :3000 + `reviewer` de contexto fresco) e commitado antes do próximo. Detalhe e incidentes no `HANDOFF-ORQUESTRADOR`.
