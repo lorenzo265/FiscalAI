@@ -4,7 +4,7 @@
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
 **Branch:** `fix/auditoria-onda-c` (Onda A+B já em `main` via fast-forward; não pushado)
-**Suite atual:** **2668 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Suite atual:** **2681 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
@@ -21,7 +21,7 @@ Corrigidos (golden de borda em todos):
 - **A6 — parcelamento em dia útil** (`parcelamentos/calcula_parcelamento.py` v2→v3): vencimento de parcela posterga sáb/dom/feriado p/ o próximo dia útil (reusa `_proximo_dia_util` da agenda). ≠ FGTS (que antecipa).
 - **A4 — imobilizado taxa×vida coerência** (`imobilizado/service.py`): taxa e vida útil informadas juntas têm de ser coerentes (`taxa ≈ 12/vida`, tolerância 0.5pp); incoerência → rejeita; vida é a grandeza primária (taxa re-derivada p/ ficha=cálculo). IN SRF 162/1998.
 
-**A3 (Documentos — reconciliação ICMSTot×itens + CST×CSOSN + CFOP/NCM cabeçalho) REVERTIDA:** a 1ª tentativa veio com fixtures XML malformadas (declaração fora do offset 0 — 18 testes próprios nunca rodaram) e abordagem **hard-reject** que rejeitaria notas reais (a reconciliação comparou Σitens vs **vNF**, que inclui desconto/frete — falso-positivo; e rejeitava CST em emitente do Simples). **Refazer com:** reconciliar Σitens vs **vProd** (não vNF); CFOP/NCM cabeçalho → None se malformado (lenient); CST×CSOSN como **flag não-bloqueante**, não rejeição. `[follow-up Onda C.2]`.
+- **A3 — reconciliação NF + CFOP/NCM cabeçalho + CST×CSOSN** (`ingestao/parser.py`): **2ª tentativa, agora correta** (a 1ª foi revertida — fixtures XML malformadas + hard-reject que rejeitaria notas reais comparando Σitens vs vNF). Versão final: reconcilia **Σ(itens) vs ICMSTot.vProd** (não vNF — golden prova que nota com desconto vNF<vProd é aceita), tolerância R$0,02, mensagem traduzida; pula quando vProd ausente (retrocompat). CFOP/NCM do cabeçalho → None se malformado (lenient, não rejeita). CST×CSOSN incoerente com o CRT → **log structlog não-bloqueante** (`ingestao.cst_csosn_incoerente`), não rejeição.
 
 ---
 

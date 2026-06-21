@@ -10,6 +10,10 @@ Sprint 18 PR1: ``parse_xml_nfe`` passa a popular ``NFeData.itens`` lendo
 ``<det>`` em sequência (pendência #26 resolvida). Campos agregados do
 cabeçalho permanecem para retrocompat — quem só precisa do total da NF
 não muda nada; quem precisa de granularidade lê ``itens``.
+
+Auditoria Onda C: reconciliação Σ(itens.vProd) vs ICMSTot.vProd (quando
+presente). Cabeçalho CFOP/NCM normalizado com mesma validação de formato
+que ``_parse_item``. CST×CSOSN vs CRT: log de aviso não-bloqueante.
 """
 
 from __future__ import annotations
@@ -22,8 +26,10 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 import defusedxml.ElementTree as ET
+import structlog
 
 _NS = "http://www.portalfiscal.inf.br/nfe"
+_log = structlog.get_logger(__name__)
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 TipoDocumento = Literal["nfe", "nfce"]
@@ -336,11 +342,56 @@ def parse_xml_nfe(xml_bytes: bytes) -> NFeData:
     valor_cofins = _decimal(_find_text(icms_tot, "vCOFINS") if icms_tot is not None else "0")
 
     # ── Itens (Sprint 18 PR1) ──────────────────────────────────────────────
+    # CRT do emitente — usado na Tarefa 3 para log de aviso CST×CSOSN.
+    # crt_raw já foi capturado acima; aqui apenas reutilizamos crt.
     itens: list[NFeItem] = []
     for det in inf_nfe.findall(_t("det")):
         item = _parse_item(det)
         if item is not None:
+            # Tarefa 3 — CST×CSOSN vs CRT: log de aviso NÃO-BLOQUEANTE.
+            # CRT 1/2 (Simples Nacional) deve usar CSOSN (3 dígitos: 1xx).
+            # CRT 3 (Regime Normal) deve usar CST (2 dígitos: 0x-9x).
+            # Quando incoerente, registramos aviso e seguimos o parse normalmente.
+            if item.cst_icms is not None and crt is not None:
+                csosn_esperado = crt in ("1", "2")
+                # CSOSN: 3 dígitos começando em 1xx (ex.: 101, 102, 201, 300, 400, 500, 900)
+                eh_csosn = len(item.cst_icms) == 3
+                if csosn_esperado and not eh_csosn:
+                    _log.warning(
+                        "ingestao.cst_csosn_incoerente",
+                        n_item=item.n_item,
+                        crt=crt,
+                        codigo=item.cst_icms,
+                        motivo="CRT Simples Nacional mas item usa CST (2 dígitos) em vez de CSOSN",
+                    )
+                elif not csosn_esperado and eh_csosn:
+                    _log.warning(
+                        "ingestao.cst_csosn_incoerente",
+                        n_item=item.n_item,
+                        crt=crt,
+                        codigo=item.cst_icms,
+                        motivo="CRT Regime Normal mas item usa CSOSN (3 dígitos) em vez de CST",
+                    )
             itens.append(item)
+
+    # Tarefa 1 — Reconciliação Σ(itens.vProd) vs ICMSTot.vProd.
+    # Só valida se: (a) o campo vProd está presente no ICMSTot (não-vazio)
+    # e (b) há pelo menos 1 item parseado. Usa _decimal_opt para distinguir
+    # "campo ausente" de "campo presente com valor 0,00". NÃO compara contra
+    # vNF — vNF inclui desconto/frete e geraria falso-positivo em notas legítimas.
+    valor_produtos_tot: Decimal | None = None
+    if icms_tot is not None:
+        valor_produtos_tot = _decimal_opt(_find_text(icms_tot, "vProd"))
+    if valor_produtos_tot is not None and itens:
+        soma_itens = sum(it.valor_total for it in itens)
+        diferenca = abs(soma_itens - valor_produtos_tot)
+        _TOLERANCIA = Decimal("0.02")
+        if diferenca > _TOLERANCIA:
+            raise XmlNFeInvalido(
+                f"O total dos itens (R$ {soma_itens}) não confere com o total de "
+                f"produtos declarado na nota (R$ {valor_produtos_tot}). "
+                f"Diferença de R$ {diferenca} excede a tolerância de R$ {_TOLERANCIA}."
+            )
 
     # Cabeçalho — agregados do primeiro item para retrocompat.
     primeiro_det: StdET.Element | None = inf_nfe.find(_t("det"))
@@ -348,10 +399,12 @@ def parse_xml_nfe(xml_bytes: bytes) -> NFeData:
     ncm: str | None = None
     cclasstrib: str | None = None
     if primeiro_det is not None:
+        # Tarefa 2 — validação de formato (igual a _parse_item): CFOP 4 dígitos
+        # numéricos; NCM 8 dígitos numéricos. Malformado → None, sem exceção.
         cfop_raw = _find_text(primeiro_det, "prod", "CFOP")
         ncm_raw = _find_text(primeiro_det, "prod", "NCM")
-        cfop = cfop_raw if cfop_raw else None
-        ncm = ncm_raw if ncm_raw else None
+        cfop = cfop_raw if cfop_raw and cfop_raw.isdigit() and len(cfop_raw) == 4 else None
+        ncm = ncm_raw if ncm_raw and ncm_raw.isdigit() and len(ncm_raw) == 8 else None
         # ── Reforma Tributária — cClassTrib (NF-e 4.x extensão IBSCBS) ────
         # Caminho canônico: <det><imposto><IBSCBS><cClassTrib>. Ausência é
         # esperada em NF-e 4.0 — fallback silencioso para None.
