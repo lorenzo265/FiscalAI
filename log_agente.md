@@ -3,11 +3,25 @@
 **Última atualização:** 2026-06-21
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
-**Branch:** `fix/auditoria-fiscal-2026-06` (a partir de `main`)
-**Suite atual:** **2617 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Branch:** `fix/auditoria-onda-c` (Onda A+B já em `main` via fast-forward; não pushado)
+**Suite atual:** **2668 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
+
+---
+
+## Auditoria Fiscal 2026-06-21 — Onda C (🟠 graves) · branch `fix/auditoria-onda-c`
+
+Onda A+B consolidadas em `main` (fast-forward local, `095cbd4`, **não pushado**). Onda C ataca os 🟠 do auto de infração, mesmo método (4 implementadores write-only → orquestrador valida → commita). **Suite: 2668 passed, 3 skipped. mypy strict ✅.**
+
+Corrigidos (golden de borda em todos):
+- **A7 — Simples fora da Reforma 2026** (`reforma/calcula_cbs_ibs.py` v1→v2 + `integrar_documento.py` + `service.py`): guard `regime_excluido_fase_teste` — SN/MEI em 2026 NÃO recebem destaque CBS/IBS (LC 214/2025 art. 41-42); backfill pula SN no ano 2026; 2027+ destaca normal. `valor_total`/`valor_impostos` nunca somam CBS/IBS.
+- **A1 — RBT12 proporcionalização início de atividade** (`fiscal/calcula_das.py` v3→v4 + schemas/service/router/snapshots): empresa nova (RBT12=0) com `receita_acumulada` + `meses_atividade` → `RBT12_prop = (acumulada/meses)×12` e alíquota EFETIVA (Res. CGSN 140/2018 art. 18 §§2-3); caminho legado preservado. Golden antigo `anexo_I_rbt12_zero` (fixava o bug) corrigido p/ o caso proporcionalizado (DAS R$ 673,00).
+- **A6 — parcelamento em dia útil** (`parcelamentos/calcula_parcelamento.py` v2→v3): vencimento de parcela posterga sáb/dom/feriado p/ o próximo dia útil (reusa `_proximo_dia_util` da agenda). ≠ FGTS (que antecipa).
+- **A4 — imobilizado taxa×vida coerência** (`imobilizado/service.py`): taxa e vida útil informadas juntas têm de ser coerentes (`taxa ≈ 12/vida`, tolerância 0.5pp); incoerência → rejeita; vida é a grandeza primária (taxa re-derivada p/ ficha=cálculo). IN SRF 162/1998.
+
+**A3 (Documentos — reconciliação ICMSTot×itens + CST×CSOSN + CFOP/NCM cabeçalho) REVERTIDA:** a 1ª tentativa veio com fixtures XML malformadas (declaração fora do offset 0 — 18 testes próprios nunca rodaram) e abordagem **hard-reject** que rejeitaria notas reais (a reconciliação comparou Σitens vs **vNF**, que inclui desconto/frete — falso-positivo; e rejeitava CST em emitente do Simples). **Refazer com:** reconciliar Σitens vs **vProd** (não vNF); CFOP/NCM cabeçalho → None se malformado (lenient); CST×CSOSN como **flag não-bloqueante**, não rejeição. `[follow-up Onda C.2]`.
 
 ---
 

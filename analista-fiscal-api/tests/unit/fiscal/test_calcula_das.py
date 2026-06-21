@@ -20,6 +20,7 @@ import pytest
 
 from app.modules.fiscal.calcula_das import (
     FaixaDAS,
+    _calcular_rbt12_proporcionalizado,
     calcular_das,
     calcular_das_multi_anexo,
     resolver_anexo_fator_r,
@@ -56,11 +57,18 @@ def test_calcula_das_golden(nome: str, caso: dict) -> None:  # type: ignore[type
     exp = caso["expected"]
 
     faixas = _faixas_from_json(inp["faixas"])
+
+    # Campos opcionais v4: proporcionalização empresa nova
+    receita_acumulada = Decimal(inp["receita_acumulada"]) if "receita_acumulada" in inp else None
+    meses_atividade: int | None = inp.get("meses_atividade")
+
     resultado = calcular_das(
         rbt12=Decimal(inp["rbt12"]),
         receita_mes=Decimal(inp["receita_mes"]),
         faixas=faixas,
         anexo=inp.get("anexo", "I"),
+        receita_acumulada=receita_acumulada,
+        meses_atividade=meses_atividade,
     )
 
     assert resultado.faixa == exp["faixa"], (
@@ -237,7 +245,7 @@ def test_single_anexo_preserva_receitas_por_anexo() -> None:
         anexo="I",
     )
     assert resultado.receitas_por_anexo == {"I": Decimal("40000.00")}
-    assert resultado.algoritmo_versao == "sn.das.v3"
+    assert resultado.algoritmo_versao == "sn.das.v4"
 
 
 def test_multi_anexo_soma_dois_anexos() -> None:
@@ -262,7 +270,7 @@ def test_multi_anexo_soma_dois_anexos() -> None:
         "I": Decimal("10000"),
         "III": Decimal("5000"),
     }
-    assert resultado.algoritmo_versao == "sn.das.v3"
+    assert resultado.algoritmo_versao == "sn.das.v4"
 
 
 def test_multi_anexo_fator_r_alterna_iii_para_v() -> None:
@@ -402,6 +410,171 @@ def test_fator_r_2799_vai_para_anexo_v() -> None:
     fator_r = massa_salarial_12m / rbt12
     assert fator_r < Decimal("0.28"), f"Setup inválido: fator_r={fator_r}"
     assert resolver_anexo_fator_r("III", fator_r) == "V"
+
+
+# ── v4: proporcionalização RBT12 empresa nova (Res. CGSN 140/2018 art. 18 §§2º-3º) ──
+#
+# ACHADO 🟠 — auditoria onda-c 2026-06-21.
+# Empresa nova (< 12 meses) não tem RBT12 histórico. A lei exige proporcionalizar:
+#   1º mês: RBT12_prop = receita_mes × 12.
+#   meses 2-11: RBT12_prop = (receita_acumulada / meses_atividade) × 12.
+# O DAS usa ALÍQUOTA EFETIVA sobre o RBT12_prop — NÃO a nominal pura da faixa 1.
+
+
+def test_proporcionaliza_rbt12_primeiro_mes() -> None:
+    """1º mês de atividade: RBT12_prop = receita × 12.
+
+    receita_mes = R$16.000 → RBT12_prop = R$192.000 (Faixa 2, não Faixa 1).
+    alíq efetiva = (192000 × 7,30% − 5940) / 192000 = 8076/192000 = 4,2062500%.
+    DAS = 16000 × 0,042062500 = R$673,00.
+    Sem proporcionalização (rbt12=0, caminho legado) seria R$640,00 (faixa 1, 4%).
+    """
+    resultado = calcular_das(
+        rbt12=Decimal("0.00"),
+        receita_mes=Decimal("16000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=Decimal("16000.00"),
+        meses_atividade=1,
+    )
+    assert resultado.faixa == 2, f"esperado faixa 2, obtido {resultado.faixa}"
+    assert resultado.aliquota_efetiva == Decimal("0.0421")
+    assert resultado.valor == Decimal("673.00")
+    assert resultado.rbt12_proporcionalizado == Decimal("192000.00")
+    assert resultado.rbt12_usado == Decimal("192000.00")
+
+
+def test_proporcionaliza_rbt12_terceiro_mes() -> None:
+    """3º mês de atividade: RBT12_prop = (receita_acumulada / 3) × 12.
+
+    receita_acumulada = R$73.000 (meses: 20k+25k+28k); meses = 3.
+    RBT12_prop = (73000/3) × 12 = R$292.000 (Faixa 2).
+    alíq efetiva = (292000×7,30%−5940)/292000 = 15376/292000 = 5,265753...%.
+    quantize 4 casas ROUND_HALF_EVEN → 5,27%.
+    DAS = 28000 × (15376/292000) = R$1.474,41.
+    """
+    resultado = calcular_das(
+        rbt12=Decimal("0.00"),
+        receita_mes=Decimal("28000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=Decimal("73000.00"),
+        meses_atividade=3,
+    )
+    assert resultado.faixa == 2
+    assert resultado.aliquota_efetiva == Decimal("0.0527")
+    assert resultado.valor == Decimal("1474.41")
+    assert resultado.rbt12_proporcionalizado == Decimal("292000.00")
+
+
+def test_proporcionaliza_rbt12_eleva_para_faixa_4() -> None:
+    """Empresa no 1º mês com receita R$65k → RBT12_prop = R$780k → Faixa 4.
+
+    Sem proporcionalização: faixa 1 (4% nominal), DAS = R$2.600.
+    Com proporcionalização: RBT12_prop = 65000×12 = 780000 (> 720000 = topo faixa 3
+    → faixa 4, rbt12_ate = 1.800.000).
+    alíq efetiva = (780000×10,70%−22500)/780000 = (83460−22500)/780000
+      = 60960/780000 = 7,8153846...% → 7,82%.
+    DAS = 65000 × (60960/780000) = R$5.080,00.
+
+    Verificação: 60960/780000 = 0,07815384615... → 5ª casa = 8 > 5 → 0,0782.
+    65000 × 0,07815384615... = 5079,999... → arredonda para R$5.080,00.
+    """
+    resultado = calcular_das(
+        rbt12=Decimal("0.00"),
+        receita_mes=Decimal("65000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=Decimal("65000.00"),
+        meses_atividade=1,
+    )
+    assert resultado.faixa == 4
+    assert resultado.aliquota_efetiva == Decimal("0.0782")
+    assert resultado.valor == Decimal("5080.00")
+    assert resultado.rbt12_proporcionalizado is not None
+
+
+def test_proporcionaliza_sem_meses_atividade_usa_ramo_legado() -> None:
+    """Quando meses_atividade é None mas receita_acumulada fornecida: ignora proporcionalização.
+
+    A função exige AMBOS os parâmetros para ativar o ramo de proporcionalização.
+    Com apenas receita_acumulada, cai no ramo legado (rbt12=0 → alíquota nominal faixa 1).
+    """
+    resultado = calcular_das(
+        rbt12=Decimal("0.00"),
+        receita_mes=Decimal("16000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=Decimal("16000.00"),
+        meses_atividade=None,  # não fornecido
+    )
+    # Ramo legado: faixa 1, 4% nominal
+    assert resultado.faixa == 1
+    assert resultado.aliquota_efetiva == Decimal("0.0400")
+    assert resultado.rbt12_proporcionalizado is None
+
+
+def test_proporcionaliza_sem_receita_acumulada_usa_ramo_legado() -> None:
+    """Quando receita_acumulada é None mas meses_atividade fornecido: ignora proporcionalização."""
+    resultado = calcular_das(
+        rbt12=Decimal("0.00"),
+        receita_mes=Decimal("16000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=None,
+        meses_atividade=1,
+    )
+    assert resultado.faixa == 1
+    assert resultado.rbt12_proporcionalizado is None
+
+
+def test_proporcionaliza_ignora_quando_rbt12_positivo() -> None:
+    """Se rbt12 > 0 (empresa já tem histórico), ignora receita_acumulada/meses_atividade.
+
+    O RBT12 real prevalece sobre o proporcionalizado.
+    """
+    resultado = calcular_das(
+        rbt12=Decimal("100000.00"),  # RBT12 real disponível
+        receita_mes=Decimal("16000.00"),
+        faixas=_FAIXAS_I,
+        receita_acumulada=Decimal("16000.00"),
+        meses_atividade=1,
+    )
+    assert resultado.faixa == 1  # RBT12 100k → faixa 1
+    assert resultado.rbt12_usado == Decimal("100000.00")
+    assert resultado.rbt12_proporcionalizado is None
+
+
+def test_calcula_rbt12_proporcionalizado_primeiro_mes() -> None:
+    """Unidade: _calcular_rbt12_proporcionalizado para 1 mês."""
+    resultado = _calcular_rbt12_proporcionalizado(Decimal("30000.00"), 1)
+    assert resultado == Decimal("360000.00")
+
+
+def test_calcula_rbt12_proporcionalizado_tres_meses() -> None:
+    """Unidade: _calcular_rbt12_proporcionalizado para 3 meses."""
+    resultado = _calcular_rbt12_proporcionalizado(Decimal("73000.00"), 3)
+    # (73000 / 3) × 12 = 24333.333... × 12 = 292000
+    assert resultado == Decimal("292000.00")
+
+
+def test_calcula_rbt12_proporcionalizado_meses_invalido_levanta() -> None:
+    """meses_atividade = 0 ou >= 12 devem levantar ValueError."""
+    with pytest.raises(ValueError, match="meses_atividade deve ser >= 1"):
+        _calcular_rbt12_proporcionalizado(Decimal("10000.00"), 0)
+    with pytest.raises(ValueError, match="meses_atividade deve ser < 12"):
+        _calcular_rbt12_proporcionalizado(Decimal("10000.00"), 12)
+
+
+def test_calcula_rbt12_proporcionalizado_receita_negativa_levanta() -> None:
+    """receita_acumulada negativa deve levantar ValueError."""
+    with pytest.raises(ValueError, match="receita_acumulada"):
+        _calcular_rbt12_proporcionalizado(Decimal("-1.00"), 1)
+
+
+def test_proporcionalizado_12meses_com_rbt12_zero_nao_deve_acontecer() -> None:
+    """Se alguém fornecer meses_atividade=12 e rbt12=0, o helper recusa com ValueError.
+
+    O schema Pydantic limita meses_atividade <= 11, mas testamos o helper puro
+    para garantir a guarda interna da função.
+    """
+    with pytest.raises(ValueError, match="meses_atividade deve ser < 12"):
+        _calcular_rbt12_proporcionalizado(Decimal("120000.00"), 12)
 
 
 def test_encargos_viram_anexo_v_para_iii() -> None:

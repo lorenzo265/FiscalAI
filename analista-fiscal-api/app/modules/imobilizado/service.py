@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,7 @@ from app.shared.exceptions import (
     BemJaBaixado,
     BemNaoEncontrado,
     EmpresaNaoEncontrada,
+    LancamentoInvalido,
     TabelaTributariaAusente,
 )
 
@@ -89,6 +90,12 @@ class ImobilizadoService:
         )
         return _para_out(bem)
 
+    # Tolerância para comparação taxa ≈ 12 / vida_util_meses.
+    # IN SRF 162/1998: taxa anual e vida útil são a mesma grandeza;
+    # admitimos ±0.5 p.p. de folga para arredondamentos do cliente
+    # (ex.: taxa 0.1667 ≈ 12/72 = 0.1666̄).
+    _TOLERANCIA_COERENCIA = Decimal("0.005")
+
     async def _resolver_taxa_vida_util(
         self,
         session: AsyncSession,
@@ -98,14 +105,57 @@ class ImobilizadoService:
         taxa_informada: Decimal | None,
         vida_util_informada: int | None,
     ) -> tuple[Decimal, int]:
-        """Resolve taxa e vida útil. Se ambos informados, usa-os.
+        """Resolve taxa e vida útil garantindo coerência com IN SRF 162/1998.
 
-        Caso contrário, busca na ``TabelaDepreciacaoRfb`` pela categoria.
-        Cliente pode informar só um dos dois — o outro vem da tabela.
+        Regra: ``taxa_anual = 12 / vida_util_meses`` (com tolerância ±0.5 p.p.).
+
+        Casos:
+          * Ambos informados → valida coerência; rejeita se divergirem.
+            A vida útil é a grandeza primária: ``taxa_anual = 12 / vida_meses``.
+          * Só taxa → deriva vida útil: ``vida = round(12 / taxa)``; mínimo 1 mês.
+          * Só vida → deriva taxa: ``taxa = 12 / vida``; quantizada em 4 casas.
+          * Nenhum → busca na ``TabelaDepreciacaoRfb`` pela categoria.
         """
         if taxa_informada is not None and vida_util_informada is not None:
-            return taxa_informada, vida_util_informada
+            # Ambos fornecidos: verificar coerência.
+            # taxa esperada a partir da vida útil informada.
+            taxa_esperada = Decimal(12) / Decimal(vida_util_informada)
+            diferenca = abs(taxa_informada - taxa_esperada)
+            if diferenca > self._TOLERANCIA_COERENCIA:
+                raise LancamentoInvalido(
+                    f"Coerência IN SRF 162/1998 violada: taxa_depreciacao_anual={taxa_informada} "
+                    f"e vida_util_meses={vida_util_informada} são incompatíveis. "
+                    f"Para vida de {vida_util_informada} meses a taxa esperada é "
+                    f"{taxa_esperada.quantize(Decimal('0.0001'))} "
+                    f"(tolerância ±{self._TOLERANCIA_COERENCIA}). "
+                    f"Informe apenas um deles para que o sistema derive o outro."
+                )
+            # Coerentes: a vida útil é a grandeza primária; deriva taxa de forma
+            # consistente para que ficha e cálculo jamais divirjam.
+            taxa_derivada = (Decimal(12) / Decimal(vida_util_informada)).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_EVEN
+            )
+            log.info(
+                "imobilizado.taxa_vida_derivada_de_vida",
+                taxa_informada=str(taxa_informada),
+                taxa_derivada=str(taxa_derivada),
+                vida_util_meses=vida_util_informada,
+            )
+            return taxa_derivada, vida_util_informada
 
+        if taxa_informada is not None and vida_util_informada is None:
+            # Só taxa: deriva vida = round(12 / taxa); garante >= 1 mês.
+            vida_derivada = max(1, round(Decimal(12) / taxa_informada))
+            return taxa_informada, vida_derivada
+
+        if taxa_informada is None and vida_util_informada is not None:
+            # Só vida: deriva taxa.
+            taxa_derivada = (Decimal(12) / Decimal(vida_util_informada)).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_EVEN
+            )
+            return taxa_derivada, vida_util_informada
+
+        # Nenhum informado: busca na tabela RFB.
         tabela = await TabelaDepreciacaoRepo(session).taxa_vigente(
             categoria.value, em
         )
@@ -115,13 +165,7 @@ class ImobilizadoService:
                 f"'{categoria.value}' em {em.isoformat()}"
             )
 
-        taxa = taxa_informada if taxa_informada is not None else tabela.taxa_anual
-        vida = (
-            vida_util_informada
-            if vida_util_informada is not None
-            else tabela.vida_util_anos * 12
-        )
-        return taxa, vida
+        return tabela.taxa_anual, tabela.vida_util_anos * 12
 
     # ── baixa ────────────────────────────────────────────────────────────────
 

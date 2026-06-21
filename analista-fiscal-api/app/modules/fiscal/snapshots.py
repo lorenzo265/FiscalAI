@@ -21,7 +21,7 @@ Como usar:
     # snap.base_calculo — Decimal | None
 
 Tipos cobertos hoje (todos os outputs das Sprints 2, 11):
-  * Simples Nacional DAS (sn.das.v3)
+  * Simples Nacional DAS (sn.das.v4 — proporcionalização RBT12 empresa nova)
   * Lucro Presumido — IRPJ (lp.irpj.trimestral.v2)
   * Lucro Presumido — CSLL (lp.csll.trimestral.v1)
   * Lucro Presumido — PIS/COFINS cumulativo (lp.pis_cofins.cumulativo.v1)
@@ -74,6 +74,8 @@ class DasSnapshot(_BaseSnapshot):
     receita_mes: Decimal | None = None
     rbt12: Decimal | None = None
     anexo_efetivo: str | None = None
+    # v4: preenchido apenas quando RBT12 foi proporcionalizado (empresa nova)
+    rbt12_proporcionalizado: Decimal | None = None
 
     @property
     def valor_devido(self) -> Decimal:

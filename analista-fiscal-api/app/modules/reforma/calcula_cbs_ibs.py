@@ -7,16 +7,21 @@ Fundamento legal:
   * LC 214/2025 art. 349 — CBS plena 2027+ substitui PIS+Cofins
   * LC 214/2025 art. 124 — ICMS+ISS extintos em 2033
   * LC 214/2025 art. 156-A §1º — alíquota de referência 26,5% (preliminar)
+  * LC 214/2025 art. 41-42 + Resolução CGSN — Simples Nacional NÃO destaca
+    CBS/IBS durante a fase de teste (TESTE_2026). O SN passará a destacar
+    a partir de 2027 (FaseReforma.TRANSICAO em diante).
 
 **Princípio §8.12** — toda exibição CBS/IBS é informacional/estimativa e
 deve ser labelada ``"Estimativa — sujeita a regulamentação (LC 214/2025 +
 PLP 68/2024 em tramitação). Não substitui apuração oficial."``
 
-Fórmula (v1):
+Fórmula (v2):
 
   valor_cbs   = base_calculo × aliquota_cbs
   valor_ibs   = base_calculo × aliquota_ibs
   valor_total = valor_cbs + valor_ibs
+
+  (zero quando regime SN na fase TESTE_2026 — LC 214/2025 art. 41-42)
 
 Quantização: ``ROUND_HALF_EVEN`` 2 casas aplicada a cada parcela
 isoladamente (CBS e IBS são tributos distintos com escrituração própria).
@@ -33,7 +38,39 @@ from app.shared.exceptions import BaseCalculoInvalida
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "reforma.cbs-ibs.v1"
+ALGORITMO_VERSAO = "reforma.cbs-ibs.v2"
+
+# LC 214/2025 art. 41-42 + Resolução CGSN: durante a fase de teste 2026 o
+# Simples Nacional NÃO apura nem destaca CBS/IBS.  A exclusão cessa em
+# TRANSICAO (2027+), quando o SN passará a destacar normalmente.
+REGIMES_EXCLUIDOS_FASE_TESTE: frozenset[str] = frozenset({"simples_nacional", "mei"})
+
+
+def regime_excluido_fase_teste(
+    regime_tributario: str | None,
+    fase: FaseReforma,
+) -> bool:
+    """Retorna True quando a empresa NÃO deve ter destaque CBS/IBS.
+
+    A exclusão aplica-se APENAS à fase de teste (TESTE_2026).  Em 2027+
+    (TRANSICAO/PLENO) o Simples Nacional e MEI passam a destacar.
+
+    Args:
+        regime_tributario: valor do campo ``empresa.regime_tributario``
+            (``"simples_nacional"``, ``"mei"``, ``"lucro_presumido"``, etc.)
+            ou ``None`` quando desconhecido — sem exclusão nesse caso.
+        fase: fase da Reforma vigente na competência do documento.
+
+    Returns:
+        ``True`` → excluído (CBS/IBS = 0 / não-aplicável).
+        ``False`` → sujeito ao destaque informacional normalmente.
+    """
+    if fase is not FaseReforma.TESTE_2026:
+        return False
+    if regime_tributario is None:
+        return False
+    return regime_tributario in REGIMES_EXCLUIDOS_FASE_TESTE
+
 
 OBSERVACAO_ESTIMATIVA = (
     "Estimativa — sujeita a regulamentação (LC 214/2025 + PLP 68/2024 em "

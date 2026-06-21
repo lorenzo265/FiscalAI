@@ -187,7 +187,8 @@ class TestContratoDeResultado:
         assert "Estimativa" in r.observacao_estimativa
 
     def test_algoritmo_versao_constante(self) -> None:
-        assert ALGORITMO_VERSAO == "reforma.cbs-ibs.v1"
+        # v2 — bump pelo guard de exclusão SN na fase TESTE_2026 (LC 214/2025 art. 41-42)
+        assert ALGORITMO_VERSAO == "reforma.cbs-ibs.v2"
         r = calcular_cbs_ibs(Decimal("100.00"), _aliquota_2026())
         assert r.algoritmo_versao == ALGORITMO_VERSAO
 

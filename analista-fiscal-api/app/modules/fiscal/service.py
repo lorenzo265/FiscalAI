@@ -129,6 +129,8 @@ class FiscalService:
             fator_r=fator_r,
             uf=empresa.uf,
             sublimite_estadual=payload.sublimite_estadual,
+            receita_acumulada=payload.receita_acumulada,
+            meses_atividade=payload.meses_atividade,
         )
 
         faixas_dict = [
@@ -160,6 +162,13 @@ class FiscalService:
                     else None
                 ),
                 "competencia": payload.competencia,
+                # v4: inicio de atividade (proporcionalização RBT12)
+                "receita_acumulada": (
+                    str(payload.receita_acumulada)
+                    if payload.receita_acumulada is not None
+                    else None
+                ),
+                "meses_atividade": payload.meses_atividade,
             },
             output_jsonb={
                 "anexo": resultado.anexo,
@@ -178,6 +187,12 @@ class FiscalService:
                 "receitas_por_anexo": {
                     a: str(v) for a, v in resultado.receitas_por_anexo.items()
                 },
+                # v4: presente apenas quando proporcionalização foi ativada
+                "rbt12_proporcionalizado": (
+                    str(resultado.rbt12_proporcionalizado)
+                    if resultado.rbt12_proporcionalizado is not None
+                    else None
+                ),
             },
             faixas_usadas={"faixas": faixas_dict, "anexo_efetivo": anexo_efetivo},
             algoritmo_versao=resultado.algoritmo_versao,

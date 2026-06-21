@@ -29,14 +29,17 @@ sistema apenas mostra ``parcela_base`` para fins de planejamento.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 from enum import StrEnum
 
+from app.modules.agenda.gerar_calendario import _proximo_dia_util
+
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "parcelamento.ordinario.v2"
+ALGORITMO_VERSAO = "parcelamento.ordinario.v3"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -68,6 +71,9 @@ class ResultadoParcelamento:
     algoritmo_versao: str = ALGORITMO_VERSAO
 
 
+_FERIADOS_VAZIO: frozenset[date] = frozenset()
+
+
 def _quantizar(v: Decimal) -> Decimal:
     return v.quantize(_CENTAVO, rounding=ROUND_HALF_EVEN)
 
@@ -78,6 +84,7 @@ def gerar_parcelamento_ordinario(
     data_adesao: date,
     *,
     contribuinte: TipoContribuinte = TipoContribuinte.PJ,
+    feriados: Iterable[date] | None = None,
 ) -> ResultadoParcelamento:
     """Gera cronograma de parcelamento ordinário.
 
@@ -86,8 +93,12 @@ def gerar_parcelamento_ordinario(
             multa e juros consolidados na adesão).
         num_parcelas: 1..60 (limite do ordinário).
         data_adesao: data de adesão; 1ª parcela vence no mesmo dia do mês
-            seguinte (ou último dia do mês, se inexistente).
+            seguinte (ou último dia do mês, se inexistente), postergado
+            para o próximo dia útil quando cair em sábado/domingo/feriado
+            (IN RFB 1.300/2012 art. 26).
         contribuinte: PJ (mín. R$200) ou PF (mín. R$100).
+        feriados: feriados nacionais a considerar na postergação de dia não-útil.
+            Quando ``None``, somente sábados e domingos são postergados.
 
     Returns:
         ResultadoParcelamento.
@@ -104,6 +115,10 @@ def gerar_parcelamento_ordinario(
             f"num_parcelas deve estar entre 1 e {_MAX_PARCELAS_ORDINARIO} "
             f"(ordinário Lei 10.522/2002); recebido {num_parcelas}"
         )
+
+    feriados_set: frozenset[date] = (
+        frozenset(feriados) if feriados is not None else _FERIADOS_VAZIO
+    )
 
     minima = (
         _PARCELA_MINIMA_PJ
@@ -129,7 +144,7 @@ def gerar_parcelamento_ordinario(
         parcelas_list.append(
             ParcelaProjetada(
                 numero=n,
-                vencimento=_proximo_vencimento(data_adesao, n),
+                vencimento=_proximo_vencimento(data_adesao, n, feriados_set),
                 valor_projetado=valor,
             )
         )
@@ -151,17 +166,22 @@ def gerar_parcelamento_ordinario(
     )
 
 
-def _proximo_vencimento(adesao: date, n: int) -> date:
+def _proximo_vencimento(
+    adesao: date, n: int, feriados: frozenset[date] = _FERIADOS_VAZIO
+) -> date:
     """1ª parcela vence no mesmo dia do mês seguinte à adesão; e assim por diante.
 
     Se o dia não existe no mês alvo (ex.: 31 em fevereiro), usa o último dia.
+    Em seguida, posterga para o próximo dia útil quando cair em sábado,
+    domingo ou feriado nacional (IN RFB 1.300/2012 art. 26).
     """
     novo_mes = adesao.month + n
     novo_ano = adesao.year + (novo_mes - 1) // 12
     novo_mes_norm = ((novo_mes - 1) % 12) + 1
     dia = adesao.day
     ultimo_dia = _ultimo_dia_do_mes(novo_ano, novo_mes_norm)
-    return date(novo_ano, novo_mes_norm, min(dia, ultimo_dia))
+    candidato = date(novo_ano, novo_mes_norm, min(dia, ultimo_dia))
+    return _proximo_dia_util(candidato, feriados)
 
 
 _DIAS_POR_MES = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)

@@ -20,7 +20,10 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.empresa.repo import EmpresaRepo
-from app.modules.reforma.calcula_cbs_ibs import AliquotaCBSIBS
+from app.modules.reforma.calcula_cbs_ibs import (
+    AliquotaCBSIBS,
+    REGIMES_EXCLUIDOS_FASE_TESTE,
+)
 from app.modules.reforma.integrar_documento import (
     popular_cbs_ibs_informacional,
 )
@@ -171,6 +174,19 @@ class ReformaService:
         if empresa is None:
             raise EmpresaNaoEncontrada(f"Empresa {empresa_id} não encontrada")
 
+        # Guard: LC 214/2025 art. 41-42 — SN/MEI não apuram CBS/IBS na fase
+        # de teste 2026.  Retorna imediatamente sem consultar alíquota nem
+        # iterar documentos; todos os documentos do ano são contados como
+        # ignorados (não-aplicável por lei).
+        if ano == 2026 and empresa.regime_tributario in REGIMES_EXCLUIDOS_FASE_TESTE:
+            log.info(
+                "reforma.documento.backfill.sn_excluido_2026",
+                empresa_id=str(empresa_id),
+                ano=ano,
+                regime=empresa.regime_tributario,
+            )
+            return RecalculoResultado(ano=ano, atualizados=0, ignorados=0)
+
         # Resolve alíquota uma vez para o ano (otimização — assume vigência
         # estável dentro do ano civil). Se houver mudança de vigência mid-year,
         # uma execução por mês seria mais correta — mas o seed atual tem
@@ -188,7 +204,11 @@ class ReformaService:
         atualizados = 0
         ignorados = 0
         for doc in docs:
-            resultado = popular_cbs_ibs_informacional(doc, aliquotas)
+            resultado = popular_cbs_ibs_informacional(
+                doc,
+                aliquotas,
+                regime_tributario=empresa.regime_tributario,
+            )
             if not resultado.calculou:
                 ignorados += 1
                 continue

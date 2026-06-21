@@ -11,6 +11,13 @@ Mantemos a função pura para ficar trivialmente testável + idempotente.
 **Princípio §8.2** — esta integração só popula campos ainda NULL. Nunca
 sobrescreve valor_cbs/valor_ibs vindos do XML (que são os fatos oficiais
 da nota). O retorno indica explicitamente se houve cálculo ou não.
+
+LC 214/2025 art. 41-42 + Resolução CGSN:
+O Simples Nacional e MEI NÃO apuram/destacam CBS/IBS na fase TESTE_2026.
+Quando ``regime_tributario`` for ``"simples_nacional"`` ou ``"mei"`` e a
+``aliquotas.fase`` for ``FaseReforma.TESTE_2026``, este helper devolve
+``calculou=False`` com valores zerados (não-aplicável).  Em 2027+ a
+restrição cessa e o SN/MEI passa a destacar normalmente.
 """
 
 from __future__ import annotations
@@ -20,9 +27,11 @@ from decimal import Decimal
 from typing import Protocol
 
 from app.modules.reforma.calcula_cbs_ibs import (
+    ALGORITMO_VERSAO,
     AliquotaCBSIBS,
     ResultadoCBSIBS,
     calcular_cbs_ibs,
+    regime_excluido_fase_teste,
 )
 
 
@@ -58,9 +67,20 @@ class IntegracaoCbsIbs:
     algoritmo_versao: str
 
 
+_ZERO = Decimal("0")
+
+_OBS_SN_EXCLUIDO_2026 = (
+    "Simples Nacional/MEI excluído do destaque CBS/IBS na fase de teste 2026 "
+    "(LC 214/2025 art. 41-42 + Resolução CGSN). Destaque informacional não "
+    "aplicável nesta competência."
+)
+
+
 def popular_cbs_ibs_informacional(
     doc: _DocLike,
     aliquotas: AliquotaCBSIBS,
+    *,
+    regime_tributario: str | None = None,
 ) -> IntegracaoCbsIbs:
     """Calcula CBS/IBS informacional para documento sem extensão IBSCBSTot.
 
@@ -72,15 +92,33 @@ def popular_cbs_ibs_informacional(
             e ``valor_ibs`` (que serão lidos para idempotência).
         aliquotas: vigência resolvida pelo ``AliquotaCbsIbsRepo.vigente()``
             para a competência da nota.
+        regime_tributario: regime tributário da empresa emissora/receptora
+            (``empresa.regime_tributario``).  Quando ``"simples_nacional"``
+            ou ``"mei"`` e ``aliquotas.fase == TESTE_2026``, devolve
+            ``calculou=False`` com valores 0 e observação explicativa
+            (LC 214/2025 art. 41-42).  Em 2027+ (TRANSICAO/PLENO) a
+            restrição não se aplica — calcula normalmente.
 
     Returns:
-        ``IntegracaoCbsIbs`` com ``calculou=False`` se documento já tem
-        valor_cbs E valor_ibs populados (idempotente — caller faz no-op);
-        ``calculou=True`` com valores calculados caso contrário.
+        ``IntegracaoCbsIbs`` com ``calculou=False`` se:
+          * documento já tem valor_cbs E valor_ibs populados (idempotente);
+          * regime SN/MEI na fase TESTE_2026 (não-aplicável por lei).
+        ``calculou=True`` com valores calculados nos demais casos.
 
     Raises:
         BaseCalculoInvalida: valor_total negativo (defeito de ingestão).
     """
+    # ── Guard: SN/MEI excluído na fase TESTE_2026 (LC 214/2025 art. 41-42) ─
+    if regime_excluido_fase_teste(regime_tributario, aliquotas.fase):
+        return IntegracaoCbsIbs(
+            calculou=False,
+            valor_cbs=_ZERO,
+            valor_ibs=_ZERO,
+            base_calculo=doc.valor_total,
+            observacao=_OBS_SN_EXCLUIDO_2026,
+            algoritmo_versao=ALGORITMO_VERSAO,
+        )
+
     # ── Idempotência (§8.9) ──────────────────────────────────────────────
     # Se ambos já estão populados, devolve o existente sem recalcular.
     if doc.valor_cbs is not None and doc.valor_ibs is not None:

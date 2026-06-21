@@ -1,10 +1,10 @@
 {
-  "descricao": "Anexo I — empresa nova 1º mês, receita R$16k → RBT12 prop R$192k (Faixa 2) → DAS R$673,00",
-  "fonte": "Res. CGSN 140/2018 art. 18 §§2º-3º — 1º mês: RBT12_prop = receita × 12 = 16000×12 = 192000; alíq efetiva = (192000×7,30%−5940)/192000 = 8076/192000 = 4,209375% ≈ 4,21%; DAS = 16000×0,042062500 = R$673,00",
+  "descricao": "Anexo I — empresa nova 1º mês, receita R$30k → RBT12 prop R$360k (borda Faixa 2) → DAS R$1.695,00",
+  "fonte": "Res. CGSN 140/2018 art. 18 §§2º-3º — 1º mês: RBT12_prop = 30000×12 = 360000 (borda sup. Faixa 2); alíq efetiva = (360000×7,30%−5940)/360000 = 20340/360000 = 5,6500%; DAS = 30000×0,056500 = R$1695,00",
   "input": {
     "rbt12": "0.00",
-    "receita_mes": "16000.00",
-    "receita_acumulada": "16000.00",
+    "receita_mes": "30000.00",
+    "receita_acumulada": "30000.00",
     "meses_atividade": 1,
     "anexo": "I",
     "faixas": [
@@ -18,7 +18,7 @@
   },
   "expected": {
     "faixa": 2,
-    "aliquota_efetiva": "0.0421",
-    "valor": "673.00"
+    "aliquota_efetiva": "0.0565",
+    "valor": "1695.00"
   }
 }

@@ -1,4 +1,9 @@
-"""Golden tests do parcelamento ordinário (Sprint 11 PR3)."""
+"""Golden tests do parcelamento ordinário (Sprint 11 PR3 + fix A6).
+
+Fix A6: vencimentos postergam para o próximo dia útil quando caem em
+sábado/domingo/feriado (IN RFB 1.300/2012 art. 26). O comportamento é
+idêntico ao da agenda/gerar_calendario — posterga, nunca antecipa (≠ FGTS).
+"""
 
 from __future__ import annotations
 
@@ -99,13 +104,14 @@ class TestCronogramaBasico:
         assert len(r.parcelas) == 24
 
     def test_uma_parcela_unica(self) -> None:
-        # Dívida pequena em parcela única
+        # Dívida pequena em parcela única.
+        # 05/04/2026 é domingo → posterga para 06/04/2026 (segunda).
         r = gerar_parcelamento_ordinario(
             Decimal("500.00"), 1, date(2026, 3, 5),
         )
         assert r.parcela_base == Decimal("500.00")
         assert len(r.parcelas) == 1
-        assert r.parcelas[0].vencimento == date(2026, 4, 5)
+        assert r.parcelas[0].vencimento == date(2026, 4, 6)  # segunda (domingo postergado)
 
 
 class TestParcelaMinimaPJ:
@@ -144,29 +150,100 @@ class TestParcelaMinimaPF:
 
 
 class TestDiaSemEquivalente:
-    def test_31_janeiro_vai_para_28_fevereiro(self) -> None:
-        # Adesão em 31/jan/2026 (não bissexto): 1ª parcela em 28/fev
+    def test_31_janeiro_vai_para_28_fevereiro_postergado(self) -> None:
+        # Adesão em 31/jan/2026 (não bissexto): candidato 28/fev/2026.
+        # 28/02/2026 é sábado → posterga para 02/03/2026 (segunda).
+        # Parcela 2: candidato 31/mar/2026 (terça) → mantém.
         r = gerar_parcelamento_ordinario(
             Decimal("12000"), 12, date(2026, 1, 31),
         )
-        assert r.parcelas[0].vencimento == date(2026, 2, 28)
-        assert r.parcelas[1].vencimento == date(2026, 3, 31)
+        assert r.parcelas[0].vencimento == date(2026, 3, 2)   # segunda (sábado postergado)
+        assert r.parcelas[1].vencimento == date(2026, 3, 31)  # terça — dia útil
 
     def test_31_janeiro_em_ano_bissexto_vai_para_29(self) -> None:
-        # 2024 é bissexto; usar 2024 para testar
+        # 2024 é bissexto; 29/02/2024 é quinta-feira → dia útil, mantém.
         r = gerar_parcelamento_ordinario(
             Decimal("12000"), 12, date(2024, 1, 31),
         )
         assert r.parcelas[0].vencimento == date(2024, 2, 29)
 
     def test_atravessa_ano(self) -> None:
-        # Adesão dez/2026 → 1ª em jan/2027
+        # Adesão dez/2026 → 1ª em jan/2027.
+        # 10/01/2027 é domingo → posterga para 11/01/2027 (segunda).
+        # 10/02/2027 é quarta → mantém.
+        # 10/03/2027 é quarta → mantém.
         r = gerar_parcelamento_ordinario(
             Decimal("12000"), 3, date(2026, 12, 10),
         )
-        assert r.parcelas[0].vencimento == date(2027, 1, 10)
-        assert r.parcelas[1].vencimento == date(2027, 2, 10)
-        assert r.parcelas[2].vencimento == date(2027, 3, 10)
+        assert r.parcelas[0].vencimento == date(2027, 1, 11)  # segunda (domingo postergado)
+        assert r.parcelas[1].vencimento == date(2027, 2, 10)  # quarta — dia útil
+        assert r.parcelas[2].vencimento == date(2027, 3, 10)  # quarta — dia útil
+
+
+class TestDiaUtilVencimento:
+    """Golden cases A6 — postergação de vencimento para próximo dia útil.
+
+    Comportamento esperado (IN RFB 1.300/2012 art. 26):
+      * sábado  → próxima segunda (salvo feriado na segunda → terça, etc.)
+      * domingo → próxima segunda (salvo feriado na segunda → terça, etc.)
+      * feriado → próximo dia útil
+      * dia útil → mantém
+    """
+
+    def test_vencimento_em_sabado_vai_para_segunda(self) -> None:
+        # Adesão 05/jan/2026 (segunda); 1ª parcela nominal = 05/fev/2026 (quinta) → mantém.
+        # Usamos adesão 31/jan/2026: 1ª parcela nominal = 28/fev/2026 (sábado) → 02/mar/2026.
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 3, date(2026, 1, 31),
+        )
+        assert r.parcelas[0].vencimento == date(2026, 3, 2)  # segunda (sábado 28/fev postergado)
+        assert r.parcelas[0].vencimento.weekday() == 0        # 0 = segunda
+
+    def test_vencimento_em_domingo_vai_para_segunda(self) -> None:
+        # Adesão 05/mar/2026; 1ª parcela nominal = 05/abr/2026 (domingo) → 06/abr/2026.
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 1, date(2026, 3, 5),
+        )
+        assert r.parcelas[0].vencimento == date(2026, 4, 6)  # segunda (domingo 05/abr postergado)
+        assert r.parcelas[0].vencimento.weekday() == 0
+
+    def test_vencimento_em_feriado_vai_para_proximo_dia_util(self) -> None:
+        # Adesão 21/abr/2026 (terça; Tiradentes — não altera adesão, só vencimento).
+        # 1ª parcela nominal = 21/mai/2026 (quinta) → dia útil, mantém.
+        # Testamos feriado passado explicitamente: 21/mai/2026 como feriado →
+        # posterga para 22/mai/2026 (sexta).
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 1, date(2026, 4, 21),
+            feriados=[date(2026, 5, 21)],
+        )
+        assert r.parcelas[0].vencimento == date(2026, 5, 22)  # sexta (feriado postergado)
+
+    def test_vencimento_em_feriado_segunda_vai_para_terca(self) -> None:
+        # Se o próximo dia útil após fim de semana também é feriado, avança mais um dia.
+        # Nominal = sábado → segunda é feriado → terça.
+        # Adesão: 31/jan/2026; parcela 1 nominal = 28/fev/2026 (sábado).
+        # 02/mar/2026 (segunda) marcada como feriado → vai para 03/mar/2026 (terça).
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 1, date(2026, 1, 31),
+            feriados=[date(2026, 3, 2)],
+        )
+        assert r.parcelas[0].vencimento == date(2026, 3, 3)  # terça
+
+    def test_vencimento_em_dia_util_mantem(self) -> None:
+        # Adesão 05/jan/2026 (segunda); 1ª parcela nominal = 05/fev/2026 (quinta) → mantém.
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 1, date(2026, 1, 5),
+        )
+        assert r.parcelas[0].vencimento == date(2026, 2, 5)  # quinta — dia útil
+        assert r.parcelas[0].vencimento.weekday() == 3       # 3 = quinta
+
+    def test_sem_feriados_somente_fds_postergado(self) -> None:
+        # Garante que sem feriados apenas sábado/domingo são tratados.
+        # Adesão 10/dez/2026; parcela 1 nominal = 10/jan/2027 (domingo) → 11/jan/2027.
+        r = gerar_parcelamento_ordinario(
+            Decimal("12000"), 1, date(2026, 12, 10),
+        )
+        assert r.parcelas[0].vencimento == date(2027, 1, 11)  # segunda
 
 
 class TestBordas:

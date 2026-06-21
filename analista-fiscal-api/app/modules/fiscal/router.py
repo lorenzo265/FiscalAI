@@ -27,6 +27,7 @@ def _apuracao_to_out(ap: ApuracaoFiscal) -> ApuracaoDASOut:
     from decimal import Decimal
 
     sublimite_str = out.get("sublimite_aplicado")
+    rbt12_prop_str = out.get("rbt12_proporcionalizado")
     return ApuracaoDASOut(
         id=ap.id,
         empresa_id=ap.empresa_id,
@@ -47,6 +48,7 @@ def _apuracao_to_out(ap: ApuracaoFiscal) -> ApuracaoDASOut:
         uf=out.get("uf"),
         sublimite_aplicado=Decimal(sublimite_str) if sublimite_str else None,
         sublimite_excedido=bool(out.get("sublimite_excedido", False)),
+        rbt12_proporcionalizado=Decimal(rbt12_prop_str) if rbt12_prop_str else None,
     )
 
 

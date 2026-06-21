@@ -52,6 +52,32 @@ class ApuracaoDASIn(BaseModel):
             "R$1.800.000 — informar explicitamente nesses casos."
         ),
     )
+    receita_acumulada: Decimal | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Soma da receita bruta desde o início de atividade até e incluindo "
+            "o mês de competência (inclusive receita_mes). Obrigatório em conjunto "
+            "com meses_atividade para empresas com < 12 meses de atividade. "
+            "Quando fornecido com meses_atividade e RBT12=0, a função calcula o "
+            "RBT12 proporcionalizado conforme Res. CGSN 140/2018 art. 18 §§2º-3º. "
+            "Ignorado quando a empresa já possui RBT12 real (≥ 12 meses)."
+        ),
+    )
+    meses_atividade: int | None = Field(
+        default=None,
+        ge=1,
+        le=11,
+        description=(
+            "Número de meses de atividade da empresa até o mês de competência "
+            "inclusive (mínimo 1, máximo 11). Usar apenas para empresas com "
+            "< 12 meses de atividade. Acima de 11 meses o RBT12 real já está "
+            "disponível e deve ser informado via rbt12_override ou via view "
+            "materializada. Obrigatório em conjunto com receita_acumulada para "
+            "ativar a proporcionalização do RBT12 (Res. CGSN 140/2018 art. 18 "
+            "§§2º-3º)."
+        ),
+    )
 
 
 class FaixaUsadaOut(BaseModel):
@@ -85,6 +111,7 @@ class ApuracaoDASOut(BaseModel):
     uf: str | None = None
     sublimite_aplicado: Decimal | None = None
     sublimite_excedido: bool = False
+    rbt12_proporcionalizado: Decimal | None = None
 
 
 class ApuracaoListOut(BaseModel):
