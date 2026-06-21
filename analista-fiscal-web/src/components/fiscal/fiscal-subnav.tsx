@@ -9,6 +9,7 @@ const ITENS = [
   { href: "/fiscal/guias", label: "Guias", indice: "02" },
   { href: "/fiscal/simulador", label: "Simulador", indice: "03" },
   { href: "/fiscal/reforma-tributaria", label: "Reforma 2026", indice: "04" },
+  { href: "/fiscal/limites", label: "Limites", indice: "05" },
 ];
 
 /**
@@ -20,7 +21,7 @@ export function FiscalSubnav() {
   const pathname = usePathname();
   return (
     <nav
-      className="flex items-end gap-0 border-b"
+      className="flex items-end gap-0 border-b overflow-x-auto"
       style={{ borderColor: "var(--color-rule)" }}
       aria-label="Sub-navegação fiscal"
     >
@@ -35,7 +36,7 @@ export function FiscalSubnav() {
             href={it.href}
             aria-current={ativo ? "page" : undefined}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium transition-colors",
+              "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[13px] font-medium transition-colors",
               ativo
                 ? "text-[var(--color-ink)]"
                 : "text-[var(--color-ink-2)] hover:text-[var(--color-ink)]"

@@ -498,3 +498,42 @@ O `reviewer` registra o veredito assim:
 - Validação técnica: `tsc src/` limpo; dev server renderiza.
 - **Parecer final: VERDE. D4 (lotes A/C/D/E + home) COMPLETO.**
 - Próximo: write-back da Onda 3 (HANDOFF-ORQUESTRADOR + roadmap + memória). Telas restantes do roadmap são Trilha B / sprints posteriores: X14 "fechar o mês" (backend S5), X15 onboarding CNPJ-first (lógica), X16 assistente real (backend), X17 monitores de limite, X18 brand pack, X19 motion polish.
+
+### 2026-06-21 · screen-implementer · X17/Onda 4 · PR-X17 — tela nova /fiscal/limites
+- Fez: construiu a tela **nova** `/fiscal/limites` — Monitor de Limites do Simples Nacional e MEI — na identidade v2 "Arkan Claro", imitando os gabaritos aprovados (Notas X8, Fiscal X10).
+  1. **Rota nova** `src/app/(dashboard)/fiscal/limites/page.tsx` ("use client"). Estrutura v2 canônica: eyebrow "Módulo · Fiscal", h1 Fraunces "Limites do Simples", número-herói, FiscalSubnav, blocos de conteúdo.
+  2. **FiscalSubnav** (`src/components/fiscal/fiscal-subnav.tsx`): adicionado item `{ href: "/fiscal/limites", label: "Limites", indice: "05" }` no array `ITENS`. Preservado o formato exato dos 4 itens anteriores.
+  3. **Número-herói**: `faturamento12m` via `useApuracaoAtual()` (fallback para `empresa.faturamento12m`), contado em centavos com `useCountUp(id="limites:faturamento12m")` e formatado por `formatarMoeda`. Linha de contexto: "X% do teto de R$ Y" com cor responsiva (verde/ocre/danger conforme percentual). Mono light `clamp(2.5rem,8vw,4.5rem)` / weight 300 / whitespace-nowrap.
+  4. **Réguas (RulerGauge empilhadas)** — coração da tela (`Framed marks={false} tone="rule"`):
+     - MEI: 1 régua (limite R$ 81.000) com projeção linear.
+     - Simples Nacional: 2 réguas (sublimite estadual R$ 3,6M + teto R$ 4,8M), cada uma com projeção, separadas por `border` 1px.
+     - `projetarMesCruzamento` duplicada como função pura local (NÃO importada da home — sem acoplamento). Idêntica à do `simples-nacional-card.tsx`; comportamento 100% preservado em ambos.
+  5. **AvisoDesenquadramento**: aparece quando pct >= 80 OU há projeção de cruzamento. Texto em PT claro, sem jargão: explica o efeito real (ICMS/ISS fora do DAS; migração MEI→ME; exclusão do Simples). 3 tons: aviso (80–99%, ocre), cruzamento de projeção (ocre), estouro (>= 100%, danger). Calcula "faltam R$ Y" com `Math.max(0, limite - fatAtual)` (correto).
+  6. **Fator R monitor** (condicional — só Simples c/ fatorR): `RulerGauge` com escala 0–40% e marcador fixo em 28% (umbral). Valor atual em 28px mono bold. Caixa de explicação em PT claro com tom verde-wash (ok) ou ocre-wash (atencao). Nunca expõe "Anexo III/V" cru — traduzido via `ANEXOS[x].titulo` + `<abbr>`.
+  7. **Carimbo "Dentro do limite"** (`tom="green" inView`): assinatura da tela — aparece no header do painel de réguas quando pct < 80 em todos os limites aplicáveis.
+  8. **Estados cobertos**: `loading` (`LoadingState`), `isError` (`ErrorState` com retry), regime não suportado (`EmptyState` com explicação), regime válido (conteúdo pleno).
+  9. **Motion**: 1 entrada (page reveal via `reveal`+`staggerChildren`+`revealChild`) + 1 signature (count-up do herói). `useReducedMotion` honrado com `staticVariants`. Zero `width/height/top/left`.
+- Arquivos tocados:
+  - NOVO: `src/app/(dashboard)/fiscal/limites/page.tsx`
+  - EDITADO: `src/components/fiscal/fiscal-subnav.tsx` (só append do item "05 Limites")
+  - NÃO TOCADOS: `globals.css`, `layout.tsx`, `ui/*`, `shared/*`, `blueprint/*`, `lib/motion/*`, `layout/*`, hooks/providers/Dexie/lógica fiscal/cálculo, `simples-nacional-card.tsx` (home intacta, verificado).
+- Build/lint: aguarda `tsc --noEmit` + render no dev server pelo orquestrador. Análise estática: imports resolvem (todos referenciados nos gabaritos aprovados); `Variants` do Framer tipadas corretamente; `AvisoDesenquadramento.fatAtual` para cálculo correto; `RulerGauge` props conforme a API em `blueprint/ruler.tsx`; motion só `transform/opacity/scaleX` + reduced-motion; zero hardcode de token; zero alias antigo.
+- Gates v2 §5:
+  - Sem saudação "Olá"; 1 número-herói mono clamp; 1 assinatura (Carimbo/count-up); ≤3 blocos acima da dobra (Bloco 1 = header+herói, Bloco 2 = réguas, Bloco 3 = Fator R); `Framed marks={false} tone="rule"` (zero crop marks em painel comum); verde só saúde/ação; ocre/danger em aviso (mundo quente, não 2º acento); mono em todo dado; status cor+ícone+palavra; sem pílula/sombra genérica; Carimbo como rito pós-"tudo-ok".
+  - "Anexo III/V" traduzido via `ANEXOS[x].titulo` + `<abbr title>` — invariante §7 preservado.
+- Pendências:
+  - (1) `tsc --noEmit` + render no dev server pelo orquestrador.
+  - (2) Verificação visual em `/fiscal/limites` desktop + mobile (herói legível; réguas exibidas; projeção quando aplicável; aviso de desenquadramento quando pct >= 80; Fator R condicional na empresa-demo que é SIMPLES_NACIONAL).
+  - (3) `projetarMesCruzamento` está duplicada em `limites/page.tsx` e `simples-nacional-card.tsx` — candidata a extração para `src/lib/fiscal/projetar-cruzamento.ts` num refactor futuro (sem prioridade: é função pura de 10 linhas, comportamento idêntico).
+  - (4) Subnav Fiscal fica com 5 itens — verificar que não transborda em mobile estreito (todos os itens têm rótulo curto, mas valer check visual).
+- Faltou no design-system: — (tudo existia: `RulerGauge`, `useCountUp`, `Framed marks={false}`, `Carimbo`, `Pill`, `LoadingState`, `ErrorState`, `EmptyState`, `FATOR_R`/`ANEXOS` de traducao, `reveal`/`staggerChildren`/`revealChild`/`staticVariants`, `useReducedMotion`, tokens canônicos).
+- Próximo: `reviewer` — gates anti-slop v2 + invariantes + validação visual `/fiscal/limites` (desktop+mobile; empresa-demo SIMPLES_NACIONAL; Fator R aparece; home intacta); depois orquestrador commita e avança para X18 brand pack / X19 motion polish.
+
+### 2026-06-21 · reviewer + orquestrador · PR-X17 (/fiscal/limites) · parecer + verificação visual
+- Veredito do reviewer: **VERDE** (aprovado). Gates v2 OK; **4 lógicas condicionais corretas** (Fator R só Anexo III/V; régua MEI só regime MEI; aviso de desenquadramento só quando pct/projeção cruza; projeção `projetarMesCruzamento` cópia fiel da home — **home NÃO tocada**, git confirma). Nada de dado inventado; estados loading/empty/error tratados. ink-3 só em rótulo/decorativo (nenhum em dado).
+- **Nuance de dados (importante p/ o próximo):** a empresa em RUNTIME (backend real :8000) é **"Comércio Demonstração... Anexo I"** (comércio) → o **FatorRMonitor corretamente NÃO renderiza** (Fator R só serviços III/V). O arquivo estático `lib/stores/empresa-demo.ts` diz Anexo III, mas NÃO é a fonte em runtime — o app puxa a empresa do backend. Por isso a tela demo mostra 2 réguas (sublimite 19% / teto 14%) + Carimbo "Dentro do limite", sem Fator R/MEI/desenquadramento (todos corretos p/ esse perfil).
+- **Verificação visual (orquestrador, Playwright @ :3000):** desktop (herói R$680k "14% do teto", 2 réguas verdes, Carimbo) e mobile (herói cabe, réguas viram label+valor empilhado). Subnav de 5 itens transbordava no mobile → **corrigido** (`overflow-x-auto` + `shrink-0 whitespace-nowrap`; "Reforma 2026" não quebra mais).
+- **Correções do orquestrador:** (1) subnav scroll mobile; (2) `<h1>` condicional "Limite do MEI" vs "Limites do Simples" (era fixo — AMARELO do reviewer, caminho MEI).
+- Sugestões (→ backlog, não-bloqueiam): extrair `projetarMesCruzamento`+`LIMITE_MEI` p/ `lib/fiscal/*`; auto-scroll da subnav p/ o item ativo no mobile.
+- Validação técnica: `tsc src/` limpo; dev server renderiza.
+- **Parecer final: VERDE.** Próximo: X19 motion polish.
