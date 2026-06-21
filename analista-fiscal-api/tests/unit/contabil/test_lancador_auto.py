@@ -504,14 +504,23 @@ class TestFolhaLancamento:
         )
         assert cand is None
 
-    def test_folha_sem_irrf_balance_ainda_fechado(self) -> None:
-        """IRRF=0 (funcionário isento) — partida ainda existe mas com valor 0;
-        partidas continuam balanceadas."""
+    def test_folha_sem_irrf_nao_emite_partida_zerada(self) -> None:
+        """IRRF=0 (funcionário isento / redutor Lei 15.270/2025) — a linha de
+        IRRF NÃO vira partida (R$0,00 não se lança, e o validador de partida
+        dobrada rejeita valor não positivo). As partidas restantes seguem
+        balanceadas (D==C) e TODAS com valor > 0."""
         contas = _contas()
         cand = gerar_partidas_de_folha(
             _folha(total_irrf="0", total_inss_empregado="500"), contas
         )
         assert cand is not None
+        # A conta de IRRF a recolher nem aparece quando o IRRF é zero.
+        assert all(
+            p.conta_id != contas.irrf_funcionarios_recolher
+            for p in cand.partidas
+        )
+        # Nenhuma partida com valor <= 0 (não passaria no validador).
+        assert all(p.valor > Decimal("0") for p in cand.partidas)
         total_d = sum(
             (p.valor for p in cand.partidas if p.tipo == "D"), Decimal("0")
         )

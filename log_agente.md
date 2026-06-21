@@ -38,9 +38,12 @@ PO aprovou a proposta IRRF no gate (alíquota seedada) e pediu o redutor ligado 
   - holerite mensal, pró-labore, férias (sobre férias+1/3), 13º (IRRF exclusivo do 13º), rescisão (só nas verbas TRIBUTÁVEIS: saldo de salário + 13º prop.; aviso indenizado / férias indenizadas+1/3 / multa FGTS seguem **isentos**).
   - Mecanismo: parâmetro KW `aplicar_redutor_lei_15270` (default False = retrocompat); services (`service`, `socio_service`, `eventos_service`) ativam por `competência >= date(2026,1,1)`. **Goldens ≤ 2025 inalterados**; +16 goldens 2026 (≤5.000→0, faixa linear, >7.350 cheia) por verba.
 
+**Gate operacional (rodado pelo orquestrador, Docker de pé):** `alembic upgrade head` aplicou a `0059` (0058→0059); query no Postgres confirma o **trigger fechou a vigência IRRF 2024 em `valid_to=2025-12-31`** e abriu a 2026 (`valid_from=2026-01-01`, isento 2.428,80) — zero UPDATE manual. **Integração: 24 passed.** Falta só `fiscal-validator` + merge/push (ato do PO).
+
+**Bug de interação pego na integração (fix `lancador_auto.py`):** o conversor `gerar_partidas_de_folha` emitia uma partida de IRRF mesmo com `total_irrf=0` (comum agora que o redutor zera o IRRF de salário ≤ R$5.000); a validação de partida dobrada da Onda A (#6) corretamente rejeitava → quebrava o pipeline da folha. Fix: omitir linhas de valor 0 (preserva D=C; valor negativo segue rejeitado). Golden reforçado. **Unit passava — só a integração pegou.**
+
 Pendências `[follow-up]` da Onda B:
-1. **Pré-merge (gate operacional):** `docker compose up -d` + `poetry run alembic upgrade head` (confirmar que a 0059 aplica e o trigger fechou 2024) + `fiscal-validator`. Só então merge.
-2. **Gap retroativo IRRF mai–dez/2025** — a tabela mudou em mai/2025 (Lei 15.191) e nunca foi seedada; a vigência fev/2024 ficou aberta o ano todo. Exige uma vigência própria `2025-05-01`→`2025-12-31`. Registrado em `docs/pendencias/tabelas-2026-oficiais.md`.
+1. **Gap retroativo IRRF mai–dez/2025** — a tabela mudou em mai/2025 (Lei 15.191) e nunca foi seedada; a vigência fev/2024 ficou aberta o ano todo. Exige uma vigência própria `2025-05-01`→`2025-12-31`. Registrado em `docs/pendencias/tabelas-2026-oficiais.md`.
 
 **Onda C (próxima):** os 🟠 restantes do auto de infração — CST×CSOSN, CFOP/NCM cabeçalho, ICMSTot×itens, Simples fora da Reforma 2026, UPDATE ICMS RJ→INSERT, parcelamento dia útil — + os follow-ups (persistir retenção dividendos; formato `folhasSalario` SERPRO).
 

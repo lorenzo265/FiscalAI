@@ -619,7 +619,7 @@ def gerar_partidas_de_folha(
         folha.total_proventos - folha.total_inss_empregado - folha.total_irrf
     )
 
-    partidas: tuple[PartidaCandidata, ...] = (
+    _partidas_brutas: tuple[PartidaCandidata, ...] = (
         # Bloco 1 — folha bruta = salário líquido + retenções (passivos)
         PartidaCandidata(
             conta_id=contas.despesa_pessoal,
@@ -653,6 +653,12 @@ def gerar_partidas_de_folha(
             valor=folha.total_fgts_empregador,
         ),
     )
+    # Linha com valor=0 (ex.: IRRF zerado pelo redutor da Lei 15.270/2025, ou
+    # competência sem IRRF/INSS retido) NÃO vira partida — R$0,00 não se lança,
+    # e o validador de partida dobrada (lancador_service) rejeita valor não
+    # positivo. Remover a linha zerada preserva o balanço D=C (a linha removida
+    # contribuía 0 ao seu lado). Valor NEGATIVO permanece → rejeitado (bug real).
+    partidas = tuple(p for p in _partidas_brutas if p.valor != Decimal("0"))
     historico = f"Folha mensal {competencia:%Y-%m}"
     return LancamentoCandidato(
         historico=historico,
