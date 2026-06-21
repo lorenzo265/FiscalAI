@@ -34,11 +34,11 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 ---
 
 ## 📍 Estado atual (resumo — detalhe na última entrada do log)
-- **Branch viva:** `main` @ `acc42e4` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
+- **Branch viva:** `main` @ `2286e4a` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
 - **Backend:** roadmap 0–22 completo; em hardening + production-ready. Integração 24/24 (fixtures RLS corrigidos).
-- **Frontend:** identidade v2 "Arkan Claro" — **D0→D4 COMPLETO** + **X17 monitores de limite** (`/fiscal/limites`). ~41 telas na v2.
-- **Onda 4 em curso:** X17 ✅. **X19** (motion overlays) investigado e **REVERTIDO** — precisa de PR dedicado (`@utility` ou Framer; CSS `@layer` não gera variante no Tailwind v4). Resto da Onda 4 depende de credenciais/backends do PO: X14 (fechar o mês, S5) · X15 (onboarding lógica) · X16 (assistente backend) · X18 (brand pack).
-- **Backlog:** segurança do webhook · teste de integração do webhook · largura da coluna Contraparte na DataTable · **motion de entrada dos overlays** (dialog/sheet inertes; Plano A/C no `HANDOFF.md`).
+- **Frontend:** identidade v2 "Arkan Claro" — **D0→D4 COMPLETO** + Onda 4 front: **X17** monitores de limite · **X19** motion dos overlays (animam, @utility) · **X16** assistente (já real; label) · **X15** onboarding CNPJ-first (dashboard imediato) + fix do 422 que quebrava o onboarding. App ligado ao backend real :8000.
+- **Onda 4 restante (depende do PO):** X14 "fechar o mês" (backend S5) · X18 brand pack · LLM no dev p/ o assistente responder (Ollama/Gemini) · "pedir o resto em contexto" do onboarding (refinamento).
+- **Backlog:** segurança do webhook · teste de integração do webhook · largura da coluna Contraparte na DataTable · timeout/erro no fetch do assistente (hoje fica "digitando" sem LLM).
 
 ---
 
@@ -88,3 +88,9 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 - **Lição nova:** **validar motion no browser com `getComputedStyle`/`evaluate`**, não confiar no relatório do subagente (ele não tem shell p/ testar) — o Plano B "parecia certo" mas era inerte. E: **Tailwind v4 = `@utility` (não `@layer utilities`) para utilidade que precisa de variante** (`data-[state]:`, `hover:`, etc.).
 - **Estado:** `main` @ `acc42e4` + write-back; working tree limpo; **NÃO pushado**. Dev server vivo em :3000.
 - **Próximo:** Onda 4 restante conforme o PO: X19 via PR dedicado (Framer) · X15/X16 (lógica/backend) · X18 brand pack. Backlog técnico segue.
+
+### 2026-06-21 · orquestrador · Onda 4 front COMPLETA (X19 re-feito, X16, X15) — ordem a→b→c do PO
+- O PO pediu "seguir a ordem a, b, c". **(a) X19** re-feito e ENTROU (`8d2dc1c`): Opção A (`@utility` no `globals.css` — a forma que o Tailwind v4 exige p/ gerar a variante `data-[state=open]:`). Insight: v4 usa a propriedade CSS `translate` (≠ `transform`) p/ `-translate-1/2`; keyframe anima só `transform`, sem base-offset. Verificado no DOM (dialog anima + centerX=640). **(b)** backends confirmados (:8000, 177 rotas; app já-real) + **X16** (`293bd56`): assistente JÁ era real, removido o label "Mock" falso (LLM no dev é ops). **X15** (`2286e4a`): onboarding CNPJ-first com dashboard imediato ("Ir para o painel" após o CNPJ) + **corrigido um 422 pré-existente que quebrava TODO o onboarding** (`faturamento12m` extra_forbidden no body). Verificado ponta-a-ponta com conta nova + BrasilAPI viva → /home da empresa nova.
+- **Lições novas:** (1) **Tailwind v4: `@utility` (não `@layer utilities`)** p/ utilidade com variante. (2) v4 `-translate-*` = propriedade `translate`. (3) validar **motion no browser** (`getComputedStyle`) — relato de subagente sem shell não basta. (4) ler o **`response-body` do 422** acha contrato quebrado na hora. (5) muitos restarts de dev server thrasham o `.next`/browser — `node fs.rmSync('.next')` + reload limpo.
+- **Estado:** `main` @ `2286e4a`, working tree limpo, **NÃO pushado**. Dev server :3000 vivo.
+- **Próximo orquestrador → faça:** o que resta da Onda 4 depende do PO (X14 backend S5, X18 brand pack, LLM no dev). (c) é ato do PO: revisar/pushar.
