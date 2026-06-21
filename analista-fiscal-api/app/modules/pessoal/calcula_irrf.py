@@ -3,14 +3,20 @@
 Camada 1 (determinística). Função pura, zero I/O.
 
 Fundamento legal:
-  * Lei 14.848/2024 — atualizou faixas vigentes.
-  * MP 1.171/2024 — convertida na referida lei; ampliou isenção até R$ 2.259,20.
+  * Lei 15.191/2025 — tabela progressiva mensal vigente em 2026 (faixas,
+    alíquotas, parcela a deduzir, dedução por dependente R$ 189,59,
+    desconto simplificado R$ 607,20 = 25% × R$ 2.428,80). Inalterada desde a
+    competência maio/2025.
+  * Lei 15.270/2025 (vigência 01/01/2026) — REDUTOR mensal da retenção na
+    fonte. Aplicado APÓS o cálculo tradicional, sobre o RENDIMENTO TRIBUTÁVEL
+    BRUTO do mês (o "salário", não a base de cálculo — confirmado nos exemplos
+    oficiais da RFB), com piso 0. Ver constantes ``_REDUTOR_*`` abaixo.
   * IN RFB 1.500/2014 (consolidação) + RIR 2018 art. 700.
   * Lei 9.250/1995 art. 4º II / art. 8º II "f" — pensão alimentícia judicial
     dedutível da base de cálculo do IRRF.
-  * Lei 14.848/2024 art. 2º — desconto simplificado mensal: 25% do teto da
-    1ª faixa da tabela progressiva mensal (faixa de alíquota 0% / isenção).
-    Aplica-se o método mais benéfico ao contribuinte (menor IRRF).
+  * Desconto simplificado mensal: 25% do teto da 1ª faixa da tabela progressiva
+    mensal (faixa de alíquota 0% / isenção). Aplica-se o método mais benéfico
+    ao contribuinte (menor IRRF).
 
 Fórmulas:
 
@@ -20,17 +26,24 @@ Fórmulas:
                         − (dependentes × deducao_dependente_mensal)
                         − pensao_alimenticia
 
-    Método simplificado (Lei 14.848/2024):
+    Método simplificado:
         desconto_simplificado = 0,25 × base_ate_faixa_1
         base_irrf_simpl       = salario_bruto − desconto_simplificado
 
     Para cada base: aplica tabela progressiva → irrf = base × aliquota − parcela_deduzir
-    Resultado final: método com menor IRRF.
+    IRRF tradicional = método com menor IRRF.
 
     Encontra a faixa cuja ``base_ate >= base_irrf`` (ordenadas crescentes).
     irrf = max(0, base_irrf × aliquota_faixa − parcela_deduzir_faixa)
 
   Faixa 1 (isenta) → aliquota=0, parcela_deduzir=0 → irrf=0 automaticamente.
+
+    Redutor Lei 15.270/2025 (só quando ``aplicar_redutor_lei_15270=True``),
+    referência = ``salario_bruto`` (rendimento tributável bruto):
+        ref ≤ 5.000,00            → IRRF efetivo = 0,00 (isenção efetiva)
+        5.000,01 ≤ ref ≤ 7.350,00 → redutor = max(0, 978,62 − 0,133145 × ref)
+                                     IRRF final = max(0, irrf_tradicional − redutor)
+        ref > 7.350,00            → tabela cheia (sem redutor)
 
 Quantização: ``ROUND_HALF_EVEN`` 2 casas no resultado final.
 """
@@ -43,11 +56,23 @@ from typing import Literal
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "irrf.mensal.v2"
+# v3: redutor mensal da Lei 15.270/2025 (vigência 01/01/2026) somado ao motor
+# de tabela progressiva da Lei 15.191/2025. v2 = só progressiva (Lei 14.848/2024).
+ALGORITMO_VERSAO = "irrf.mensal.v3"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
 _DESCONTO_SIMPLIFICADO_PCT = Decimal("0.25")
+
+# ── Redutor mensal da retenção — Lei 15.270/2025, vigência 01/01/2026 ───────
+# Incide sobre o RENDIMENTO TRIBUTÁVEL BRUTO do mês (o "salário"), não sobre a
+# base de cálculo — texto literal da RFB: "se utiliza nessa tabela de redução o
+# valor do salário, e não o da base de cálculo". Aplicado APÓS o IRRF
+# tradicional (método mais benéfico), com piso 0. Coeficientes oficiais:
+_REDUTOR_PISO_ISENCAO = Decimal("5000.00")   # ≤ este valor → IRRF efetivo 0,00
+_REDUTOR_TETO = Decimal("7350.00")           # acima deste valor → tabela cheia
+_REDUTOR_LINEAR_LEI_15270 = Decimal("978.62")  # termo constante da fórmula
+_REDUTOR_COEF = Decimal("0.133145")            # coeficiente angular da fórmula
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,8 +99,11 @@ class ResultadoIrrf:
     faixa: int
     aliquota: Decimal
     parcela_deduzir: Decimal
-    irrf: Decimal  # valor a reter (BRL, 2 casas)
+    irrf: Decimal  # valor a reter (BRL, 2 casas) — JÁ líquido do redutor
     metodo: Literal["legal", "simplificado"]  # qual método foi aplicado
+    # ── Redutor Lei 15.270/2025 (vigência 01/01/2026) — auditável ──────────
+    irrf_tradicional: Decimal = _ZERO  # IRRF antes do redutor (tabela cheia)
+    redutor_lei_15270: Decimal = _ZERO  # valor abatido (0 se não aplicável)
     algoritmo_versao: str = ALGORITMO_VERSAO
 
 
@@ -85,14 +113,20 @@ def calcular_irrf_mensal(
     dependentes: int,
     faixas: list[FaixaIrrf],
     pensao_alimenticia: Decimal = _ZERO,
+    *,
+    aplicar_redutor_lei_15270: bool = False,
 ) -> ResultadoIrrf:
     """Calcula o IRRF mensal a reter.
 
     Aplica ambos os métodos (legal e simplificado) e devolve o mais benéfico
-    (menor IRRF). O campo ``metodo`` indica qual foi aplicado.
+    (menor IRRF). O campo ``metodo`` indica qual foi aplicado. Quando
+    ``aplicar_redutor_lei_15270=True`` (competências ≥ 01/01/2026), o redutor
+    da Lei 15.270/2025 é subtraído do IRRF tradicional (piso 0).
 
     Args:
-        salario_bruto: rendimento tributável bruto do mês.
+        salario_bruto: rendimento tributável bruto do mês. Também é a
+                referência do redutor da Lei 15.270/2025 (o "salário", não a
+                base de cálculo — texto literal da RFB).
         inss_empregado: INSS já retido (dedutível da base — IN RFB 1.500 art. 52).
         dependentes: número de dependentes para fins de IRRF.
         faixas: 5 faixas vigentes na competência. Vêm de ``tabela_irrf_faixa``
@@ -101,9 +135,15 @@ def calcular_irrf_mensal(
         pensao_alimenticia: pensão alimentícia judicial paga (Lei 9.250/1995
                 art. 4º II / art. 8º II "f"). Dedutível da base do IRRF pelo
                 método legal. Default=0 (backward-compatible).
+        aplicar_redutor_lei_15270: aplica o redutor mensal da Lei 15.270/2025
+                APÓS o cálculo tradicional. O caller (service) decide com base
+                na competência (vigência 01/01/2026). Default=False
+                (backward-compatible — competências anteriores não têm redutor).
 
     Returns:
-        ResultadoIrrf com base, faixa, valor e método aplicado.
+        ResultadoIrrf com base, faixa, valor (já líquido do redutor) e método
+        aplicado. ``irrf_tradicional`` e ``redutor_lei_15270`` expõem o
+        detalhe auditável do abatimento.
 
     Raises:
         ValueError: se valores negativos ou ``faixas`` vazia.
@@ -155,14 +195,38 @@ def calcular_irrf_mensal(
     # ── Escolha do método mais benéfico ────────────────────────────────────
     if irrf_simpl < irrf_legal:
         metodo: Literal["legal", "simplificado"] = "simplificado"
-        irrf_final = irrf_simpl
+        irrf_tradicional = irrf_simpl
         faixa_obj = faixa_simpl
         base_final = base_simpl
     else:
         metodo = "legal"
-        irrf_final = irrf_legal
+        irrf_tradicional = irrf_legal
         faixa_obj = faixa_legal
         base_final = base_legal
+
+    # ── Redutor mensal — Lei 15.270/2025 (vigência 01/01/2026) ─────────────
+    # Aplicado APÓS o IRRF tradicional, sobre o RENDIMENTO TRIBUTÁVEL BRUTO
+    # (= salario_bruto, "o salário, não a base de cálculo" — RFB), piso 0.
+    redutor = _ZERO
+    if aplicar_redutor_lei_15270:
+        if salario_bruto <= _REDUTOR_PISO_ISENCAO:
+            # Isenção efetiva: o redutor zera o IRRF tradicional inteiro.
+            redutor = irrf_tradicional
+        elif salario_bruto <= _REDUTOR_TETO:
+            redutor_bruto = (
+                _REDUTOR_LINEAR_LEI_15270 - _REDUTOR_COEF * salario_bruto
+            )
+            if redutor_bruto < _ZERO:
+                redutor_bruto = _ZERO
+            redutor = redutor_bruto.quantize(_CENTAVO, rounding=ROUND_HALF_EVEN)
+            # O abatimento nunca excede o próprio imposto apurado (piso 0).
+            if redutor > irrf_tradicional:
+                redutor = irrf_tradicional
+        # salario_bruto > _REDUTOR_TETO → tabela cheia, redutor permanece 0.
+
+    irrf_final = irrf_tradicional - redutor
+    if irrf_final < _ZERO:
+        irrf_final = _ZERO
 
     return ResultadoIrrf(
         salario_bruto=salario_bruto,
@@ -180,6 +244,8 @@ def calcular_irrf_mensal(
         parcela_deduzir=faixa_obj.parcela_deduzir,
         irrf=irrf_final,
         metodo=metodo,
+        irrf_tradicional=irrf_tradicional,
+        redutor_lei_15270=redutor,
     )
 
 

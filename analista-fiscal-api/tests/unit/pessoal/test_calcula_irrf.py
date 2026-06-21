@@ -288,7 +288,7 @@ class TestEstrutura:
             Decimal("3000"), Decimal("253.41"), 0, FAIXAS_VIGENTES
         )
         assert r.algoritmo_versao == ALGORITMO_VERSAO
-        assert ALGORITMO_VERSAO == "irrf.mensal.v2"
+        assert ALGORITMO_VERSAO == "irrf.mensal.v3"
 
     def test_resultado_tem_campo_metodo(self) -> None:
         r = calcular_irrf_mensal(
