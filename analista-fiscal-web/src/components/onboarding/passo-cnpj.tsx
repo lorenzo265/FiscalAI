@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Search, CheckCircle2, Building2, MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Search, CheckCircle2, Building2, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +11,7 @@ import { Pill } from "@/components/shared/pill";
 import { validarCNPJ, apenasDigitos, formatarCNPJ } from "@/lib/format/cnpj";
 import { api, ApiError } from "@/lib/api-client";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
+import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 
 export function PassoCnpj() {
   const cnpj = useOnboardingStore((s) => s.cnpj);
@@ -20,9 +23,34 @@ export function PassoCnpj() {
   const setAnexoSimples = useOnboardingStore((s) => s.setAnexoSimples);
   const setFaturamento12m = useOnboardingStore((s) => s.setFaturamento12m);
   const proximo = useOnboardingStore((s) => s.proximo);
+  const empresaCriada = useOnboardingStore((s) => s.empresaCriada);
+  const reset = useOnboardingStore((s) => s.reset);
+
+  const router = useRouter();
+  const { salvarEmpresa, refresh } = useEmpresaAtual();
 
   const [erro, setErro] = React.useState<string | null>(null);
   const [carregando, setCarregando] = React.useState(false);
+  const [entrando, setEntrando] = React.useState(false);
+
+  // CNPJ-first (X15): a empresa já foi criada no backend pelo lookup, com regime/
+  // anexo/faturamento inferidos. O dono pode ir DIRETO para o painel; certificado
+  // e bancos são opcionais e configuráveis depois, em contexto. Reusa o mesmo
+  // salvar+refresh+reset+/home da tela de conclusão (sem cert/bancos).
+  async function irParaPainel() {
+    if (!empresaCriada) return;
+    setEntrando(true);
+    try {
+      await salvarEmpresa(empresaCriada);
+      await refresh();
+      reset();
+      toast.success("Pronto — bem-vindo ao Arkan.");
+      router.push("/home");
+    } catch {
+      toast.error("Não conseguimos abrir o painel agora. Tente de novo.");
+      setEntrando(false);
+    }
+  }
 
   // Texto livre EXATAMENTE como o usuário digita (aceita `. / -`, espaços ou só
   // dígitos). NÃO reformatamos a cada tecla — era isso que jogava o cursor pro
@@ -169,8 +197,20 @@ export function PassoCnpj() {
             </ItemDl>
           </dl>
 
-          <div className="flex justify-end px-5 pb-5">
-            <Button onClick={proximo}>Confirmar e continuar</Button>
+          <div className="flex flex-col gap-3 px-5 pb-5">
+            <p className="text-[11px] text-[var(--color-ink-2)] leading-relaxed">
+              Já dá pra começar. Certificado digital e contas bancárias você
+              conecta depois, direto no painel — quando precisar.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button variant="outline" onClick={proximo}>
+                Revisar e configurar agora
+              </Button>
+              <Button onClick={irParaPainel} disabled={entrando || !empresaCriada}>
+                {entrando ? "Abrindo..." : "Ir para o painel"}
+                <ArrowRight className="size-4" />
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

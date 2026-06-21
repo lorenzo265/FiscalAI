@@ -259,14 +259,12 @@ export const empresa = {
    * cria automaticamente). O wizard usa para pular a criação manual.
    */
   lookupCnpjComEmpresa: async (
-    cnpj: string,
-    faturamento12m?: number
+    cnpj: string
   ): Promise<{ dados: CnpjLookupResponse; empresa: Empresa | null }> => {
-    const body = toSnake({
-      cnpj,
-      faturamento12m:
-        faturamento12m != null ? String(faturamento12m) : null,
-    });
+    // O endpoint /empresas/onboarding aceita SÓ `cnpj` (schema com extra="forbid").
+    // Enviar `faturamento12m` (mesmo null) dava 422 extra_forbidden e quebrava o
+    // onboarding inteiro de contas novas. O faturamento é refinado depois.
+    const body = toSnake({ cnpj });
     const r = await fetchJson("/empresas/onboarding", onboardingResultadoSchema, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
