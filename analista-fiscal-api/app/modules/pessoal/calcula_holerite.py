@@ -12,10 +12,18 @@ Sequência do cálculo (ordem importa: IRRF depende do INSS):
 
   1. salario_bruto = salario_base (PR1 — só salário fixo)
   2. inss = calcular_inss_empregado(...)
-  3. irrf = calcular_irrf_mensal(salario_bruto, inss.inss, dependentes, ...)
+  3. irrf = calcular_irrf_mensal(salario_bruto, inss.inss, dependentes, ...,
+             aplicar_redutor_lei_15270=aplicar_redutor_lei_15270)
   4. fgts = calcular_fgts(...)
   5. liquido = salario_bruto − inss − irrf
   6. Quantização final em 2 casas.
+
+Redutor Lei 15.270/2025 (vigência 01/01/2026):
+  O parâmetro ``aplicar_redutor_lei_15270`` expõe a ativação para o caller.
+  O service decide com base na competência:
+      aplicar = (competencia >= date(2026, 1, 1))
+  A referência do redutor é o salário bruto mensal (rendimento tributável
+  bruto — texto RFB: "o salário, não a base de cálculo").
 """
 
 from __future__ import annotations
@@ -38,7 +46,7 @@ from app.modules.pessoal.calcula_irrf import (
     calcular_irrf_mensal,
 )
 
-ALGORITMO_VERSAO = "holerite.clt.v1"
+ALGORITMO_VERSAO = "holerite.clt.v2"
 
 _CENTAVO = Decimal("0.01")
 
@@ -64,6 +72,7 @@ def calcular_holerite(
     aliquota_fgts: Decimal,
     *,
     vinculo: str = "clt",
+    aplicar_redutor_lei_15270: bool = False,
 ) -> ResultadoHolerite:
     """Calcula um holerite mensal completo a partir das tabelas vigentes.
 
@@ -74,6 +83,10 @@ def calcular_holerite(
         faixas_irrf: 5 faixas vigentes.
         aliquota_fgts: alíquota vigente do vínculo.
         vinculo: vínculo para fins de FGTS / persistência.
+        aplicar_redutor_lei_15270: ativa o redutor mensal da Lei 15.270/2025.
+            O caller (service) decide com base na competência:
+            ``aplicar = (competencia >= date(2026, 1, 1))``.
+            Default=False (backward-compatible — competências < 2026).
 
     Returns:
         ResultadoHolerite completo.
@@ -82,7 +95,11 @@ def calcular_holerite(
 
     inss = calcular_inss_empregado(salario_bruto, faixas_inss)
     irrf = calcular_irrf_mensal(
-        salario_bruto, inss.inss, dependentes_irrf, faixas_irrf
+        salario_bruto,
+        inss.inss,
+        dependentes_irrf,
+        faixas_irrf,
+        aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
     )
     fgts = calcular_fgts(salario_bruto, aliquota_fgts, vinculo=vinculo)
 

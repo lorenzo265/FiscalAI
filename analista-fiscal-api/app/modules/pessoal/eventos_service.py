@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
+
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -183,6 +185,9 @@ class EventosFolhaService:
                 faixas_inss=faixas_inss,
                 faixas_irrf=faixas_irrf,
                 dependentes=func.dependentes_irrf,
+                aplicar_redutor_lei_15270=(
+                    data_evento >= _DATA_VIGENCIA_REDUTOR
+                ),
             )
             evento = _evento_de_13o_segunda(
                 tenant_id, empresa_id, funcionario_id,
@@ -225,6 +230,9 @@ class EventosFolhaService:
             faixas_inss=faixas_inss,
             faixas_irrf=faixas_irrf,
             dependentes=func.dependentes_irrf,
+            aplicar_redutor_lei_15270=(
+                payload.periodo_inicio >= _DATA_VIGENCIA_REDUTOR
+            ),
         )
         periodo_fim = payload.periodo_inicio + timedelta(
             days=payload.dias_gozados - 1
@@ -291,6 +299,9 @@ class EventosFolhaService:
             faixas_inss=faixas_inss,
             faixas_irrf=faixas_irrf,
             dependentes=func.dependentes_irrf,
+            aplicar_redutor_lei_15270=(
+                payload.data_demissao >= _DATA_VIGENCIA_REDUTOR
+            ),
         )
         evento = _evento_de_rescisao(
             tenant_id, empresa_id, funcionario_id,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 from decimal import Decimal
 from uuid import UUID
 
@@ -157,6 +159,7 @@ class ProlaboreService:
             faixas_irrf=faixas_irrf,
             dependentes=socio.dependentes_irrf,
             aliquota_inss=payload.aliquota_inss,
+            aplicar_redutor_lei_15270=(comp_dia1 >= _DATA_VIGENCIA_REDUTOR),
         )
 
         prolabore = ProlaboreMensal(

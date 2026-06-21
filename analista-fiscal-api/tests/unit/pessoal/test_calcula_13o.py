@@ -1,4 +1,4 @@
-"""Golden tests do 13º salário — 1ª e 2ª parcelas (Sprint 10 PR2)."""
+"""Golden tests do 13º salário — 1ª e 2ª parcelas (Sprint 10 PR2 + redutor Lei 15.270/2025)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from app.modules.pessoal.calcula_13o import (
 )
 from tests.unit.pessoal.test_calcula_inss import FAIXAS_2025 as INSS_FAIXAS
 from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
+from tests.unit.pessoal.test_calcula_inss_2026 import FAIXAS_2026 as INSS_FAIXAS_2026
+from tests.unit.pessoal.test_calcula_irrf_2026 import FAIXAS_2026 as IRRF_FAIXAS_2026
 
 
 class TestPrimeiraParcela:
@@ -234,8 +236,91 @@ class TestFgts13o:
         assert fgts_total_anual == esperado  # 3000 × 8% = 240.00
 
     def test_versao_bumped(self) -> None:
-        """Bump v2→v3 sinaliza correção m8 FA8: avos=0 agora aceito."""
-        assert ALGORITMO_VERSAO == "13o.v3"
+        """Bump v3→v4 sinaliza ativação do redutor Lei 15.270/2025."""
+        assert ALGORITMO_VERSAO == "13o.v4"
+
+
+class TestDecimoTerceiroReductor2026:
+    """Goldens do 13º com redutor Lei 15.270/2025 (competências ≥ 2026-01-01).
+
+    O redutor se aplica ao IRRF EXCLUSIVO NA FONTE do 13º (Lei 8.134/1990
+    art. 16 — cálculo separado). Referência = base_proporcional (13º bruto).
+    Todos os valores conferidos à mão (ROUND_HALF_EVEN).
+    """
+
+    def test_13o_salario_4500_avos_12_isento_redutor_2026(self) -> None:
+        # base = 4500 × 12/12 = 4500,00 ≤ 5000 → redutor zera o IRRF.
+        # INSS sobre 4500 (INSS 2026):
+        #   F1: 1621 × 7,5% = 121,5750
+        #   F2: (2902,84−1621) × 9% = 115,3656
+        #   F3: (4354,27−2902,84) × 12% = 174,1716
+        #   F4: (4500−4354,27) × 14% = 145,73 × 14% = 20,4022
+        #   Total = 431,5144 → 431,51
+        # IRRF tradicional:
+        #   base_legal = 4500 − 431,51 = 4068,49 → F4 → 4068,49×22,5%−675,49 = 239,92
+        #   base_simpl = 4500 − 607,20 = 3892,80 → F4 → 3892,80×22,5%−675,49 = 875,88−675,49 = 200,39
+        #   min(239,92; 200,39) = 200,39 → simplificado
+        # Redutor: 4500 ≤ 5000 → zera → irrf = 0,00
+        # segunda = 4500 − 2250 − 431,51 − 0,00 = 1818,49
+        r = calcular_13o_segunda(
+            salario=Decimal("4500.00"),
+            avos=12,
+            primeira_parcela_paga=Decimal("2250.00"),
+            faixas_inss=INSS_FAIXAS_2026,
+            faixas_irrf=IRRF_FAIXAS_2026,
+            dependentes=0,
+            aplicar_redutor_lei_15270=True,
+        )
+        assert r.base_proporcional == Decimal("4500.00")
+        assert r.inss.inss == Decimal("431.51")
+        assert r.irrf.irrf_tradicional == Decimal("200.39")
+        assert r.irrf.redutor_lei_15270 == Decimal("200.39")
+        assert r.irrf.irrf == Decimal("0.00")
+        assert r.irrf.metodo == "simplificado"
+        assert r.valor_segunda_parcela == Decimal("1818.49")
+
+    def test_13o_salario_6000_avos_12_redutor_linear_2026(self) -> None:
+        # base = 6000 × 12/12 = 6000,00; 5000 < 6000 ≤ 7350 → faixa linear.
+        # INSS sobre 6000 (INSS 2026):
+        #   F4: (6000−4354,27) × 14% = 1645,73 × 14% = 230,4022
+        #   Total = 121,5750 + 115,3656 + 174,1716 + 230,4022 = 641,5144 → 641,51
+        # IRRF:
+        #   base_legal = 6000 − 641,51 = 5358,49 → F5 → 5358,49×27,5%−908,73 = 564,85
+        #   base_simpl = 6000 − 607,20 = 5392,80 → F5 → 574,29
+        #   min(564,85; 574,29) = 564,85 → legal
+        # Redutor: 978,62 − 0,133145×6000 = 978,62 − 798,87 = 179,75
+        # irrf_final = 564,85 − 179,75 = 385,10
+        # segunda = 6000 − 3000 − 641,51 − 385,10 = 1973,39
+        r = calcular_13o_segunda(
+            salario=Decimal("6000.00"),
+            avos=12,
+            primeira_parcela_paga=Decimal("3000.00"),
+            faixas_inss=INSS_FAIXAS_2026,
+            faixas_irrf=IRRF_FAIXAS_2026,
+            dependentes=0,
+            aplicar_redutor_lei_15270=True,
+        )
+        assert r.base_proporcional == Decimal("6000.00")
+        assert r.inss.inss == Decimal("641.51")
+        assert r.irrf.irrf_tradicional == Decimal("564.85")
+        assert r.irrf.redutor_lei_15270 == Decimal("179.75")
+        assert r.irrf.irrf == Decimal("385.10")
+        assert r.irrf.metodo == "legal"
+        assert r.valor_segunda_parcela == Decimal("1973.39")
+
+    def test_2025_13o_nao_aplica_redutor(self) -> None:
+        # Default (sem redutor) → goldens 2025 inalterados.
+        r = calcular_13o_segunda(
+            salario=Decimal("3000.00"),
+            avos=12,
+            primeira_parcela_paga=Decimal("1500.00"),
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        assert r.irrf.redutor_lei_15270 == Decimal("0.00")
+        # Golden histórico: irrf 2025 = 13,20 (simplificado)
+        assert r.irrf.irrf == Decimal("13.20")
 
 
 class TestAvosZeroM8:

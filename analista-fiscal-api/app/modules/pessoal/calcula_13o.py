@@ -24,9 +24,16 @@ Fórmulas:
   primeira_parcela = base_13 / 2                              (sem desconto)
   inss_13          = calcular_inss_empregado(base_13, ...)    (escalonado)
   irrf_13          = calcular_irrf_mensal(
-                       base_13, inss_13.inss, dependentes, ...)
+                       base_13, inss_13.inss, dependentes, ...,
+                       aplicar_redutor_lei_15270=aplicar_redutor_lei_15270)
   fgts_empregador  = base_13 × 8%                             (só na 2ª parcela)
   segunda_parcela  = base_13 − primeira_paga − inss_13 − irrf_13
+
+Redutor Lei 15.270/2025 (vigência 01/01/2026): O IRRF do 13º é EXCLUSIVO NA
+FONTE (Lei 8.134/1990 art. 16 — cálculo separado). O redutor SE APLICA ao
+IRRF exclusivo do 13º (RFB confirma), com referência = base_proporcional
+(o 13º bruto — "o salário, não a base de cálculo"). O caller decide ativar
+via ``aplicar_redutor_lei_15270`` na chamada de ``calcular_13o_segunda``.
 
 Observação: ``primeira_paga`` é input do cálculo da 2ª — se a 1ª foi
 adiantada em valor diferente de ``base/2`` (acordo individual), o sistema
@@ -53,7 +60,7 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "13o.v3"
+ALGORITMO_VERSAO = "13o.v4"
 
 _CENTAVO = Decimal("0.01")
 _DOZE = Decimal("12")
@@ -164,6 +171,8 @@ def calcular_13o_segunda(
     faixas_inss: list[FaixaInss],
     faixas_irrf: list[FaixaIrrf],
     dependentes: int,
+    *,
+    aplicar_redutor_lei_15270: bool = False,
 ) -> Resultado13oSegunda:
     """Calcula a 2ª parcela do 13º (paga até 20/dez).
 
@@ -178,6 +187,12 @@ def calcular_13o_segunda(
         faixas_inss: 4 faixas vigentes em dezembro.
         faixas_irrf: 5 faixas vigentes em dezembro.
         dependentes: número de dependentes IRRF.
+        aplicar_redutor_lei_15270: ativa o redutor mensal da Lei 15.270/2025
+            sobre o IRRF EXCLUSIVO do 13º. O caller decide com base no ano
+            de competência: ``aplicar = (ano_competencia >= 2026)``.
+            Referência do redutor = ``base_proporcional`` (o 13º bruto —
+            RFB: "o salário, não a base de cálculo").
+            Default=False (backward-compatible — competências < 2026).
 
     Returns:
         Resultado13oSegunda.
@@ -195,7 +210,13 @@ def calcular_13o_segunda(
 
     base = _quantizar(salario * Decimal(avos) / _DOZE)
     inss = calcular_inss_empregado(base, faixas_inss)
-    irrf = calcular_irrf_mensal(base, inss.inss, dependentes, faixas_irrf)
+    irrf = calcular_irrf_mensal(
+        base,
+        inss.inss,
+        dependentes,
+        faixas_irrf,
+        aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
+    )
 
     # FGTS: 8% sobre a base integral do 13º (Lei 8.036/90 art. 15).
     # Registrado integralmente na 2ª parcela — a 1ª é adiantamento sem tributos,

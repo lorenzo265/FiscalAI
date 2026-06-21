@@ -32,8 +32,14 @@ Fórmulas:
   fgts_empregador     = base_fgts × 8%
 
   inss   = calcular_inss_empregado(bruto_tributavel, ...)
-  irrf   = calcular_irrf_mensal(bruto_tributavel, inss.inss, deps, ...)
+  irrf   = calcular_irrf_mensal(bruto_tributavel, inss.inss, deps, ...,
+             aplicar_redutor_lei_15270=aplicar_redutor_lei_15270)
   liquido = bruto_tributavel + abono_pecuniario − inss − irrf
+
+  Redutor Lei 15.270/2025 (vigência 01/01/2026): referência = bruto_tributavel
+  (= férias gozadas + 1/3 — o rendimento tributável bruto recebido no mês).
+  O caller decide ativar via ``aplicar_redutor_lei_15270`` com base na
+  competência: ``aplicar = (competencia >= date(2026, 1, 1))``.
 
 Limites:
   * dias_gozados ∈ [1, 30].
@@ -61,7 +67,7 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "ferias.v2"
+ALGORITMO_VERSAO = "ferias.v3"
 
 _CENTAVO = Decimal("0.01")
 _TRINTA = Decimal("30")
@@ -102,6 +108,8 @@ def calcular_ferias(
     faixas_inss: list[FaixaInss],
     faixas_irrf: list[FaixaIrrf],
     dependentes: int,
+    *,
+    aplicar_redutor_lei_15270: bool = False,
 ) -> ResultadoFerias:
     """Calcula um pagamento de férias.
 
@@ -112,6 +120,12 @@ def calcular_ferias(
         faixas_inss: 4 faixas vigentes na competência.
         faixas_irrf: 5 faixas vigentes na competência.
         dependentes: número de dependentes IRRF.
+        aplicar_redutor_lei_15270: ativa o redutor mensal da Lei 15.270/2025.
+            O caller (service) decide com base na competência:
+            ``aplicar = (competencia >= date(2026, 1, 1))``.
+            Referência do redutor = ``bruto_tributavel`` (férias gozadas + 1/3
+            — o rendimento tributável bruto recebido no mês de férias).
+            Default=False (backward-compatible — competências < 2026).
 
     Returns:
         ResultadoFerias.
@@ -148,7 +162,13 @@ def calcular_ferias(
         abono = _quantizar(abono_dias + terco_abono)
 
     inss = calcular_inss_empregado(bruto, faixas_inss)
-    irrf = calcular_irrf_mensal(bruto, inss.inss, dependentes, faixas_irrf)
+    irrf = calcular_irrf_mensal(
+        bruto,
+        inss.inss,
+        dependentes,
+        faixas_irrf,
+        aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
+    )
 
     # FGTS: 8% sobre bruto tributável (férias gozadas + 1/3 constitucional).
     # Abono pecuniário NÃO integra base (verba indenizatória — STF RE 895.294).

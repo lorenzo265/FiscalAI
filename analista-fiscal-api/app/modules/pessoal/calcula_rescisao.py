@@ -66,7 +66,7 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "rescisao.v1"
+ALGORITMO_VERSAO = "rescisao.v2"
 
 _CENTAVO = Decimal("0.01")
 _TRINTA = Decimal("30")
@@ -179,6 +179,8 @@ def calcular_rescisao(
     faixas_inss: list[FaixaInss],
     faixas_irrf: list[FaixaIrrf],
     dependentes: int,
+    *,
+    aplicar_redutor_lei_15270: bool = False,
 ) -> ResultadoRescisao:
     """Calcula uma rescisão trabalhista completa.
 
@@ -197,6 +199,15 @@ def calcular_rescisao(
         faixas_inss: 4 faixas vigentes na data da rescisão.
         faixas_irrf: 5 faixas vigentes.
         dependentes: número de dependentes IRRF.
+        aplicar_redutor_lei_15270: ativa o redutor mensal da Lei 15.270/2025
+            nas verbas TRIBUTÁVEIS da rescisão (saldo de salário e 13º
+            proporcional). NÃO se aplica a verbas isentas de IRRF (aviso
+            indenizado, férias vencidas/proporcionais indenizadas + 1/3,
+            multa FGTS 40%/20%) — essas já retêm IRRF zero (IN RFB 1.500
+            art. 7º; Lei 7.713/1988 art. 6º V).
+            O caller decide com base na competência da rescisão:
+            ``aplicar = (data_rescisao >= date(2026, 1, 1))``.
+            Default=False (backward-compatible — rescisões < 2026).
 
     Returns:
         ResultadoRescisao.
@@ -258,8 +269,19 @@ def calcular_rescisao(
     )
 
     # ── Tributação por bloco ────────────────────────────────────────────
+    # Verbas TRIBUTÁVEIS: saldo de salário (pelo método mensal) e 13º
+    # proporcional (IRRF exclusivo na fonte — Lei 8.134/1990 art. 16).
+    # O redutor Lei 15.270/2025 aplica-se a ambas quando vigente (2026+).
+    # Verbas ISENTAS (aviso indenizado, férias indenizadas venc/prop + 1/3,
+    # multa FGTS) retêm IRRF zero por lei — redutor irrelevante para elas.
     inss_saldo = calcular_inss_empregado(saldo, faixas_inss)
-    irrf_saldo = calcular_irrf_mensal(saldo, inss_saldo.inss, dependentes, faixas_irrf)
+    irrf_saldo = calcular_irrf_mensal(
+        saldo,
+        inss_saldo.inss,
+        dependentes,
+        faixas_irrf,
+        aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
+    )
 
     if bruto_13 > _ZERO:
         inss_13: ResultadoInssEmpregado | None = calcular_inss_empregado(
@@ -267,7 +289,11 @@ def calcular_rescisao(
         )
         assert inss_13 is not None  # narrow for mypy
         irrf_13: ResultadoIrrf | None = calcular_irrf_mensal(
-            bruto_13, inss_13.inss, dependentes, faixas_irrf
+            bruto_13,
+            inss_13.inss,
+            dependentes,
+            faixas_irrf,
+            aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
         )
     else:
         inss_13 = None

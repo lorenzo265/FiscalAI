@@ -4,7 +4,7 @@
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
 **Branch:** `fix/auditoria-fiscal-2026-06` (a partir de `main`)
-**Suite atual:** **2588 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Suite atual:** **2617 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
@@ -26,7 +26,23 @@ Pendências conscientes desta onda (`[follow-up]`):
 1. **Persistir a retenção de dividendos** — as colunas `retencao_dividendos_10pct` / `total_acumulado_mes` ainda NÃO existem em `DistribuicaoLucros` (models.py). O service **computa + retorna + loga**, mas passa `retido_anteriormente_no_mes=0` → em 2º+ pagamento do mês **após** cruzar 50k, retém **a mais** (conservador, recuperável na DAA — **nunca a menos**; o erro original era reter ZERO). Follow-up: migration 2-fases (add colunas nullable + backfill + NOT NULL) + wire do `socio_service`.
 2. **Formato `folhasSalario` do SERPRO** — confirmar contra o Manual PGDAS-D real.
 
-**Onda B (próxima):** **#1 IRRF 2026 redutor** (Lei 15.191/2025 faixas + Lei 15.270/2025 redutor) via `aliquota-smith` — **PARA no gate** (alíquota seedada = freio). Migration = `0059`. Depois os 🟠 restantes do auto de infração (CST×CSOSN, CFOP/NCM cabeçalho, ICMSTot×itens, Simples fora da Reforma 2026, UPDATE ICMS RJ→INSERT, parcelamento dia útil).
+---
+
+## Auditoria Fiscal 2026-06-21 — Onda B (#1 IRRF 2026 redutor) · APROVADO no gate pelo PO
+
+PO aprovou a proposta IRRF no gate (alíquota seedada) e pediu o redutor ligado em **TODA** a folha. Commits `a0c81b1` (proposta) + wiring (este). **Suite: 2617 passed, 3 skipped. mypy strict ✅. NÃO pushado.**
+
+- **Migration `0059_irrf_2026_redutor.py`** (`down_revision=0058`): INSERT da vigência SCD 2026 da `tabela_irrf_faixa` (isento R$ 2.428,80; faixas 7,5/15/22,5/27,5% com parcelas a deduzir 182,16/394,16/675,49/908,73; dependente 189,59; **Lei 15.191/2025**). Trigger fecha a vigência 2024 em 2025-12-31. **Zero UPDATE/DELETE** em linha seedada.
+- **Redutor da Lei 15.270/2025** em `calcula_irrf.py` (v2→v3): pós-cálculo, referência = **rendimento bruto** (RFB: "o valor do salário, não a base"); isenção efetiva ≤ R$ 5.000; faixa 5.000,01–7.350 = `978,62 − 0,133145×rendimento`; > R$ 7.350 sem redutor. **Método batido com os Exemplos 4 e 5 oficiais da RFB** (idênticos ao centavo; o Ex.4 usa INSS 2025 R$ 649,60 — daí 382,88 — enquanto o holerite 2026 usa INSS 2026 R$ 641,51 → 385,10; o redutor 179,75 é igual nos dois).
+- **Wiring por competência (≥ 2026-01-01)** — confirmado contra a orientação oficial RFB dez/2025:
+  - holerite mensal, pró-labore, férias (sobre férias+1/3), 13º (IRRF exclusivo do 13º), rescisão (só nas verbas TRIBUTÁVEIS: saldo de salário + 13º prop.; aviso indenizado / férias indenizadas+1/3 / multa FGTS seguem **isentos**).
+  - Mecanismo: parâmetro KW `aplicar_redutor_lei_15270` (default False = retrocompat); services (`service`, `socio_service`, `eventos_service`) ativam por `competência >= date(2026,1,1)`. **Goldens ≤ 2025 inalterados**; +16 goldens 2026 (≤5.000→0, faixa linear, >7.350 cheia) por verba.
+
+Pendências `[follow-up]` da Onda B:
+1. **Pré-merge (gate operacional):** `docker compose up -d` + `poetry run alembic upgrade head` (confirmar que a 0059 aplica e o trigger fechou 2024) + `fiscal-validator`. Só então merge.
+2. **Gap retroativo IRRF mai–dez/2025** — a tabela mudou em mai/2025 (Lei 15.191) e nunca foi seedada; a vigência fev/2024 ficou aberta o ano todo. Exige uma vigência própria `2025-05-01`→`2025-12-31`. Registrado em `docs/pendencias/tabelas-2026-oficiais.md`.
+
+**Onda C (próxima):** os 🟠 restantes do auto de infração — CST×CSOSN, CFOP/NCM cabeçalho, ICMSTot×itens, Simples fora da Reforma 2026, UPDATE ICMS RJ→INSERT, parcelamento dia útil — + os follow-ups (persistir retenção dividendos; formato `folhasSalario` SERPRO).
 
 ---
 

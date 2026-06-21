@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from datetime import date
 from datetime import datetime as _dt
+
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -167,6 +169,8 @@ class PessoalService:
         total_irrf = _ZERO
         total_fgts = _ZERO
 
+        aplicar_redutor = comp_dia1 >= _DATA_VIGENCIA_REDUTOR
+
         for func in funcionarios:
             resultado = calcular_holerite(
                 salario_base=func.salario_base,
@@ -175,6 +179,7 @@ class PessoalService:
                 faixas_irrf=faixas_irrf,
                 aliquota_fgts=aliq_fgts_clt,
                 vinculo=func.vinculo,
+                aplicar_redutor_lei_15270=aplicar_redutor,
             )
             holerites.append(
                 Holerite(
@@ -217,7 +222,7 @@ class PessoalService:
         folha.total_fgts_empregador = total_fgts
         folha.total_descontos = total_descontos
         folha.total_liquido = total_liquido
-        folha.algoritmo_versao = "holerite.clt.v1"
+        folha.algoritmo_versao = "holerite.clt.v2"
         folha.fechada_em = fechada_em
 
         await session.commit()

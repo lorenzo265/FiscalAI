@@ -10,6 +10,11 @@ Fundamento legal:
   * Lei 14.848/2024 — tabela mensal IRRF (mesma usada no holerite CLT).
   * Portaria Interministerial MPS/MF — teto previdenciário anual (vem da
     SCD ``tabela_inss_faixa`` com ``tipo='contribuinte_individual'``).
+  * Lei 15.270/2025 (vigência 01/01/2026) — redutor mensal do IRRF.
+    Aplica-se ao pró-labore porque é rendimento sujeito à incidência mensal.
+    Referência do redutor = ``valor_bruto`` (rendimento tributável bruto —
+    RFB: "o salário, não a base de cálculo"). O caller decide ativar via
+    ``aplicar_redutor_lei_15270`` com base na competência.
 
 Diferença em relação ao INSS empregado (escalonado):
   * Pró-labore usa alíquota PLANA (11%) sobre a base limitada ao teto.
@@ -42,7 +47,7 @@ from app.modules.pessoal.calcula_irrf import (
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "prolabore.v1"
+ALGORITMO_VERSAO = "prolabore.v2"
 
 _CENTAVO = Decimal("0.01")
 _ALIQ_DEFAULT = Decimal("0.1100")
@@ -75,6 +80,7 @@ def calcular_prolabore(
     dependentes: int,
     *,
     aliquota_inss: Decimal = _ALIQ_DEFAULT,
+    aplicar_redutor_lei_15270: bool = False,
 ) -> ResultadoProlabore:
     """Calcula pró-labore mensal — INSS 11% (plano simplificado) + IRRF.
 
@@ -85,6 +91,12 @@ def calcular_prolabore(
         faixas_irrf: 5 faixas IRRF mensais vigentes.
         dependentes: dependentes IRRF do sócio.
         aliquota_inss: default 0,1100 (plano simplificado — Lei 9.876/1999).
+        aplicar_redutor_lei_15270: ativa o redutor mensal da Lei 15.270/2025.
+            O caller (service) decide com base na competência:
+            ``aplicar = (competencia >= date(2026, 1, 1))``.
+            Referência do redutor = ``valor_bruto`` (rendimento tributável
+            bruto — RFB: "o salário, não a base de cálculo").
+            Default=False (backward-compatible — competências < 2026).
 
     Returns:
         ResultadoProlabore.
@@ -107,7 +119,13 @@ def calcular_prolabore(
     base_inss = teto_previdenciario if teto_aplicado else valor_bruto
     inss = _quantizar(base_inss * aliquota_inss)
 
-    irrf = calcular_irrf_mensal(valor_bruto, inss, dependentes, faixas_irrf)
+    irrf = calcular_irrf_mensal(
+        valor_bruto,
+        inss,
+        dependentes,
+        faixas_irrf,
+        aplicar_redutor_lei_15270=aplicar_redutor_lei_15270,
+    )
     valor_liquido = _quantizar(valor_bruto - inss - irrf.irrf)
 
     return ResultadoProlabore(

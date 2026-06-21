@@ -1,4 +1,4 @@
-"""Golden tests de férias — gozadas + 1/3 + abono pecuniário (Sprint 10 PR2)."""
+"""Golden tests de férias — gozadas + 1/3 + abono pecuniário (Sprint 10 PR2 + redutor Lei 15.270/2025)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from app.modules.pessoal.calcula_ferias import (
 )
 from tests.unit.pessoal.test_calcula_inss import FAIXAS_2025 as INSS_FAIXAS
 from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
+from tests.unit.pessoal.test_calcula_inss_2026 import FAIXAS_2026 as INSS_FAIXAS_2026
+from tests.unit.pessoal.test_calcula_irrf_2026 import FAIXAS_2026 as IRRF_FAIXAS_2026
 
 
 class TestFeriasIntegrais:
@@ -205,5 +207,89 @@ class TestFgtsFerias:
         assert r.base_fgts == r.bruto_tributavel
 
     def test_versao_bumped(self) -> None:
-        """Bump v1→v2 sinaliza adição do campo fgts_empregador."""
-        assert ALGORITMO_VERSAO == "ferias.v2"
+        """Bump v2→v3 sinaliza ativação do redutor Lei 15.270/2025."""
+        assert ALGORITMO_VERSAO == "ferias.v3"
+
+
+class TestFeriasReductor2026:
+    """Goldens de férias com redutor Lei 15.270/2025 (competências ≥ 2026-01-01).
+
+    Referência do redutor = bruto_tributavel (férias gozadas + 1/3 constitucional).
+    Todos os valores conferidos à mão (ROUND_HALF_EVEN).
+    """
+
+    def test_ferias_salario_3600_30d_isento_redutor_2026(self) -> None:
+        # Salário 3600, 30 dias gozados → bruto_trib = 3600 + 1200 = 4800
+        # 4800 ≤ 5000 → redutor zera o IRRF.
+        # INSS sobre 4800 (INSS 2026):
+        #   F1: 1621 × 7,5% = 121,5750
+        #   F2: (2902,84−1621) × 9% = 1281,84 × 9% = 115,3656
+        #   F3: (4354,27−2902,84) × 12% = 1451,43 × 12% = 174,1716
+        #   F4: (4800−4354,27) × 14% = 445,73 × 14% = 62,4022
+        #   Total = 473,5144 → 473,51
+        # IRRF tradicional:
+        #   base_legal = 4800 − 473,51 = 4326,49 → F4 → 4326,49×22,5%−675,49 = 973,4603−675,49 = 297,97
+        #   base_simpl = 4800 − 607,20 = 4192,80 → F4 → 4192,80×22,5%−675,49 = 943,38−675,49 = 267,89
+        #   min(297,97; 267,89) = 267,89 → simplificado
+        # Redutor: bruto_trib 4800 ≤ 5000 → zera → irrf = 0,00
+        # Líquido = 4800 + 0 − 473,51 − 0,00 = 4326,49
+        r = calcular_ferias(
+            salario=Decimal("3600.00"),
+            dias_gozados=30,
+            dias_vendidos=0,
+            faixas_inss=INSS_FAIXAS_2026,
+            faixas_irrf=IRRF_FAIXAS_2026,
+            dependentes=0,
+            aplicar_redutor_lei_15270=True,
+        )
+        assert r.bruto_tributavel == Decimal("4800.00")
+        assert r.inss.inss == Decimal("473.51")
+        assert r.irrf.irrf_tradicional == Decimal("267.89")
+        assert r.irrf.redutor_lei_15270 == Decimal("267.89")
+        assert r.irrf.irrf == Decimal("0.00")
+        assert r.irrf.metodo == "simplificado"
+        assert r.valor_liquido == Decimal("4326.49")
+
+    def test_ferias_salario_4500_30d_redutor_linear_2026(self) -> None:
+        # Salário 4500, 30 dias → bruto_trib = 4500 + 1500 = 6000
+        # 5000 < 6000 ≤ 7350 → faixa linear.
+        # INSS sobre 6000 (INSS 2026):
+        #   F4: (6000−4354,27) × 14% = 1645,73 × 14% = 230,4022
+        #   Total = 121,5750 + 115,3656 + 174,1716 + 230,4022 = 641,5144 → 641,51
+        # IRRF tradicional:
+        #   base_legal = 6000 − 641,51 = 5358,49 → F5 → 5358,49×27,5%−908,73 = 1473,5848−908,73 = 564,85
+        #   base_simpl = 6000 − 607,20 = 5392,80 → F5 → 5392,80×27,5%−908,73 = 1483,02−908,73 = 574,29
+        #   min(564,85; 574,29) = 564,85 → legal
+        # Redutor: 978,62 − 0,133145×6000 = 978,62 − 798,87 = 179,75
+        # irrf_final = 564,85 − 179,75 = 385,10
+        # Líquido = 6000 + 0 − 641,51 − 385,10 = 4973,39
+        r = calcular_ferias(
+            salario=Decimal("4500.00"),
+            dias_gozados=30,
+            dias_vendidos=0,
+            faixas_inss=INSS_FAIXAS_2026,
+            faixas_irrf=IRRF_FAIXAS_2026,
+            dependentes=0,
+            aplicar_redutor_lei_15270=True,
+        )
+        assert r.bruto_tributavel == Decimal("6000.00")
+        assert r.inss.inss == Decimal("641.51")
+        assert r.irrf.irrf_tradicional == Decimal("564.85")
+        assert r.irrf.redutor_lei_15270 == Decimal("179.75")
+        assert r.irrf.irrf == Decimal("385.10")
+        assert r.irrf.metodo == "legal"
+        assert r.valor_liquido == Decimal("4973.39")
+
+    def test_2025_ferias_nao_aplica_redutor(self) -> None:
+        # Default (sem redutor) → goldens 2025 inalterados.
+        r = calcular_ferias(
+            salario=Decimal("3000.00"),
+            dias_gozados=30,
+            dias_vendidos=0,
+            faixas_inss=INSS_FAIXAS,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+        )
+        assert r.irrf.redutor_lei_15270 == Decimal("0.00")
+        # Golden existente: irrf = 133,84 (simplificado)
+        assert r.irrf.irrf == Decimal("133.84")
