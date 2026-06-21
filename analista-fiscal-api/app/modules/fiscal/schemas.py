@@ -23,7 +23,25 @@ class ApuracaoDASIn(BaseModel):
     folha_12m: Decimal | None = Field(
         default=None,
         ge=0,
-        description="Folha dos últimos 12 meses — obrigatório para Anexo III/V",
+        description=(
+            "Remuneração bruta dos últimos 12 meses (salários + pró-labore + 13º) "
+            "— obrigatório para Anexo III/V. NÃO inclui encargos patronais; "
+            "estes devem ser informados separadamente em `encargos_folha_12m`."
+        ),
+    )
+    encargos_folha_12m: Decimal = Field(
+        default=Decimal("0"),
+        ge=0,
+        description=(
+            "Soma dos encargos patronais recolhidos nos últimos 12 meses: CPP "
+            "(Contribuição Patronal Previdenciária do Simples Nacional) + FGTS "
+            "+ 13º salário (quando não incluído em `folha_12m`). "
+            "Fonte: LC 123/2006 art. 18 §5º-J e §24; Res. CGSN 140/2018 art. 26 §1º. "
+            "ATENÇÃO: o caller DEVE popular este campo para que o Fator R seja "
+            "calculado corretamente. O default 0 preserva retrocompatibilidade "
+            "com callers que ainda não fornecem os encargos, mas produz Fator R "
+            "subestimado (pode jogar a empresa do Anexo III para o V)."
+        ),
     )
     sublimite_estadual: Decimal | None = Field(
         default=None,

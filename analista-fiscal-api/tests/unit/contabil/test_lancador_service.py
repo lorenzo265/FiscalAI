@@ -1,4 +1,8 @@
-"""Testes do LancadorService — orquestrador do motor automático (Sprint 9 PR2)."""
+"""Testes do LancadorService — orquestrador do motor automático (Sprint 9 PR2).
+
+FA achado #6 (2026-06-21): validação de partidas dobradas em _persistir.
+Lei 6.404 art. 177 / NBC TG — Σ D == Σ C; todo valor de partida > 0.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from app.modules.contabil.plano_referencial import (
 )
 from app.shared.exceptions import (
     EmpresaNaoEncontrada,
+    LancamentoInvalido,
     PlanoContasIncompleto,
 )
 
@@ -217,4 +222,206 @@ async def test_persistir_cria_lancamento_confirmado() -> None:
     chamada = lanc_repo.criar.await_args
     assert chamada.kwargs["status"] == "confirmado"
     assert chamada.kwargs["total_debito"] == Decimal("50")
+    partida_repo.criar_lote.assert_awaited_once()
+
+
+# ── Achado #6 — validação partidas dobradas em _persistir ──────────────────
+# Lei 6.404 art. 177 / NBC TG + §8.4 do projeto.
+# _persistir DEVE rejeitar candidatos desbalanceados ou com valores <= 0
+# antes de qualquer I/O no banco.
+
+
+def _candidato_balanceado() -> LancamentoCandidato:
+    """Candidato válido: D=100 C=100."""
+    return LancamentoCandidato(
+        historico="Folha 2026-05",
+        data_lancamento=date(2026, 5, 1),
+        competencia=date(2026, 5, 1),
+        origem_tipo="folha",
+        origem_id=uuid.uuid4(),
+        partidas=(
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="D", valor=Decimal("100")),
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="C", valor=Decimal("100")),
+        ),
+    )
+
+
+def _candidato_desbalanceado() -> LancamentoCandidato:
+    """Candidato inválido: D=100 C=90 → desbalanceado."""
+    return LancamentoCandidato(
+        historico="Folha corrompida",
+        data_lancamento=date(2026, 5, 1),
+        competencia=date(2026, 5, 1),
+        origem_tipo="folha",
+        origem_id=uuid.uuid4(),
+        partidas=(
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="D", valor=Decimal("100")),
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="C", valor=Decimal("90")),
+        ),
+    )
+
+
+def _candidato_valor_zero() -> LancamentoCandidato:
+    """Candidato inválido: partida com valor=0."""
+    return LancamentoCandidato(
+        historico="IRRF sem desconto",
+        data_lancamento=date(2026, 5, 1),
+        competencia=date(2026, 5, 1),
+        origem_tipo="folha",
+        origem_id=uuid.uuid4(),
+        partidas=(
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="D", valor=Decimal("500")),
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="C", valor=Decimal("500")),
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="C", valor=Decimal("0")),
+        ),
+    )
+
+
+def _candidato_valor_negativo() -> LancamentoCandidato:
+    """Candidato inválido: partida com valor negativo (folha com líquido negativo)."""
+    return LancamentoCandidato(
+        historico="Folha com líquido negativo",
+        data_lancamento=date(2026, 5, 1),
+        competencia=date(2026, 5, 1),
+        origem_tipo="folha",
+        origem_id=uuid.uuid4(),
+        partidas=(
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="D", valor=Decimal("1000")),
+            PartidaCandidata(
+                conta_id=uuid.uuid4(), tipo="C", valor=Decimal("-200")
+            ),  # líquido negativo
+            PartidaCandidata(conta_id=uuid.uuid4(), tipo="C", valor=Decimal("1200")),
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_persistir_candidato_desbalanceado_levanta() -> None:
+    """Candidato D≠C → LancamentoInvalido ANTES de qualquer I/O.
+
+    Por que é borda: conversor puro (lancador_auto) bem escrito nunca gera
+    desbalanceamento; mas regressão de código ou alteração futura pode.
+    Esta trava captura a inconsistência sem deixar gravar dado inválido.
+
+    Input:  D=100 / C=90 (diferença R$10)
+    Esperado: raise LancamentoInvalido com "partidas_desbalanceadas"
+    """
+    session = AsyncMock()
+    candidato = _candidato_desbalanceado()
+    lanc_repo = AsyncMock()
+    lanc_repo.por_origem = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "app.modules.contabil.lancador_service.LancamentoRepo",
+            return_value=lanc_repo,
+        ),
+        pytest.raises(LancamentoInvalido, match="partidas_desbalanceadas"),
+    ):
+        await LancadorService()._persistir(
+            session, uuid.uuid4(), uuid.uuid4(), candidato
+        )
+
+    # Banco NÃO deve ter sido tocado.
+    lanc_repo.criar.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_persistir_candidato_valor_zero_levanta() -> None:
+    """Partida com valor=0 → LancamentoInvalido.
+
+    Por que é borda: folha sem IRRF geraria partida valor=0 para
+    'IRRF Funcionários a Recolher' se o conversor não filtrar — quebra
+    partida dobrada (valor não positivo).
+
+    Input:  D=500 / C=500 / C=0
+    Esperado: raise LancamentoInvalido com "_valor_nao_positivo"
+    """
+    session = AsyncMock()
+    candidato = _candidato_valor_zero()
+    lanc_repo = AsyncMock()
+    lanc_repo.por_origem = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "app.modules.contabil.lancador_service.LancamentoRepo",
+            return_value=lanc_repo,
+        ),
+        pytest.raises(LancamentoInvalido, match="_valor_nao_positivo"),
+    ):
+        await LancadorService()._persistir(
+            session, uuid.uuid4(), uuid.uuid4(), candidato
+        )
+
+    lanc_repo.criar.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_persistir_candidato_valor_negativo_levanta() -> None:
+    """Partida com valor negativo (líquido negativo da folha) → LancamentoInvalido.
+
+    Por que é borda: folha onde INSS + IRRF > salário bruto (raro mas possível
+    em folha retroativa com desconto judicial) geraria `liquido_pagar` negativo
+    no conversor. Sem esta trava, gravaria crédito negativo — viola integridade.
+
+    Input:  D=1000 / C=-200 / C=1200
+    Esperado: raise LancamentoInvalido com "_valor_nao_positivo"
+    """
+    session = AsyncMock()
+    candidato = _candidato_valor_negativo()
+    lanc_repo = AsyncMock()
+    lanc_repo.por_origem = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "app.modules.contabil.lancador_service.LancamentoRepo",
+            return_value=lanc_repo,
+        ),
+        pytest.raises(LancamentoInvalido, match="_valor_nao_positivo"),
+    ):
+        await LancadorService()._persistir(
+            session, uuid.uuid4(), uuid.uuid4(), candidato
+        )
+
+    lanc_repo.criar.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_persistir_candidato_balanceado_persiste_normalmente() -> None:
+    """Candidato válido (D==C, valores > 0) persiste e retorna True.
+
+    Por que é borda: garante que a nova validação NÃO bloqueia o caminho
+    feliz — regressão na trava quebraria todos os lotes automáticos.
+
+    Input:  D=100 / C=100 (balanceado, valores positivos)
+    Esperado: True (criado), total_debito == 100 passado ao criar()
+    """
+    session = AsyncMock()
+    candidato = _candidato_balanceado()
+    lanc_persistido = SimpleNamespace(id=uuid.uuid4())
+    lanc_repo = AsyncMock()
+    lanc_repo.por_origem = AsyncMock(return_value=None)
+    lanc_repo.criar = AsyncMock(return_value=lanc_persistido)
+    partida_repo = AsyncMock()
+    partida_repo.criar_lote = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.contabil.lancador_service.LancamentoRepo",
+            return_value=lanc_repo,
+        ),
+        patch(
+            "app.modules.contabil.lancador_service.PartidaRepo",
+            return_value=partida_repo,
+        ),
+    ):
+        criou = await LancadorService()._persistir(
+            session, uuid.uuid4(), uuid.uuid4(), candidato
+        )
+
+    assert criou is True
+    chamada = lanc_repo.criar.await_args
+    assert chamada.kwargs["status"] == "confirmado"
+    assert chamada.kwargs["total_debito"] == Decimal("100")
+    assert chamada.kwargs["total_credito"] == Decimal("100")
     partida_repo.criar_lote.assert_awaited_once()

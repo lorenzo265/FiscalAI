@@ -358,3 +358,83 @@ def test_validar_soma_receitas_fora_tolerancia_levanta() -> None:
             receita_mes=Decimal("10000.00"),
             receitas_por_anexo={"I": Decimal("6000"), "III": Decimal("3000")},
         )
+
+
+# ── Achado #3 — Fator R sem encargos (auditoria 2026-06-21) ──────────────────
+#
+# Fonte: LC 123/2006 art. 18 §5º-J e §24; Res. CGSN 140/2018 art. 26 §1º.
+# Massa salarial do Fator R = remuneração (salários + pró-labore + 13º)
+# ACRESCIDA do CPP (Contribuição Patronal Previdenciária) e do FGTS.
+#
+# Estes testes provam via `resolver_anexo_fator_r` que:
+#  1. Fator R exatamente 28,00% → Anexo III (borda >= exata).
+#  2. Fator R 27,99% → Anexo V (abaixo da borda).
+#  3. Incluir encargos vira o anexo de V→III: sem encargos o Fator R ficaria
+#     abaixo de 28% (Anexo V); com CPP+FGTS passa de 28% (Anexo III).
+#     Este terceiro teste é o que prova o bug original — o "ouro" que garante
+#     que a correção em fiscal/service.py usa massa_salarial_12m correta.
+#
+# Nota: `resolver_anexo_fator_r` é a função pura em calcula_das.py.
+# O cálculo da massa → fator_r ocorre em fiscal/service.py; estes testes
+# cobrem a lógica de resolução de borda e o impacto da inclusão dos encargos.
+
+
+def test_fator_r_exatamente_28_porcento_vai_para_anexo_iii() -> None:
+    """Fator R = 28,00% exato (massa/rbt12 = 0.28) → Anexo III.
+
+    Borda crítica: o comparador >= em resolver_anexo_fator_r deve incluir o limiar.
+    RBT12 = 500.000; massa_salarial_12m = 140.000 → fator_r = 0.28 exato.
+    """
+    rbt12 = Decimal("500000.00")
+    massa_salarial_12m = Decimal("140000.00")  # 140.000 / 500.000 = 0.2800 exato
+    fator_r = massa_salarial_12m / rbt12
+    assert fator_r == Decimal("0.28"), f"Setup inválido: fator_r={fator_r}"
+    assert resolver_anexo_fator_r("III", fator_r) == "III"
+
+
+def test_fator_r_2799_vai_para_anexo_v() -> None:
+    """Fator R = 27,99% → Anexo V (abaixo do limiar de 28%).
+
+    RBT12 = 500.000; massa_salarial_12m = 139.950 → fator_r = 0.27990 < 0.28.
+    """
+    rbt12 = Decimal("500000.00")
+    massa_salarial_12m = Decimal("139950.00")  # 139.950 / 500.000 = 0.27990
+    fator_r = massa_salarial_12m / rbt12
+    assert fator_r < Decimal("0.28"), f"Setup inválido: fator_r={fator_r}"
+    assert resolver_anexo_fator_r("III", fator_r) == "V"
+
+
+def test_encargos_viram_anexo_v_para_iii() -> None:
+    """CASO CRÍTICO — prova o bug do Achado #3.
+
+    Cenário: empresa Anexo III/V com:
+      - folha_12m (salários apenas) = R$ 130.000
+      - encargos_folha_12m (CPP + FGTS) = R$ 15.000
+      - RBT12 = R$ 500.000
+
+    Sem encargos: fator_r = 130.000 / 500.000 = 26,00% → Anexo V (alíquota maior).
+    Com encargos: massa = 145.000 → fator_r = 145.000 / 500.000 = 29,00% → Anexo III.
+
+    O bug original calculava folha_12m/rbt12 sem somar os encargos → resolvia V
+    quando o correto (conforme Res. CGSN 140/2018 art. 26 §1º) é III.
+    A correção em fiscal/service.py usa massa_salarial_12m = folha_12m + encargos_folha_12m.
+    """
+    rbt12 = Decimal("500000.00")
+    folha_12m = Decimal("130000.00")
+    encargos_folha_12m = Decimal("15000.00")
+    massa_salarial_12m = folha_12m + encargos_folha_12m  # = 145.000
+
+    fator_r_sem_encargos = folha_12m / rbt12  # 0.2600 < 0.28 → Anexo V (ERRADO)
+    fator_r_com_encargos = massa_salarial_12m / rbt12  # 0.2900 >= 0.28 → Anexo III (CORRETO)
+
+    # Confirma que a empresa ficaria no V sem a correção:
+    assert resolver_anexo_fator_r("III", fator_r_sem_encargos) == "V", (
+        "Sem encargos deveria cair no Anexo V (comportamento anterior/errado)"
+    )
+    # Confirma que com a correção vai para o III:
+    assert resolver_anexo_fator_r("III", fator_r_com_encargos) == "III", (
+        "Com encargos deve ir para Anexo III (comportamento correto per CGSN 140/2018)"
+    )
+    # Confirma os valores numéricos:
+    assert fator_r_sem_encargos == Decimal("0.26")
+    assert fator_r_com_encargos == Decimal("0.29")

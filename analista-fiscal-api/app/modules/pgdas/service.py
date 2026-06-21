@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Protocol
 
 from app.shared.db.models import ApuracaoFiscal, Empresa
@@ -238,15 +238,32 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
     real do PGDAS-D quando empresa tem receitas em múltiplos anexos (Anexo I + III,
     ou Fator R alternando III↔V).
 
+    v4 (Achado #4 — auditoria 2026-06-21): preenche ``folhasSalario`` na declaração
+    quando a empresa é Anexo III ou V, usando ``input_jsonb.massa_salarial_12m``
+    (remuneração + encargos CPP/FGTS/13º). Sem isso, o SERPRO recalcula o Fator R
+    com folha vazia → resolve Anexo V → DAS divergente do calculado internamente.
+    Fonte: LC 123/2006 art. 18 §5º-J; Res. CGSN 140/2018 art. 26 §1º.
+
+    SUPOSIÇÃO DE FORMATO (Manual SERPRO PGDAS-D v1.4+ não disponível nesta base):
+    Cada item de ``folhasSalario`` tem ``{"competencia": "AAAAMM", "valorFolha": "0.00"}``.
+    A massa 12m é distribuída uniformemente pelas 12 competências anteriores à
+    competência da apuração. Confirmar e ajustar contra o Manual SERPRO real antes
+    de habilitar em produção (sinalização: campo ``_suposicao_formato_serpro=True``
+    no payload de auditoria interno — não enviado ao SERPRO).
+
     Compatibilidade: apurações pré-v3 (sem ``receitas_por_anexo`` no jsonb)
     caem no fallback ``{anexo_efetivo: receita_mes}`` — comportamento idêntico ao
     PGDAS PR2 original (1 atividade, idAtividade do anexo_efetivo).
+    Apurações pré-v4 (sem ``massa_salarial_12m`` no input_jsonb) enviam
+    ``folhasSalario: []`` — mantém o comportamento anterior (Fator R recalculado
+    pelo SERPRO como zero → Anexo V, divergência ativa mas não piorada).
 
     Out-of-scope (pendência consciente):
       * 1 estabelecimento por empresa (a própria) — múltiplas filiais não cobertas.
       * Deduções / substituição tributária / retenção ISS / imunidades — vazias.
     """
     output = apuracao.output_jsonb or {}
+    input_jsonb = apuracao.input_jsonb or {}
     receita_total = Decimal(str(output.get("receita_mes", "0")))
     anexo_efetivo_default = output.get("anexo_efetivo") or output.get("anexo") or "I"
 
@@ -279,6 +296,16 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
         for anexo, valor in sorted(receitas_por_anexo.items())
     ]
 
+    # Preenche folhasSalario para Anexo III/V — o SERPRO usa esse campo para
+    # recalcular o Fator R internamente. Deve ser coerente com a massa salarial
+    # usada no cálculo interno (remuneração + CPP + FGTS + 13º).
+    # Achado #4 — auditoria 2026-06-21.
+    folhas_salario = _montar_folhas_salario(
+        apuracao_competencia=apuracao.competencia,
+        anexo_efetivo=anexo_efetivo_default,
+        input_jsonb=input_jsonb,
+    )
+
     estabelecimento = {
         "cnpjCompleto": empresa.cnpj,
         "atividades": atividades,
@@ -294,7 +321,7 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
             "valorFixoIcms": "0",
             "valorFixoIss": "0",
             "estabelecimentos": [estabelecimento],
-            "folhasSalario": [],
+            "folhasSalario": folhas_salario,
             "naoOptante": False,
             "transferirReceitaSt": False,
         }
@@ -304,6 +331,82 @@ def _montar_payload_declaracao(empresa: Empresa, apuracao: ApuracaoFiscal) -> Js
 def _decstr(v: Decimal) -> str:
     """Serializa Decimal preservando 2 casas — formato esperado pelo SERPRO."""
     return f"{v.quantize(Decimal('0.01')):.2f}"
+
+
+_ANEXOS_FATOR_R = frozenset({"III", "V"})
+
+
+def _competencia_anterior(ref: date, meses: int) -> str:
+    """Retorna AAAAMM da competência ``meses`` meses antes de ``ref``.
+
+    Usa subtração pura sem depender de ``dateutil`` — subtrai o número
+    de meses respeitando a contagem de ano/mês.
+    """
+    total_meses = ref.year * 12 + ref.month - 1 - meses
+    ano = total_meses // 12
+    mes = total_meses % 12 + 1
+    return f"{ano:04d}{mes:02d}"
+
+
+def _montar_folhas_salario(
+    apuracao_competencia: date,
+    anexo_efetivo: str,
+    input_jsonb: JsonObject,
+) -> list[JsonObject]:
+    """Monta a lista ``folhasSalario`` do payload PGDAS-D para o SERPRO.
+
+    Só preenche para Anexo III ou V — são os únicos em que o Fator R é calculado.
+    Para os demais, retorna lista vazia (sem folha a declarar).
+
+    ``massa_salarial_12m`` (do ``input_jsonb``) é distribuída uniformemente pelas
+    12 competências imediatamente anteriores à competência da apuração.
+    A competência da apuração em si não entra porque o PGDAS-D cobre o período
+    anterior (o mês M é apurado em M+1; a folha informada é dos 12 meses base).
+
+    SUPOSIÇÃO DE FORMATO (Manual SERPRO PGDAS-D v1.4+ não disponível nesta base):
+      {"competencia": "AAAAMM", "valorFolha": "0.00"}
+    Confirmar contra o Manual real antes de produção. Se o formato for diferente
+    (ex.: "valor" em vez de "valorFolha"), ajustar só esta função.
+
+    Retorna ``[]`` quando:
+    - o anexo não é III nem V (Fator R não aplicável), ou
+    - ``massa_salarial_12m`` não está no input_jsonb (apuração pré-v4).
+    """
+    if anexo_efetivo not in _ANEXOS_FATOR_R:
+        return []
+
+    massa_raw = input_jsonb.get("massa_salarial_12m")
+    if massa_raw is None:
+        # Apuração pré-v4 — fallback que mantém comportamento anterior (folha vazia).
+        return []
+
+    massa_total = Decimal(str(massa_raw))
+    if massa_total <= Decimal("0"):
+        return []
+
+    # Distribui uniformemente — arredonda cada parcela e compensa no último mês
+    # para evitar que arredondamentos acumulem diferença do total.
+    parcela_base = (massa_total / Decimal("12")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_EVEN
+    )
+    ajuste = massa_total - parcela_base * Decimal("12")
+    ajuste_quantizado = ajuste.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_EVEN
+    )
+
+    folhas: list[JsonObject] = []
+    for i in range(12, 0, -1):
+        competencia_str = _competencia_anterior(apuracao_competencia, i)
+        # O último mês da janela (i==1) absorve o ajuste de arredondamento.
+        valor = parcela_base + ajuste_quantizado if i == 1 else parcela_base
+        folhas.append(
+            {
+                "competencia": competencia_str,
+                "valorFolha": _decstr(valor),
+            }
+        )
+
+    return folhas
 
 
 # Mapa anexo → idAtividade do PGDAS-D — Manual SERPRO v1.4+ (2022+).

@@ -103,7 +103,12 @@ class FiscalService:
                 raise FatorRObrigatorio(
                     f"Empresa no Anexo {anexo} — forneça folha_12m para calcular Fator R"
                 )
-            fator_r = payload.folha_12m / rbt12 if rbt12 > Decimal("0") else Decimal("0")
+            # Massa salarial = remuneração bruta + encargos patronais (CPP + FGTS + 13º).
+            # Fonte: LC 123/2006 art. 18 §5º-J e §24; Res. CGSN 140/2018 art. 26 §1º.
+            # encargos_folha_12m tem default=0 para retrocompatibilidade com callers
+            # que ainda não fornecem os encargos — o Fator R será subestimado nesses casos.
+            massa_salarial_12m = payload.folha_12m + payload.encargos_folha_12m
+            fator_r = massa_salarial_12m / rbt12 if rbt12 > Decimal("0") else Decimal("0")
             anexo_efetivo = resolver_anexo_fator_r(anexo, fator_r)
 
         faixas_db = await self._tabela_repo.faixas_vigentes(anexo_efetivo, competencia_date)
@@ -147,6 +152,13 @@ class FiscalService:
                 "rbt12": str(rbt12),
                 "receita_mes": str(payload.receita_mes),
                 "folha_12m": str(payload.folha_12m) if payload.folha_12m is not None else None,
+                "encargos_folha_12m": str(payload.encargos_folha_12m),
+                # massa_salarial_12m = folha_12m + encargos_folha_12m (Fator R real)
+                "massa_salarial_12m": (
+                    str(payload.folha_12m + payload.encargos_folha_12m)
+                    if payload.folha_12m is not None
+                    else None
+                ),
                 "competencia": payload.competencia,
             },
             output_jsonb={

@@ -58,18 +58,22 @@ def test_simples_nacional_sem_funcionarios_sem_fgts() -> None:
 
 
 def test_simples_nacional_com_funcionarios_tem_12_fgts() -> None:
-    """FGTS: 12 recolhimentos mensais, dia 7 do mês seguinte."""
+    """FGTS: 12 recolhimentos mensais, dia 20 do mês seguinte (Lei 14.438/2022)."""
     itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
     fgts = [i for i in itens if i.tipo_obrigacao == "fgts"]
     assert len(fgts) == 12
 
 
-def test_simples_nacional_fgts_janeiro_vence_dia_7_fevereiro() -> None:
-    """FGTS jan/2026 nominal = 07/02 (sábado); posterga p/ 09/02 (segunda)."""
+def test_simples_nacional_fgts_janeiro_vence_dia_20_fevereiro() -> None:
+    """FGTS jan/2026 nominal = 20/02/2026 (sexta — dia útil); mantém 20/02.
+
+    Lei 14.438/2022 + FGTS Digital: vencimento = dia 20 do mês seguinte.
+    20/fev/2026 é sexta-feira, portanto não há antecipação.
+    (Substitui o golden anterior que esperava 09/02 com base no dia 7 revogado.)
+    """
     itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
     fgts_jan = next(i for i in itens if i.tipo_obrigacao == "fgts" and "jan" in i.titulo)
-    # IN RFB 1.300/2012: vencimento em sábado posterga p/ próximo dia útil
-    assert fgts_jan.data_vencimento == date(2026, 2, 9)
+    assert fgts_jan.data_vencimento == date(2026, 2, 20)
 
 
 def test_simples_nacional_com_funcionarios_tem_12_esocial() -> None:
@@ -187,11 +191,16 @@ def test_lucro_presumido_com_funcionarios_tem_12_fgts() -> None:
     assert len(fgts) == 12
 
 
-def test_lucro_presumido_fgts_janeiro_vence_dia_7_fevereiro() -> None:
-    """FGTS jan/2026 nominal = 07/02 (sábado); posterga p/ 09/02 (segunda)."""
+def test_lucro_presumido_fgts_janeiro_vence_dia_20_fevereiro() -> None:
+    """FGTS jan/2026 nominal = 20/02/2026 (sexta — dia útil); mantém 20/02.
+
+    Lei 14.438/2022 + FGTS Digital: vencimento = dia 20 do mês seguinte.
+    20/fev/2026 é sexta-feira, portanto não há antecipação.
+    (Substitui o golden anterior que esperava 09/02 com base no dia 7 revogado.)
+    """
     itens = gerar_calendario_anual("lucro_presumido", 2026, tem_funcionarios=True)
     fgts_jan = next(i for i in itens if i.tipo_obrigacao == "fgts" and "jan" in i.titulo)
-    assert fgts_jan.data_vencimento == date(2026, 2, 9)
+    assert fgts_jan.data_vencimento == date(2026, 2, 20)
 
 
 def test_lucro_presumido_com_funcionarios_tem_12_gps_inss() -> None:
@@ -331,3 +340,119 @@ def test_dia_vencimento_carnaval_arrasta_se_sucessivo() -> None:
     feriados = frozenset({date(2026, 4, 3)})
     venc = _dia_vencimento(2026, 4, 3, feriados)
     assert venc == date(2026, 4, 6)
+
+
+# ── FGTS dia 20 — goldens Lei 14.438/2022 ────────────────────────────────────
+#
+# Regra: FGTS vence dia 20 do mês seguinte. Em dia não-útil, ANTECIPA (retrocede)
+# para o dia útil imediatamente anterior — ≠ postergação das demais obrigações.
+
+
+def test_fgts_dia_20_dia_util_mantem_data() -> None:
+    """FGTS mai/2026 → 20/jun/2026 (sábado): NÃO é este caso — veja abaixo.
+
+    Este golden usa abr/2026 → 20/mai/2026 (terça-feira, dia útil): mantém 20/05.
+
+    Cálculo: mai/2026 day 1 = sexta; mai 20 = sexta + 19 = 23 mod 7 = 2 = terça.
+    Terça é dia útil → não há antecipação.
+    """
+    itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
+    fgts_abr = next(i for i in itens if i.tipo_obrigacao == "fgts" and "abr" in i.titulo)
+    # FGTS abr/2026 → 20/mai/2026 (terça) = dia útil → mantém
+    assert fgts_abr.data_vencimento == date(2026, 5, 20)
+
+
+def test_fgts_dia_20_sabado_antecipa_para_sexta() -> None:
+    """FGTS mai/2026 → 20/jun/2026 (sábado) → ANTECIPA para 19/jun/2026 (sexta).
+
+    Cálculo: jun/2026 day 1 = segunda; jun 20 = segunda + 19 = 19 mod 7 = 5 = sábado.
+    Sábado não é dia útil → retrocede 1 dia → 19/jun/2026 (sexta).
+    """
+    itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
+    fgts_mai = next(i for i in itens if i.tipo_obrigacao == "fgts" and "mai" in i.titulo)
+    assert fgts_mai.data_vencimento == date(2026, 6, 19)
+
+
+def test_fgts_dia_20_domingo_antecipa_para_sexta() -> None:
+    """FGTS ago/2026 → 20/set/2026 (domingo) → ANTECIPA para 18/set/2026 (sexta).
+
+    Cálculo: set/2026 day 1 = terça; set 20 = terça + 19 = 20 mod 7 = 6 = domingo.
+    Domingo não é dia útil → retrocede 1 dia → 19/set/2026 (sábado, também não-útil)
+    → retrocede mais 1 → 18/set/2026 (sexta). Dia útil.
+    """
+    itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True)
+    fgts_ago = next(i for i in itens if i.tipo_obrigacao == "fgts" and "ago" in i.titulo)
+    assert fgts_ago.data_vencimento == date(2026, 9, 18)
+
+
+def test_fgts_dia_20_feriado_antecipa_para_dia_util_anterior() -> None:
+    """FGTS mar/2026 → 20/abr/2026 (segunda). Se 20/abr for feriado, antecipa p/ 17/abr (sexta).
+
+    20/abr/2026 é segunda-feira. Marcamos como feriado fictício para exercitar a
+    antecipação por feriado. O retrocesso passa pelo domingo (19/abr) e sábado (18/abr)
+    e encontra 17/abr (sexta-feira, dia útil).
+    """
+    feriados = frozenset({date(2026, 4, 20)})
+    itens = gerar_calendario_anual("simples_nacional", 2026, tem_funcionarios=True, feriados=feriados)
+    fgts_mar = next(i for i in itens if i.tipo_obrigacao == "fgts" and "mar" in i.titulo)
+    # 20/abr (seg, feriado) → 19/abr (dom) → 18/abr (sáb) → 17/abr (sex) ✓
+    assert fgts_mar.data_vencimento == date(2026, 4, 17)
+
+
+def test_fgts_antecipacao_nao_afeta_outras_obrigacoes() -> None:
+    """Garantia de isolamento: GPS/INSS no mesmo mês POSTERGA (não antecipa).
+
+    mar/2026 → 20/abr/2026 (segunda, feriado fictício).
+    GPS/INSS: usa _dia_vencimento (posterga) → 21/abr/2026 (terça).
+    FGTS: usa _fgts_vencimento (antecipa) → 17/abr/2026 (sexta).
+    """
+    feriados = frozenset({date(2026, 4, 20)})
+    itens = gerar_calendario_anual("lucro_presumido", 2026, tem_funcionarios=True, feriados=feriados)
+    fgts_mar = next(i for i in itens if i.tipo_obrigacao == "fgts" and "mar" in i.titulo)
+    gps_mar = next(i for i in itens if i.tipo_obrigacao == "gps_inss" and "mar" in i.titulo)
+    # FGTS antecipa; GPS posterga — comportamentos opostos no mesmo mês/feriado
+    assert fgts_mar.data_vencimento == date(2026, 4, 17)
+    assert gps_mar.data_vencimento == date(2026, 4, 21)
+
+
+# ── Helpers _fgts_vencimento / _dia_util_anterior — testes unitários ─────────
+
+
+def test_fgts_vencimento_dia_util() -> None:
+    """_fgts_vencimento devolve 20 quando é dia útil."""
+    from app.modules.agenda.gerar_calendario import _fgts_vencimento
+
+    # 20/fev/2026 = sexta (dia útil)
+    assert _fgts_vencimento(2026, 2) == date(2026, 2, 20)
+
+
+def test_fgts_vencimento_sabado_retrocede_para_sexta() -> None:
+    """_fgts_vencimento antecipa de sábado (20/jun) para sexta (19/jun)."""
+    from app.modules.agenda.gerar_calendario import _fgts_vencimento
+
+    assert _fgts_vencimento(2026, 6) == date(2026, 6, 19)
+
+
+def test_fgts_vencimento_domingo_retrocede_para_sexta() -> None:
+    """_fgts_vencimento antecipa de domingo (20/set) para sexta (18/set), saltando sábado."""
+    from app.modules.agenda.gerar_calendario import _fgts_vencimento
+
+    assert _fgts_vencimento(2026, 9) == date(2026, 9, 18)
+
+
+def test_dia_util_anterior_feriado_na_segunda() -> None:
+    """_dia_util_anterior: segunda feriada → retrocede até sexta anterior."""
+    from app.modules.agenda.gerar_calendario import _dia_util_anterior
+
+    # 20/abr/2026 = segunda; marcamos como feriado → retrocede
+    feriados = frozenset({date(2026, 4, 20)})
+    resultado = _dia_util_anterior(date(2026, 4, 20), feriados)
+    # dom 19 → sáb 18 → sex 17 ✓
+    assert resultado == date(2026, 4, 17)
+
+
+def test_dia_util_anterior_dia_util_mantem() -> None:
+    """_dia_util_anterior: dia já útil é devolvido sem alterar."""
+    from app.modules.agenda.gerar_calendario import _dia_util_anterior
+
+    assert _dia_util_anterior(date(2026, 2, 20), frozenset()) == date(2026, 2, 20)

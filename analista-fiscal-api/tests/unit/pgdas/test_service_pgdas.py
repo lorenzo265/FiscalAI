@@ -42,6 +42,15 @@ def _apuracao_das(empresa_id: uuid.UUID) -> SimpleNamespace:
         empresa_id=empresa_id,
         competencia=date(2026, 4, 1),
         tipo="das",
+        # input_jsonb sem massa_salarial_12m — simula apuração pré-v4 (retrocompat).
+        # Testes do Achado #4 que precisam do campo populam manualmente após criar.
+        input_jsonb={
+            "rbt12": "500000.00",
+            "receita_mes": "10000.00",
+            "folha_12m": None,
+            "encargos_folha_12m": "0",
+            "competencia": "2026-04",
+        },
         output_jsonb={
             "anexo": "III",
             "anexo_efetivo": "III",
@@ -170,7 +179,11 @@ class TestMontarPayload:
 # ── Manual SERPRO PGDAS-D v1.4+ — idAtividade (Sprint 19.6 PR2 #16) ────────
 
 
-from app.modules.pgdas.service import _id_atividade_por_anexo  # noqa: E402
+from app.modules.pgdas.service import (  # noqa: E402
+    _competencia_anterior,
+    _id_atividade_por_anexo,
+    _montar_folhas_salario,
+)
 
 
 class TestIdAtividadePorAnexo:
@@ -463,3 +476,239 @@ async def test_retificacao_sem_transmissao_previa_levanta() -> None:
                 serpro_client=AsyncMock(),
             )
         assert exc_info.value.http_status == 409
+
+
+# ── Achado #4 — PGDAS transmite folhasSalario vazio (auditoria 2026-06-21) ───
+#
+# Fonte: LC 123/2006 art. 18 §5º-J; Res. CGSN 140/2018 art. 26 §1º;
+# Manual PGDAS-D SERPRO (referência ao campo folhasSalario).
+#
+# O SERPRO recalcula o Fator R internamente a partir da folha declarada no payload.
+# Se folhasSalario=[], o SERPRO resolve como se massa=0 → Fator R=0 → Anexo V,
+# divergindo do Fator R calculado internamente que pode ter resolvido Anexo III.
+#
+# Correção: _montar_folhas_salario() preenche folhasSalario para Anexo III/V
+# com a massa_salarial_12m do input_jsonb (remuneração + CPP + FGTS + 13º),
+# distribuída uniformemente pelas 12 competências anteriores à apuração.
+#
+# SUPOSIÇÃO DE FORMATO: {"competencia": "AAAAMM", "valorFolha": "0.00"}.
+# Confirmar contra o Manual SERPRO real antes de habilitar em produção.
+
+
+class TestCompetenciaAnterior:
+    """Testa a aritmética de subtração de meses para geração das competências."""
+
+    def test_um_mes_antes(self) -> None:
+        ref = date(2026, 4, 1)
+        assert _competencia_anterior(ref, 1) == "202603"
+
+    def test_doze_meses_antes(self) -> None:
+        ref = date(2026, 4, 1)
+        assert _competencia_anterior(ref, 12) == "202504"
+
+    def test_virada_de_ano(self) -> None:
+        ref = date(2026, 1, 1)
+        assert _competencia_anterior(ref, 1) == "202512"
+
+    def test_dois_anos_antes(self) -> None:
+        ref = date(2026, 3, 1)
+        assert _competencia_anterior(ref, 24) == "202403"
+
+
+class TestMontarFolhasSalario:
+    """Testa _montar_folhas_salario — construtor do campo folhasSalario do PGDAS-D."""
+
+    def test_anexo_iii_com_massa_gera_12_itens(self) -> None:
+        """Anexo III com massa_salarial_12m preenche 12 meses de folha."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={"massa_salarial_12m": "120000.00"},
+        )
+        assert len(folhas) == 12
+
+    def test_anexo_v_com_massa_gera_12_itens(self) -> None:
+        """Anexo V também usa Fator R — deve preencher folha."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="V",
+            input_jsonb={"massa_salarial_12m": "60000.00"},
+        )
+        assert len(folhas) == 12
+
+    def test_anexo_i_retorna_vazio(self) -> None:
+        """Anexo I não usa Fator R — folhasSalario deve ser []."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="I",
+            input_jsonb={"massa_salarial_12m": "120000.00"},
+        )
+        assert folhas == []
+
+    def test_sem_massa_no_input_jsonb_retorna_vazio(self) -> None:
+        """Apuração pré-v4 sem massa_salarial_12m — comportamento anterior mantido."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={},  # pré-v4: sem o campo
+        )
+        assert folhas == []
+
+    def test_massa_zero_retorna_vazio(self) -> None:
+        """Massa zero não deve gerar itens (empresa sem funcionários declarando III)."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={"massa_salarial_12m": "0.00"},
+        )
+        assert folhas == []
+
+    def test_soma_das_folhas_bate_massa_total(self) -> None:
+        """A soma dos 12 valorFolha deve igualar massa_salarial_12m (tolerância 1 centavo).
+
+        Garante que a distribuição uniforme + ajuste de arredondamento não perde
+        nem inventa centavos na transmissão ao SERPRO.
+        """
+        from decimal import Decimal as D
+
+        massa = D("120000.01")  # valor propositalmente não divisível por 12
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={"massa_salarial_12m": str(massa)},
+        )
+        soma = sum(D(f["valorFolha"]) for f in folhas)  # type: ignore[arg-type]
+        assert abs(soma - massa) <= D("0.01"), (
+            f"Soma das folhas R${soma} difere da massa R${massa} por mais de R$0,01"
+        )
+
+    def test_competencias_sao_os_12_meses_anteriores(self) -> None:
+        """As 12 competências devem ser exatamente os 12 meses anteriores à apuração."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={"massa_salarial_12m": "120000.00"},
+        )
+        competencias = [str(f["competencia"]) for f in folhas]  # type: ignore[index]
+        # Meses anteriores: de 12 meses atrás até 1 mês atrás
+        esperadas = [
+            "202504",  # 12 meses antes de abr/2026 = abr/2025
+            "202505", "202506", "202507", "202508", "202509",
+            "202510", "202511", "202512", "202601", "202602", "202603",
+        ]
+        assert competencias == esperadas
+
+    def test_formato_chaves_do_item(self) -> None:
+        """Cada item deve ter exatamente as chaves 'competencia' e 'valorFolha'."""
+        folhas = _montar_folhas_salario(
+            apuracao_competencia=date(2026, 4, 1),
+            anexo_efetivo="III",
+            input_jsonb={"massa_salarial_12m": "60000.00"},
+        )
+        for item in folhas:
+            assert set(item.keys()) == {"competencia", "valorFolha"}, (
+                f"Item com chaves inesperadas: {set(item.keys())}"
+            )
+
+
+class TestReconciliacaoPgdasVsDasInterno:
+    """Golden de reconciliação: o anexo no payload PGDAS deve igualar o anexo
+    calculado internamente (evitar divergência com o SERPRO).
+
+    Prova do Achado #4: antes da correção, folhasSalario=[] fazia o SERPRO
+    resolver Fator R como 0 → Anexo V, mesmo que internamente tivéssemos
+    calculado Anexo III. Com a correção, o campo é preenchido com a massa
+    salarial real → SERPRO e sistema convergem no mesmo anexo.
+    """
+
+    def _apuracao_com_massa(
+        self,
+        empresa_id: uuid.UUID,
+        anexo_efetivo: str,
+        massa_salarial_12m: str,
+    ) -> SimpleNamespace:
+        """Cria uma apuração simulada com input_jsonb populado (pós-v4)."""
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            empresa_id=empresa_id,
+            competencia=date(2026, 4, 1),
+            tipo="das",
+            input_jsonb={
+                "rbt12": "500000.00",
+                "receita_mes": "40000.00",
+                "folha_12m": "130000.00",
+                "encargos_folha_12m": "15000.00",
+                "massa_salarial_12m": massa_salarial_12m,
+                "competencia": "2026-04",
+            },
+            output_jsonb={
+                "anexo": "III",
+                "anexo_efetivo": anexo_efetivo,
+                "receita_mes": "40000.00",
+                "valor_das": "3636.00",
+                "fator_r": "0.29",
+            },
+            transmitido_em=None,
+            status="calculado",
+        )
+
+    def test_anexo_iii_payload_contem_folhas_nao_vazias(self) -> None:
+        """Empresa Anexo III com massa_salarial_12m → folhasSalario não é [].
+
+        Antes da correção (Achado #4): sempre [].
+        Após a correção: lista de 12 itens com a massa distribuída.
+        """
+        empresa = _empresa_sn()
+        apuracao = self._apuracao_com_massa(
+            empresa.id, "III", "145000.00"
+        )
+        payload = _montar_payload_declaracao(empresa, apuracao)
+        folhas = payload["declaracao"]["folhasSalario"]
+
+        assert isinstance(folhas, list)
+        assert len(folhas) == 12, (
+            "PGDAS-D deve declarar 12 meses de folha para Anexo III "
+            "para que o SERPRO calcule Fator R corretamente"
+        )
+
+    def test_anexo_iii_soma_folhas_bate_massa(self) -> None:
+        """A soma das folhas no payload deve igualar a massa salarial da apuração.
+
+        Esta é a prova formal de reconciliação: massa usada internamente no
+        cálculo do Fator R == massa enviada ao SERPRO no payload PGDAS-D.
+        """
+        from decimal import Decimal as D
+
+        massa = "145000.00"
+        empresa = _empresa_sn()
+        apuracao = self._apuracao_com_massa(empresa.id, "III", massa)
+        payload = _montar_payload_declaracao(empresa, apuracao)
+        folhas = payload["declaracao"]["folhasSalario"]
+
+        soma = sum(D(str(f["valorFolha"])) for f in folhas)
+        assert abs(soma - D(massa)) <= D("0.01"), (
+            f"Soma folhas PGDAS R${soma} diverge da massa interna R${massa}. "
+            "SERPRO recalcularia Fator R diferente do calculado internamente."
+        )
+
+    def test_pre_v4_sem_massa_envia_lista_vazia_compat(self) -> None:
+        """Apuração pré-v4 sem massa_salarial_12m → folhasSalario=[] (compat).
+
+        Mantém o comportamento anterior — divergência com SERPRO persiste
+        mas não é piorada. O warning deve ser dado no frontend ao contador.
+        """
+        empresa = _empresa_sn()
+        apuracao = _apuracao_das(empresa.id)  # fixture sem input_jsonb massa
+        payload = _montar_payload_declaracao(empresa, apuracao)
+        # Garante retrocompatibilidade: antes da v4, folhasSalario era []
+        assert payload["declaracao"]["folhasSalario"] == []
+
+    def test_anexo_i_nao_declara_folha(self) -> None:
+        """Empresa Anexo I não usa Fator R — folhasSalario deve ser []."""
+        empresa = _empresa_sn()
+        empresa.anexo_simples = "I"
+        apuracao = _apuracao_das(empresa.id)
+        apuracao.output_jsonb["anexo_efetivo"] = "I"
+        apuracao.input_jsonb = {"massa_salarial_12m": "50000.00"}
+        payload = _montar_payload_declaracao(empresa, apuracao)
+        assert payload["declaracao"]["folhasSalario"] == []

@@ -1,13 +1,32 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-06
-**Agente:** claude-opus-4-8 (orquestrador) + implementadores claude-sonnet-4-6
-**Skill ativa:** `fiscalai-backend`
-**Branch:** `hardening-fiscal-2026-06`
-**Suite atual:** **2520 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · +7 integração de empresa (PUT/create, requer Docker)
-**mypy strict:** ✅ 0 erros em 357 arquivos
+**Última atualização:** 2026-06-21
+**Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
+**Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
+**Branch:** `fix/auditoria-fiscal-2026-06` (a partir de `main`)
+**Suite atual:** **2588 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
+
+---
+
+## Auditoria Fiscal 2026-06-21 — Onda A (4 fixes 🔴 + 1 🟠) · branch `fix/auditoria-fiscal-2026-06`
+
+Origem: auto de infração `docs/auditoria-fiscal/auto-de-infracao-2026-06-21.md` (skill `auditor-fiscal-implacavel`, 7 auditores A1–A7). Orquestrador despachou 4 implementadores **write-only** (arquivos disjuntos) → validou **pytest + mypy strict + eyeball fiscal dos diffs** → commitou. **Suite: 2588 passed, 3 skipped (era 2520, +68 goldens de borda). mypy strict ✅. NÃO pushado** (ato do PO).
+
+Corrigidos (todos com golden de borda):
+- **#3 Fator R sem encargos** (`fiscal/service.py` + `fiscal/schemas.py`): `massa_salarial_12m = folha_12m + encargos_folha_12m` (Res. CGSN 140/2018 art. 26 §1º — massa = remuneração + CPP + FGTS + 13º). Campo `encargos_folha_12m` opcional (default 0, retrocompat — caller DEVE popular). Goldens: 28,00% exato→Anexo III, 27,99%→V, encargos virando V→III.
+- **#4 PGDAS folha vazia** (`pgdas/service.py`): `folhasSalario` preenchido com a folha 12m coerente com a massa do Fator R (reconciliação com o DAS interno). ⚠️ formato do campo SERPRO é **suposição** (`{competencia, valorFolha}`) — confirmar no Manual PGDAS-D antes de produção.
+- **#5 DRE dupla contagem** (`relatorios/calcula_dre.py` v2→v3): exclui 5.2 (Despesas Financeiras) e 5.3 (Provisão IRPJ/CSLL) do operacional; entram via `resultado_financeiro` / `irpj_csll_apurado` (Lei 6.404/76 art. 187).
+- **#6 Lançador sem partida dobrada** (`contabil/lancador_service.py`): `_persistir` reusa `validar_partidas` + `LancamentoInvalido`; rejeita desbalanceado / valor 0 / negativo no caminho automático (folha, impostos, NF).
+- **#2 Dividendos retenção 10%** (`pessoal/calcula_distribuicao.py` v2→v3 + `repo.py` + `socio_service.py` + `schemas.py`): retenção de 10% sobre o **total do mês** quando > R$ 50.000 (Lei 15.270/2025, confirmada na web; "superior a" → 50k exato não retém; inclusive Simples). Coexiste com a isenção/IRRF progressivo já existentes.
+
+Pendências conscientes desta onda (`[follow-up]`):
+1. **Persistir a retenção de dividendos** — as colunas `retencao_dividendos_10pct` / `total_acumulado_mes` ainda NÃO existem em `DistribuicaoLucros` (models.py). O service **computa + retorna + loga**, mas passa `retido_anteriormente_no_mes=0` → em 2º+ pagamento do mês **após** cruzar 50k, retém **a mais** (conservador, recuperável na DAA — **nunca a menos**; o erro original era reter ZERO). Follow-up: migration 2-fases (add colunas nullable + backfill + NOT NULL) + wire do `socio_service`.
+2. **Formato `folhasSalario` do SERPRO** — confirmar contra o Manual PGDAS-D real.
+
+**Onda B (próxima):** **#1 IRRF 2026 redutor** (Lei 15.191/2025 faixas + Lei 15.270/2025 redutor) via `aliquota-smith` — **PARA no gate** (alíquota seedada = freio). Migration = `0059`. Depois os 🟠 restantes do auto de infração (CST×CSOSN, CFOP/NCM cabeçalho, ICMSTot×itens, Simples fora da Reforma 2026, UPDATE ICMS RJ→INSERT, parcelamento dia útil).
 
 ---
 

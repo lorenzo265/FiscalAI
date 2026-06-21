@@ -4,7 +4,7 @@ Regras por regime:
   Simples Nacional (CGSN 140/2018):
     - PGDAS-D + DAS: até dia 20 do mês seguinte à competência
     - DEFIS: 31/março do ano seguinte
-    - FGTS: dia 7 do mês seguinte (quando tem_funcionarios=True)
+    - FGTS: dia 20 do mês seguinte (quando tem_funcionarios=True)
     - eSocial S-1200: dia 15 do mês seguinte (quando tem_funcionarios=True)
 
   MEI:
@@ -19,14 +19,19 @@ Regras por regime:
     - DCTFWeb: até o 15º dia do 2º mês seguinte ao fato gerador (IN RFB 2.005/2021)
       Substituiu a DCTF para todas as empresas obrigadas ao eSocial desde 2023.
     - PIS/Cofins: dia 25 do mês seguinte
-    - FGTS: dia 7 do mês seguinte (quando tem_funcionarios=True)
+    - FGTS: dia 20 do mês seguinte (quando tem_funcionarios=True) — Lei 14.438/2022
     - GPS/INSS: dia 20 do mês seguinte (quando tem_funcionarios=True)
     - eSocial S-1200: dia 15 do mês seguinte (quando tem_funcionarios=True)
 
-Dia útil:
+Dia útil — FGTS vs. demais obrigações:
   ``_dia_vencimento`` posterga para o próximo dia útil quando cai em sábado,
   domingo ou feriado nacional (IN RFB 1.300/2012 art. 26). Os feriados são
   passados pelo caller (chamada à BrasilAPI ``/feriados/v1/{ano}`` cacheada).
+
+  FGTS (Lei 14.438/2022 + FGTS Digital, competências desde mar/2024): vence no
+  dia 20 do mês seguinte. Quando o dia 20 cai em sábado, domingo ou feriado,
+  o recolhimento é ANTECIPADO para o dia útil IMEDIATAMENTE ANTERIOR — ao
+  contrário das demais obrigações, que são postergadas.
 """
 from __future__ import annotations
 
@@ -233,18 +238,20 @@ def _obrigacoes_trabalhistas(
     incluir_gps: bool,
     feriados: frozenset[date] = frozenset(),
 ) -> list[ItemCalendario]:
-    """FGTS (dia 7), eSocial S-1200 (dia 15) e GPS/INSS (dia 20, LP apenas)."""
+    """FGTS (dia 20, antecipado), eSocial S-1200 (dia 15) e GPS/INSS (dia 20, LP apenas)."""
     items: list[ItemCalendario] = []
 
     for mes in range(1, 13):
         mes_venc = mes + 1 if mes < 12 else 1
         ano_venc = ano if mes < 12 else ano + 1
 
-        # FGTS — dia 7 do mês seguinte (Lei 8.036/1990, art. 15, §5º)
+        # FGTS — dia 20 do mês seguinte (Lei 14.438/2022 + FGTS Digital, competências desde mar/2024).
+        # Em dia não-útil (sábado/domingo/feriado), ANTECIPA para o dia útil imediatamente anterior
+        # (comportamento oposto à postergação das demais obrigações tributárias).
         items.append(ItemCalendario(
             titulo=f"FGTS {_mes_nome(mes)}/{ano}",
             descricao=f"Recolhimento do FGTS referente à folha de {_mes_nome(mes)}/{ano}",
-            data_vencimento=_dia_vencimento(ano_venc, mes_venc, 7, feriados),
+            data_vencimento=_fgts_vencimento(ano_venc, mes_venc, feriados),
             regime=regime,
             tipo_obrigacao="fgts",
         ))
@@ -269,6 +276,30 @@ def _obrigacoes_trabalhistas(
             ))
 
     return items
+
+
+def _fgts_vencimento(
+    ano: int,
+    mes: int,
+    feriados: frozenset[date] = frozenset(),
+) -> date:
+    """Retorna a data de recolhimento do FGTS (dia 20 do mês dado).
+
+    Regra específica do FGTS Digital (Lei 14.438/2022): quando o dia 20 cai em
+    sábado, domingo ou feriado, o recolhimento é ANTECIPADO para o dia útil
+    imediatamente anterior — ao contrário das demais obrigações, que são
+    postergadas (cf. ``_dia_vencimento``).
+    """
+    ultimo = calendar.monthrange(ano, mes)[1]
+    candidato = date(ano, mes, min(20, ultimo))
+    return _dia_util_anterior(candidato, feriados)
+
+
+def _dia_util_anterior(d: date, feriados: frozenset[date]) -> date:
+    """Antecipa ``d`` enquanto cair em sábado/domingo/feriado (retrocede 1 dia de cada vez)."""
+    while d.weekday() >= 5 or d in feriados:
+        d -= timedelta(days=1)
+    return d
 
 
 def _dia_vencimento(

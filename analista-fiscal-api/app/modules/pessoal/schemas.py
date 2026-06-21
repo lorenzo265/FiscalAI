@@ -293,6 +293,16 @@ class DistribuicaoIn(BaseModel):
 
 
 class DistribuicaoOut(BaseModel):
+    """Resultado de uma distribuição de lucros persistida.
+
+    Campos da Lei 15.270/2025 (vigência 01/01/2026):
+      * ``retencao_dividendos_10pct``: retenção antecipada de 10% calculada
+        neste evento. None enquanto a coluna não existir no banco (pré-migration).
+        Após migration-smith adicionar as colunas, passa a ser obrigatório.
+      * ``total_acumulado_mes``: total bruto acumulado para a PJ×PF no mês
+        após este pagamento (para auditoria e próximo pagamento do mês).
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -306,6 +316,10 @@ class DistribuicaoOut(BaseModel):
     irrf_retido: Decimal
     base_calculo_referencia: str
     algoritmo_versao: str
+    # ── Lei 15.270/2025 — colunas adicionadas via migration (2 fases) ────────
+    # None enquanto a migration não for aplicada; obrigatório após.
+    retencao_dividendos_10pct: Decimal | None = None
+    total_acumulado_mes: Decimal | None = None
 
 
 class EsocialGerarIn(BaseModel):

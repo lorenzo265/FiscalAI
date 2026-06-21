@@ -13,7 +13,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.pessoal.calcula_fgts import ResultadoFgts
@@ -260,6 +260,38 @@ class DistribuicaoRepo:
         await self._s.flush()
         await self._s.refresh(d)
         return d
+
+    async def soma_bruta_no_mes(
+        self,
+        empresa_id: UUID,
+        socio_id: UUID,
+        ano: int,
+        mes: int,
+    ) -> Decimal:
+        """Retorna a soma dos valores brutos distribuídos no mês para a PJ×PF.
+
+        Usado pela Lei 15.270/2025 para calcular o acumulado do mês e
+        determinar a retenção antecipada de 10% sobre dividendos.
+
+        Args:
+            empresa_id: identificador da PJ pagadora.
+            socio_id: identificador da PF beneficiária.
+            ano: ano calendário (ex.: 2026).
+            mes: mês calendário (1–12).
+
+        Returns:
+            Soma dos valores brutos pagos no mês. Zero se não houver registros.
+        """
+        stmt = select(
+            func.coalesce(func.sum(DistribuicaoLucros.valor), Decimal("0"))
+        ).where(
+            DistribuicaoLucros.empresa_id == empresa_id,
+            DistribuicaoLucros.socio_id == socio_id,
+            extract("year", DistribuicaoLucros.data_distribuicao) == ano,
+            extract("month", DistribuicaoLucros.data_distribuicao) == mes,
+        )
+        result = (await self._s.execute(stmt)).scalar_one()
+        return Decimal(str(result))
 
 
 class EventoESocialRepo:

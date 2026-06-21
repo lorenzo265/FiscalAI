@@ -34,6 +34,11 @@ Estrutura aplicada (compatível com plano referencial RFB usado na Sprint 9):
 FA6 (2026-06-04): separação Lei 6.404 art. 187 — 4.9.* Outras Receitas NÃO compõem
 a Receita Operacional Bruta. Entram como linha própria APÓS o EBIT, antes do LAIR.
 
+FA7 (2026-06-21): dupla contagem eliminada — 5.2 (Despesas Financeiras) e 5.3
+(Provisão IRPJ/CSLL) excluídos das "Outras Despesas Operacionais". Ambos ficam
+fora do EBIT/EBITDA conforme Lei 6.404/76 art. 187. 5.2 entra via parâmetro
+`resultado_financeiro`; 5.3 via `irpj_csll_apurado` (achado #5 auditoria 2026-06).
+
 Convenção de sinal: receitas são positivas (saldo natureza C);
 despesas/deduções entram positivas e o algoritmo SUBTRAI no nível certo.
 
@@ -50,7 +55,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, getcontext
 
 getcontext().prec = 28
 
-ALGORITMO_VERSAO = "dre.estruturada.v2"
+ALGORITMO_VERSAO = "dre.estruturada.v3"
 
 _CENTAVO = Decimal("0.01")
 _ZERO = Decimal("0")
@@ -66,6 +71,9 @@ _COD_IMPOSTOS_RECEITA = "5.1.05"
 _COD_CMV = "5.1.01"
 _COD_DESPESAS_PESSOAL = ("5.1.02", "5.1.03")
 _COD_DEPRECIACAO = "5.1.04"
+# Lei 6.404/76 art. 187 — fora do resultado operacional:
+_COD_DESPESAS_FINANCEIRAS = "5.2"  # Despesas Financeiras (ECD RFB 4.03)
+_COD_PROVISAO_IR = "5.3"           # Provisão IRPJ/CSLL (ECD RFB 4.05)
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,7 +118,7 @@ class ResultadoDre:
     lair: LinhaDre
     irpj_csll: LinhaDre
     lucro_liquido: LinhaDre
-    algoritmo_versao: str = ALGORITMO_VERSAO
+    algoritmo_versao: str = ALGORITMO_VERSAO  # "dre.estruturada.v3"
 
 
 def _quantizar(v: Decimal) -> Decimal:
@@ -240,7 +248,12 @@ def calcular_dre(
         detalhes=pessoal_codigos,
     )
 
-    # Outras = todo 5.x exceto CMV, Pessoal, Encargos, Depreciação, Impostos.
+    # Outras = todo 5.1.x exceto CMV, Pessoal, Encargos, Depreciação, Impostos.
+    # FA7 (achado #5): 5.2 (Despesas Financeiras) e 5.3 (Provisão IRPJ/CSLL)
+    # são EXCLUÍDOS do resultado operacional — Lei 6.404/76 art. 187.
+    # 5.2 entra via `resultado_financeiro` (parâmetro externo).
+    # 5.3 entra via `irpj_csll_apurado` (parâmetro externo).
+    # Dupla contagem eliminada: _somar_prefixo limita-se ao subárvore 5.1.
     outras_v, outras_codigos = _somar_prefixo(
         saldos, _COD_DESPESAS_RAIZ,
         excluir=(
@@ -248,6 +261,8 @@ def calcular_dre(
             *_COD_DESPESAS_PESSOAL,
             _COD_DEPRECIACAO,
             _COD_IMPOSTOS_RECEITA,
+            _COD_DESPESAS_FINANCEIRAS,   # 5.2 — fora do operacional
+            _COD_PROVISAO_IR,            # 5.3 — fora do operacional
         ),
     )
     outras_despesas = LinhaDre(

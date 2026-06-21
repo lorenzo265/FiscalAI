@@ -231,6 +231,18 @@ class DistribuicaoService:
         else:
             limite_isento_apurado = payload.limite_isento_apurado
 
+        # ── Lei 15.270/2025: acumulado do mês anterior a este pagamento ─────
+        # Somamos os valores já registrados no banco para esta PJ×PF no mesmo
+        # mês calendário (excluindo o pagamento atual, que ainda não foi salvo).
+        # Isso habilita o recálculo incremental para múltiplos pagamentos.
+        repo_dist = DistribuicaoRepo(session)
+        dividendos_ja_pagos_no_mes = await repo_dist.soma_bruta_no_mes(
+            empresa_id=empresa_id,
+            socio_id=socio_id,
+            ano=payload.data_distribuicao.year,
+            mes=payload.data_distribuicao.month,
+        )
+
         try:
             resultado = calcular_distribuicao(
                 valor_distribuido=payload.valor,
@@ -240,10 +252,21 @@ class DistribuicaoService:
                 ),
                 faixas_irrf=faixas_irrf,
                 dependentes=socio.dependentes_irrf,
+                dividendos_ja_pagos_no_mes=dividendos_ja_pagos_no_mes,
+                # retencao_lei_15270_ja_retida_no_mes: quando os campos estiverem
+                # na tabela (após migration), buscar via repo. Por ora, default 0
+                # (conservador: pode reter a mais no 2º pagamento do mês; ajuste
+                # pós-migration ao somar coluna retencao_dividendos_10pct).
+                retencao_lei_15270_ja_retida_no_mes=_ZERO,
             )
         except ValueError as exc:
             raise DistribuicaoInvalida(str(exc)) from exc
 
+        # NOTA: campos retencao_dividendos_10pct e total_acumulado_mes ainda
+        # não existem no modelo DistribuicaoLucros — aguardam migration-smith
+        # (adicionar colunas NULLABLE + NOT NULL em 2 fases com RLS).
+        # O cálculo já é correto; a persistência desses campos virá no PR de
+        # migration + model update.
         distribuicao = DistribuicaoLucros(
             tenant_id=tenant_id,
             empresa_id=empresa_id,
@@ -257,7 +280,7 @@ class DistribuicaoService:
             base_calculo_referencia=payload.base_calculo_referencia.value,
             algoritmo_versao=resultado.algoritmo_versao,
         )
-        await DistribuicaoRepo(session).criar(distribuicao)
+        await repo_dist.criar(distribuicao)
         await session.commit()
         await session.refresh(distribuicao)
 
@@ -269,6 +292,9 @@ class DistribuicaoService:
             isento=str(resultado.valor_isento),
             tributavel=str(resultado.valor_tributavel),
             irrf=str(resultado.irrf_retido),
+            # Lei 15.270/2025 — novos campos auditados no log
+            retencao_dividendos_10pct=str(resultado.retencao_dividendos_10pct),
+            total_acumulado_mes=str(resultado.total_acumulado_mes),
         )
         return distribuicao
 

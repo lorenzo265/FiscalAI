@@ -47,6 +47,7 @@ from app.modules.contabil.lancador_auto import (
     gerar_partidas_de_provisao,
     gerar_partidas_de_transacao,
 )
+from app.modules.contabil.partidas import PartidaIn as _PartidaInDomain, validar_partidas as _validar_partidas
 from app.modules.contabil.plano_referencial import (
     CODIGOS_PADRAO_LANCAMENTO_AUTO,
     _CHAVES_CORE,
@@ -67,7 +68,7 @@ from app.shared.db.models import (
     ProvisaoMensal,
     TransacaoBancaria,
 )
-from app.shared.exceptions import EmpresaNaoEncontrada, PlanoContasIncompleto
+from app.shared.exceptions import EmpresaNaoEncontrada, LancamentoInvalido, PlanoContasIncompleto
 
 log = structlog.get_logger(__name__)
 
@@ -601,9 +602,59 @@ class LancadorService:
           * True  → criado novo
           * False → já existia (idempotente)
           * None  → não houve partidas (não deveria acontecer aqui)
+
+        Validação §8.4 (partida dobrada) — achado #6 auditoria 2026-06:
+        Antes de persistir, valida Σ D == Σ C (tolerância zero — Decimal puro)
+        e todo valor de partida > 0. Candidato inválido levanta
+        ``LancamentoInvalido`` (mesma exceção do caminho manual) para que o
+        caller/lote possa tratar ou deixar propagar como erro de converter puro.
+        Validação aqui é defensiva — os conversores (lancador_auto) já devem
+        gerar candidatos balanceados; esta trava captura regressões.
         """
         if not candidato.partidas:
             return None
+
+        # ── Validação partidas dobradas (§8.4 + Lei 6.404 art. 177) ─────────
+        # Reusa _validar_partidas (mesma função do lançamento manual) em modo
+        # "estrutural" — não verifica conta no banco (sem I/O), apenas:
+        #   • todo valor > 0
+        #   • Σ D == Σ C
+        # Para isso construímos PartidaIn sem ContaView (lookup vazio) e
+        # toleramos erros de conta-não-encontrada (esperados — sem I/O aqui);
+        # só rejeitamos se houver erro de valor ou de balanceamento.
+        partidas_domain = [
+            _PartidaInDomain(conta_id=p.conta_id, tipo=p.tipo, valor=p.valor)
+            for p in candidato.partidas
+        ]
+        resultado_validacao = _validar_partidas(
+            partidas_domain,
+            contas={},          # sem lookup de conta — validação estrutural
+            empresa_id=empresa_id,
+            competencia=candidato.competencia,
+        )
+        # Coleta erros bloqueantes: desbalanceamento e valores não positivos.
+        # Erros de "conta_nao_encontrada" são tolerados (lookup vazio intencional
+        # — validação estrutural sem I/O de banco nesta camada).
+        erros_bloqueantes: list[str] = []
+        for e in resultado_validacao.erros:
+            if "partidas_desbalanceadas" in e:
+                erros_bloqueantes.append(e)
+            elif "_valor_nao_positivo" in e:
+                erros_bloqueantes.append(e)
+
+        if erros_bloqueantes:
+            log.error(
+                "contabil.auto.candidato_invalido",
+                origem_tipo=candidato.origem_tipo,
+                origem_id=str(candidato.origem_id),
+                erros=erros_bloqueantes,
+            )
+            raise LancamentoInvalido(
+                f"Candidato automático '{candidato.origem_tipo}' "
+                f"(id={candidato.origem_id}) viola partida dobrada: "
+                f"{', '.join(erros_bloqueantes)}"
+            )
+        # ── fim validação ──────────────────────────────────────────────────
 
         lanc_repo = LancamentoRepo(session)
         existente = await lanc_repo.por_origem(
@@ -612,7 +663,7 @@ class LancadorService:
         if existente is not None:
             return False
 
-        total = candidato.total
+        total = resultado_validacao.total_debito  # Σ D == Σ C garantido acima
         lanc = await lanc_repo.criar(
             tenant_id=tenant_id,
             empresa_id=empresa_id,

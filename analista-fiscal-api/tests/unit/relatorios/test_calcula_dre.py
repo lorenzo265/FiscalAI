@@ -1,6 +1,9 @@
-"""Golden tests do DRE (Sprint 12 PR1 + FA6 M9 2026-06-04).
+"""Golden tests do DRE (Sprint 12 PR1 + FA6 M9 2026-06-04 + FA7 2026-06-21).
 
 FA6: garante que 4.9.* (Outras Receitas) NÃO infla a ROB (Lei 6.404 art. 187).
+FA7: garante que 5.2 (Despesas Financeiras) e 5.3 (Provisão IRPJ/CSLL) NÃO
+     entram nas "Outras Despesas Operacionais" — eliminando dupla contagem
+     (achado #5 auditoria 2026-06 — Lei 6.404/76 art. 187).
 """
 
 from __future__ import annotations
@@ -65,7 +68,7 @@ class TestDreCompleto:
         # Lucro líquido = LAIR − IRPJ+CSLL = 18500
         assert r.lucro_liquido.valor == Decimal("18500.00")
         assert r.algoritmo_versao == ALGORITMO_VERSAO
-        assert ALGORITMO_VERSAO == "dre.estruturada.v2"
+        assert ALGORITMO_VERSAO == "dre.estruturada.v3"
 
 
 class TestDreServicosLp:
@@ -347,3 +350,224 @@ class TestFA6OutrasReceitas:
         # LAIR = 80000 + 5000 = 85000
         assert r.lair.valor == Decimal("85000.00")
         assert r.lucro_liquido.valor == Decimal("85000.00")
+
+
+class TestFA7DuplasContagens:
+    """FA7 — achado #5 — 5.2 e 5.3 fora das despesas operacionais.
+
+    Lei 6.404/76 art. 187: resultado financeiro e provisão IRPJ/CSLL
+    são linhas após o EBIT — não compõem o resultado operacional.
+
+    Antes do fix: 5.2.01 e 5.3.01 eram capturados por _somar_prefixo("5",
+    excluir=...) → entravam em 'Outras Despesas Operacionais' → EBITDA/EBIT
+    contaminados → e depois o `resultado_financeiro` (parâmetro externo) e o
+    `irpj_csll_apurado` eram somados/subtraídos de novo → DUPLA CONTAGEM.
+
+    Após o fix: 5.2 e 5.3 excluídos das despesas operacionais → sem dupla
+    contagem. 5.2 entra SOMENTE via `resultado_financeiro`; 5.3 entra SOMENTE
+    via `irpj_csll_apurado`.
+    """
+
+    def test_5_2_nao_entra_nas_outras_despesas_operacionais(self) -> None:
+        """Golden principal FA7: 5.2.01 NÃO contamina EBIT.
+
+        Cenário numérico:
+          Receita operacional  (4.1.01)  =  100.000
+          Despesa pessoal      (5.1.02)  =   20.000
+          Juros/desp.financ.   (5.2.01)  =    5.000  ← NÃO deve ir ao EBIT
+          resultado_financeiro (externo) =   -5.000  ← entra só aqui
+
+          EBIT correto   = 100.000 − 20.000 = 80.000
+          EBIT com bug   = 100.000 − 20.000 − 5.000 = 75.000
+          LAIR correto   = 80.000 + (-5.000) = 75.000
+          LAIR com bug   = 75.000 + (-5.000) = 70.000  ← dupla contagem
+          Lucro líquido  = LAIR (IRPJ/CSLL = 0)
+        """
+        saldos = [
+            _saldo("4.1.01", "100000"),
+            _saldo("5.1.02", "20000"),
+            _saldo("5.2.01", "5000"),   # Juros e Encargos Financeiros
+        ]
+        r = calcular_dre(saldos, resultado_financeiro=Decimal("-5000"))
+
+        # (a) EBIT/EBITDA NÃO incluem 5.2
+        assert r.outras_despesas.valor == Decimal("0.00"), (
+            "5.2.01 NÃO deve aparecer em Outras Despesas Operacionais"
+        )
+        assert "5.2.01" not in r.outras_despesas.detalhes
+        assert r.ebitda.valor == Decimal("80000.00"), (
+            "EBITDA = 100.000 - 20.000 = 80.000 (5.2 excluído)"
+        )
+        assert r.ebit.valor == Decimal("80000.00"), (
+            "EBIT = 80.000 (sem depreciação, sem 5.2)"
+        )
+
+        # (b) resultado_financeiro entra UMA VEZ via parâmetro
+        assert r.resultado_financeiro.valor == Decimal("-5000.00")
+
+        # (c) lucro líquido fecha corretamente (sem dupla contagem)
+        assert r.lair.valor == Decimal("75000.00"), (
+            "LAIR = EBIT 80.000 + RF -5.000 = 75.000"
+        )
+        assert r.lucro_liquido.valor == Decimal("75000.00")
+
+    def test_5_3_nao_entra_nas_outras_despesas_operacionais(self) -> None:
+        """Golden FA7: 5.3.01 NÃO contamina EBIT.
+
+        Cenário numérico:
+          Receita operacional  (4.1.01)  =  100.000
+          Despesa pessoal      (5.1.02)  =   20.000
+          Provisão IRPJ/CSLL   (5.3.01)  =    8.000  ← NÃO deve ir ao EBIT
+          irpj_csll_apurado  (externo)   =    8.000  ← entra só aqui
+
+          EBIT correto  = 100.000 − 20.000 = 80.000
+          EBIT com bug  = 100.000 − 20.000 − 8.000 = 72.000
+          LAIR correto  = 80.000 (RF = 0)
+          LL correto    = 80.000 − 8.000 = 72.000
+          LL com bug    = 72.000 − 8.000 = 64.000  ← dupla contagem
+        """
+        saldos = [
+            _saldo("4.1.01", "100000"),
+            _saldo("5.1.02", "20000"),
+            _saldo("5.3.01", "8000"),   # Provisão IRPJ / CSLL do Exercício
+        ]
+        r = calcular_dre(saldos, irpj_csll_apurado=Decimal("8000"))
+
+        # (a) EBIT/EBITDA NÃO incluem 5.3
+        assert r.outras_despesas.valor == Decimal("0.00"), (
+            "5.3.01 NÃO deve aparecer em Outras Despesas Operacionais"
+        )
+        assert "5.3.01" not in r.outras_despesas.detalhes
+        assert r.ebitda.valor == Decimal("80000.00"), (
+            "EBITDA = 100.000 - 20.000 = 80.000 (5.3 excluído)"
+        )
+        assert r.ebit.valor == Decimal("80000.00")
+
+        # (b) IRPJ/CSLL aparece UMA vez (via irpj_csll_apurado)
+        assert r.irpj_csll.valor == Decimal("8000.00")
+
+        # (c) lucro líquido fecha
+        assert r.lair.valor == Decimal("80000.00")
+        assert r.lucro_liquido.valor == Decimal("72000.00"), (
+            "LL = LAIR 80.000 − IRPJ/CSLL 8.000 = 72.000 (sem dupla contagem)"
+        )
+
+    def test_5_2_e_5_3_simultaneos_sem_dupla_contagem(self) -> None:
+        """Golden FA7 completo: 5.2 e 5.3 presentes juntos — zero dupla contagem.
+
+        Cenário numérico (caso real LP com juros e provisão):
+          Receita operacional  (4.1.01)  =  200.000
+          Impostos sobre rec.  (5.1.05)  =   12.000
+          CMV                  (5.1.01)  =   80.000
+          Despesa pessoal      (5.1.02)  =   30.000
+          Outras desp. oper.   (5.1.99)  =   10.000
+          Depreciação          (5.1.04)  =    5.000
+          ─────── EBIT ─── 200k-12k-80k-30k-10k-5k = 63.000
+          Juros financ.        (5.2.01)  =    3.000  ← NÃO operacional
+          resultado_financeiro (externo) =   -3.000
+          ─────── LAIR ─── 63.000 + (-3.000) = 60.000
+          Provisão IRPJ/CSLL   (5.3.01)  =    9.000  ← NÃO operacional
+          irpj_csll_apurado  (externo)   =    9.000
+          ─────── LL ─── 60.000 − 9.000 = 51.000
+
+        Com bug antigo:
+          outras_despesas = 10.000 + 3.000 + 9.000 = 22.000
+          EBITDA = 200k-12k-80k-30k-22k = 56k; EBIT = 51k
+          LAIR = 51k + (-3k) = 48k; LL = 48k - 9k = 39k  ← ERRADO
+        """
+        saldos = [
+            _saldo("4.1.01", "200000"),
+            _saldo("5.1.01", "80000"),
+            _saldo("5.1.02", "30000"),
+            _saldo("5.1.04", "5000"),
+            _saldo("5.1.05", "12000"),
+            _saldo("5.1.99", "10000"),
+            _saldo("5.2.01", "3000"),   # Juros — deve ser excluído do operacional
+            _saldo("5.3.01", "9000"),   # Provisão IR — deve ser excluído do operacional
+        ]
+        r = calcular_dre(
+            saldos,
+            irpj_csll_apurado=Decimal("9000"),
+            resultado_financeiro=Decimal("-3000"),
+        )
+
+        # Receita
+        assert r.receita_bruta.valor == Decimal("200000.00")
+        assert r.deducoes.valor == Decimal("12000.00")
+        assert r.receita_liquida.valor == Decimal("188000.00")
+        assert r.cmv.valor == Decimal("80000.00")
+        assert r.lucro_bruto.valor == Decimal("108000.00")
+
+        # Despesas operacionais — APENAS 5.1.99 (NÃO inclui 5.2/5.3)
+        assert r.despesas_pessoal.valor == Decimal("30000.00")
+        assert r.outras_despesas.valor == Decimal("10000.00"), (
+            "5.1.99 = 10.000; 5.2.01 e 5.3.01 NÃO devem estar aqui"
+        )
+        assert "5.2.01" not in r.outras_despesas.detalhes
+        assert "5.3.01" not in r.outras_despesas.detalhes
+
+        # (a) EBIT sem 5.2/5.3
+        assert r.ebitda.valor == Decimal("68000.00"), (
+            "EBITDA = 108.000 - 30.000 - 10.000 = 68.000"
+        )
+        assert r.depreciacao.valor == Decimal("5000.00")
+        assert r.ebit.valor == Decimal("63000.00"), (
+            "EBIT = 68.000 - 5.000 = 63.000"
+        )
+
+        # (b) resultado financeiro UMA VEZ
+        assert r.resultado_financeiro.valor == Decimal("-3000.00")
+        assert r.lair.valor == Decimal("60000.00")
+
+        # (b) IRPJ/CSLL UMA VEZ
+        assert r.irpj_csll.valor == Decimal("9000.00")
+
+        # (c) lucro líquido fecha
+        assert r.lucro_liquido.valor == Decimal("51000.00"), (
+            "LL = LAIR 60.000 − IRPJ/CSLL 9.000 = 51.000 (zero dupla contagem)"
+        )
+
+    def test_5_2_subcontas_multiplas_excluidas(self) -> None:
+        """Todas subcontas de 5.2 excluídas pelo prefixo boundary.
+
+        5.2.01 e hipotética 5.2.02 devem ambas ser excluídas.
+        """
+        saldos = [
+            _saldo("4.1.01", "50000"),
+            _saldo("5.1.02", "10000"),
+            _saldo("5.2.01", "2000"),   # Juros
+            _saldo("5.2.02", "500"),    # Hipotética taxa bancária
+        ]
+        r = calcular_dre(saldos, resultado_financeiro=Decimal("-2500"))
+
+        assert r.outras_despesas.valor == Decimal("0.00")
+        assert "5.2.01" not in r.outras_despesas.detalhes
+        assert "5.2.02" not in r.outras_despesas.detalhes
+        assert r.ebit.valor == Decimal("40000.00")
+        assert r.lair.valor == Decimal("37500.00")
+
+    def test_backward_compat_sem_5_2_e_5_3(self) -> None:
+        """Sem saldos em 5.2/5.3: comportamento idêntico ao pré-FA7.
+
+        Prova que o fix não altera resultados quando as contas financeiras
+        e de provisão têm saldo zero (empresa sem juros/LP, SN sem IRPJ/CSLL).
+        """
+        saldos = [
+            _saldo("4.1.01", "80000"),
+            _saldo("5.1.01", "30000"),
+            _saldo("5.1.02", "15000"),
+            _saldo("5.1.05", "6400"),
+        ]
+        r = calcular_dre(saldos, irpj_csll_apurado=Decimal("1000"))
+
+        assert r.receita_bruta.valor == Decimal("80000.00")
+        assert r.deducoes.valor == Decimal("6400.00")
+        assert r.receita_liquida.valor == Decimal("73600.00")
+        assert r.lucro_bruto.valor == Decimal("43600.00")
+        assert r.despesas_pessoal.valor == Decimal("15000.00")
+        assert r.outras_despesas.valor == Decimal("0.00")
+        assert r.ebitda.valor == Decimal("28600.00")
+        assert r.ebit.valor == Decimal("28600.00")
+        assert r.lair.valor == Decimal("28600.00")
+        assert r.irpj_csll.valor == Decimal("1000.00")
+        assert r.lucro_liquido.valor == Decimal("27600.00")
