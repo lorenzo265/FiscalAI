@@ -1,15 +1,18 @@
 "use client";
 
+import * as React from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Download, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
 import { RelatoriosSubnav } from "@/components/relatorios/relatorios-subnav";
 import { useIndicadores } from "@/hooks/use-relatorios";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -41,6 +44,14 @@ export default function IndicadoresPage() {
   const { data, isLoading, isError, refetch } = useIndicadores();
   const reduced = useReducedMotion();
 
+  /* ── número-herói: indicador-chave (primeiro da lista, tipicamente margem líquida) ── */
+  const indChave = data?.[0] ?? null;
+  const valorChave = indChave?.valor ?? 0;
+  const heroRaw = useCountUp(Math.round(valorChave * 100), {
+    id: "indicadores:chave",
+    format: Math.round,
+  });
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -52,31 +63,70 @@ export default function IndicadoresPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + herói + ação primária ── */}
       <motion.header
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Relatórios · Indicadores
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Indicadores financeiros
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Saúde financeira em 8 números. Cada painel mostra a evolução nos
-          últimos 12 meses para você ver tendência, não só o valor de hoje.
-        </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Relatórios · Indicadores
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Indicadores financeiros
+            </motion.h1>
+            <motion.p
+              variants={itemV}
+              className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+            >
+              Saúde financeira em 8 números. Cada painel mostra a evolução nos
+              últimos 12 meses para você ver tendência, não só o valor de hoje.
+            </motion.p>
+          </div>
+          {/* ação primária: exportar relatório */}
+          <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+            <Button
+              variant="outline"
+              size="default"
+              className="h-11 px-5 gap-2"
+              onClick={() => window.print()}
+            >
+              <Download className="size-4" />
+              Exportar PDF
+            </Button>
+          </motion.div>
+        </div>
+
+        {/* número-herói: indicador-chave */}
+        {!isLoading && indChave ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+                color: COR_POR_TOM[indChave.tom],
+              }}
+              aria-label={`${indChave.titulo}: ${formatarValor(indChave)}`}
+            >
+              {formatarValor({ ...indChave, valor: heroRaw / 100 })}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              {indChave.titulo.toLowerCase()}
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <RelatoriosSubnav />

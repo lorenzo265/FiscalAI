@@ -8,11 +8,11 @@ import { StatCard } from "@/components/shared/stat-card";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { RelatoriosSubnav } from "@/components/relatorios/relatorios-subnav";
 import { useDFC } from "@/hooks/use-relatorios";
 import { formatarMesAnoBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -27,6 +27,14 @@ export default function DFCPage() {
   const { data, isLoading, isError, refetch } = useDFC();
   const reduced = useReducedMotion();
 
+  /* ── número-herói: saldo final de caixa ── */
+  const saldoFinal = data?.saldoFinal ?? 0;
+  const heroRaw = useCountUp(Math.round(saldoFinal * 100), {
+    id: "dfc:saldo-final",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -38,31 +46,59 @@ export default function DFCPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + número-herói ── */}
       <motion.header
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Relatórios · DFC
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Fluxo de Caixa
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Como o caixa se movimentou entre operações, investimentos e
-          financiamento. Método indireto — partindo do lucro líquido.
-        </motion.p>
+        <div>
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
+            Relatórios · DFC
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+          >
+            Fluxo de Caixa
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Como o caixa se movimentou entre operações, investimentos e
+            financiamento. Método indireto — partindo do lucro líquido.
+          </motion.p>
+        </div>
+
+        {/* número-herói: saldo final de caixa */}
+        {!isLoading && data ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+                color: saldoFinal >= 0 ? "var(--color-ink)" : "var(--color-danger)",
+              }}
+              aria-label={`Saldo final de caixa: ${heroFormatado}`}
+            >
+              {heroFormatado}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              saldo final de caixa em{" "}
+              <span className="text-[var(--color-ink)]">
+                {formatarMesAnoBR(`${data.competencia}-01`)}
+              </span>
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <RelatoriosSubnav />
@@ -100,11 +136,13 @@ export default function DFCPage() {
             />
           </div>
 
+          {/* marks=true é assinatura legítima (demonstrativo de print) */}
           <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-            <div className="px-5 pt-4 pb-2">
-              <Fig n={1} titulo="Demonstração do fluxo de caixa" size="sm" />
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Demonstração do fluxo de caixa
+              </h2>
             </div>
-            <Ruler />
             <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
               {data.linhas.map((linha) => (
                 <LinhaDfcItem key={linha.chave} linha={linha} />

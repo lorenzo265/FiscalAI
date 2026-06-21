@@ -8,9 +8,10 @@ import { Moeda } from "@/components/shared/moeda";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { RelatoriosSubnav } from "@/components/relatorios/relatorios-subnav";
+import { useCountUp } from "@/lib/motion/use-count-up";
+import { formatarMoeda } from "@/lib/format/moeda";
 import { useDRE } from "@/hooks/use-relatorios";
 import {
   reveal,
@@ -26,6 +27,19 @@ export default function DREPage() {
   const { data, isLoading, isError, refetch } = useDRE();
   const reduced = useReducedMotion();
 
+  /* ── número-herói: resultado líquido (última linha de total) ── */
+  const resultadoLiquido = React.useMemo(() => {
+    if (!data) return 0;
+    const ultima = [...data.linhas].reverse().find((l) => l.tipo === "total");
+    return ultima?.valores[0] ?? 0;
+  }, [data]);
+  const heroRaw = useCountUp(Math.round(resultadoLiquido * 100), {
+    id: "dre:resultado-liquido",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+  const resultadoPositivo = resultadoLiquido >= 0;
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -37,31 +51,59 @@ export default function DREPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + número-herói ── */}
       <motion.header
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Relatórios · DRE
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Demonstrativo de Resultado
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Quanto entrou, quanto saiu, quanto sobrou. Comparamos o mês atual
-          com o anterior e o mesmo mês do ano passado.
-        </motion.p>
+        <div>
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
+            Relatórios · DRE
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+          >
+            Demonstrativo de Resultado
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Quanto entrou, quanto saiu, quanto sobrou. Comparamos o mês atual
+            com o anterior e o mesmo mês do ano passado.
+          </motion.p>
+        </div>
+
+        {/* número-herói: resultado líquido do período */}
+        {!isLoading && data ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+                color: resultadoPositivo ? "var(--color-ink)" : "var(--color-danger)",
+              }}
+              aria-label={`Resultado líquido: ${heroFormatado}`}
+            >
+              {heroFormatado}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              resultado líquido do período{" "}
+              {resultadoPositivo ? (
+                <Carimbo tom="green" sub="conferido">OK</Carimbo>
+              ) : null}
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <RelatoriosSubnav />
@@ -81,12 +123,13 @@ export default function DREPage() {
               ))}
           </div>
 
-          {/* ── tabela DRE ── */}
+          {/* ── tabela DRE — marks=true é assinatura legítima (demonstrativo de print) ── */}
           <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-            <div className="px-5 pt-4 pb-2">
-              <Fig n={1} titulo="Demonstrativo de resultado" size="sm" />
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Demonstrativo de resultado
+              </h2>
             </div>
-            <Ruler />
 
             {/* cabeçalho de colunas */}
             <div

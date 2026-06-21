@@ -18,8 +18,6 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
 import { StatusFuncionarioPill } from "@/components/pessoal/status-funcionario-pill";
@@ -35,6 +33,8 @@ import {
 } from "@/lib/schemas/pessoal";
 import { chaveCompetencia } from "@/lib/pessoal/calculo-folha";
 import { formatarMesAnoBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -86,6 +86,15 @@ export default function PessoalResumoPage() {
     (e) => e.status === "transmitido"
   ).length;
 
+  /* ── número-herói: custo total da folha (bruto + encargos patronais) ── */
+  const custoTotalFolha = totais.bruto + totais.inssEmpresa + totais.fgts;
+  const custoCentavos = Math.round(custoTotalFolha * 100);
+  const heroRaw = useCountUp(custoCentavos, {
+    id: "pessoal:custo-folha",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -97,41 +106,67 @@ export default function PessoalResumoPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + número-herói ── */}
       <motion.header
-        className="flex items-end justify-between gap-3 flex-wrap"
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <div>
-          <motion.span
-            variants={itemV}
-            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-          >
-            Módulo · Pessoal
-          </motion.span>
-          <motion.h1
-            variants={itemV}
-            className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-          >
-            Folha de{" "}
-            {formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}
-          </motion.h1>
-          <motion.p
-            variants={itemV}
-            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-          >
-            Salários calculados, encargos provisionados e eventos do eSocial
-            prontos para transmitir.
-          </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Módulo · Pessoal
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Folha de{" "}
+              {formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}
+            </motion.h1>
+          </div>
+          {/* ação primária única — verde 44px */}
+          <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+            <Button asChild size="default" className="h-11 px-5 gap-2">
+              <Link href="/pessoal/funcionarios/novo">
+                <Plus className="size-4" /> Admitir funcionário
+              </Link>
+            </Button>
+          </motion.div>
         </div>
-        <motion.div variants={itemV}>
-          <Button asChild>
-            <Link href="/pessoal/funcionarios/novo">
-              <Plus className="size-4" /> Admitir funcionário
-            </Link>
-          </Button>
+
+        {/* número-herói: custo total da folha do mês */}
+        <motion.div variants={itemV} className="flex flex-col gap-1">
+          <span
+            className="mono leading-none text-[var(--color-ink)] whitespace-nowrap"
+            style={{
+              fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+              fontWeight: 300,
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em",
+            }}
+            aria-label={`Custo total da folha: ${heroFormatado}`}
+          >
+            {heroFormatado}
+          </span>
+          <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+            custo total da folha em{" "}
+            <span className="text-[var(--color-ink)]">
+              {formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}
+            </span>
+          </span>
+          {(holerites ?? []).length > 0 ? (
+            <span
+              className="mono text-[11px] text-[var(--color-ink-2)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {(holerites ?? []).length} holerite{(holerites ?? []).length !== 1 ? "s" : ""} · inclui encargos patronais
+            </span>
+          ) : null}
         </motion.div>
       </motion.header>
 
@@ -200,21 +235,22 @@ export default function PessoalResumoPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* ── lista de funcionários ── */}
             <Framed
-              marks
-              tone="ink"
+              marks={false}
+              tone="rule"
               surface="card"
               padded={false}
               className="md:col-span-2 overflow-hidden"
             >
-              <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-                <Fig n={1} titulo="Funcionários" size="sm" />
+              <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center justify-between gap-2">
+                <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                  Funcionários
+                </h2>
                 <Button asChild variant="ghost" size="sm" className="text-xs">
                   <Link href="/pessoal/funcionarios">
                     Ver todos <ArrowRight className="size-3.5" />
                   </Link>
                 </Button>
               </div>
-              <Ruler />
 
               {(funcionarios ?? []).length === 0 ? (
                 <div className="p-5">
@@ -252,11 +288,9 @@ export default function PessoalResumoPage() {
                 ) : (
                   <AlertTriangle className="size-4 text-[var(--color-ochre)] shrink-0" />
                 )}
-                <Fig
-                  n={2}
-                  titulo={`eSocial · ${formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}`}
-                  size="sm"
-                />
+                <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                  eSocial · {formatarMesAnoBR(`${ano}-${String(mes).padStart(2, "0")}-01`)}
+                </h2>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -326,7 +360,7 @@ function LinhaFuncionario({
         <span className="text-sm font-semibold text-[var(--color-ink)] truncate">
           {funcionario.nome}
         </span>
-        <span className="text-[11px] text-[var(--color-ink-3)] truncate">
+        <span className="text-[11px] text-[var(--color-ink-2)] truncate">
           {funcionario.cargo} · {TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}
         </span>
       </div>

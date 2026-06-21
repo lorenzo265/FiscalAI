@@ -26,8 +26,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatCard } from "@/components/shared/stat-card";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { StatusEventoPill } from "@/components/pessoal/status-evento-pill";
 import {
@@ -117,7 +115,7 @@ export default function EsocialPage() {
           </motion.span>
           <motion.h1
             variants={itemV}
-            className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
           >
             Eventos do eSocial
           </motion.h1>
@@ -252,14 +250,13 @@ export default function EsocialPage() {
             <SelectItem value="todos">Todos os tipos</SelectItem>
             {Object.entries(TIPO_EVENTO_ESOCIAL_LABEL).map(([cod, label]) => (
               <SelectItem key={cod} value={cod}>
+                {label}{" "}
                 <abbr
                   title={`Código eSocial: ${cod}`}
-                  className="no-underline mono text-[11px] text-[var(--color-ink-2)]"
+                  className="no-underline mono text-[11px] text-[var(--color-ink-3)]"
                 >
-                  {cod}
+                  ({cod})
                 </abbr>
-                {" — "}
-                {label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -277,11 +274,12 @@ export default function EsocialPage() {
           descricao="Ajuste os filtros ou aguarde a próxima folha."
         />
       ) : (
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Registro de eventos eSocial" size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Registro de eventos eSocial
+            </h2>
           </div>
-          <Ruler />
           <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {lista.map((e) => (
               <LinhaEvento
@@ -321,9 +319,13 @@ function LinhaEvento({
   return (
     <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
       <div className="flex flex-col shrink-0 w-36 gap-1">
+        {/* label PT em destaque; código S-XXXX secundário em abbr */}
+        <span className="text-xs font-bold text-[var(--color-ink)] leading-tight">
+          {TIPO_EVENTO_ESOCIAL_LABEL[evento.tipo]}
+        </span>
         <abbr
-          title={`Código eSocial: ${evento.tipo} — ${TIPO_EVENTO_ESOCIAL_LABEL[evento.tipo]}`}
-          className="no-underline mono text-xs font-bold text-[var(--color-ink)]"
+          title={`Código eSocial: ${evento.tipo}`}
+          className="no-underline mono text-[10px] text-[var(--color-ink-3)]"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {evento.tipo}
@@ -333,10 +335,9 @@ function LinhaEvento({
 
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
         <span className="text-sm text-[var(--color-ink)] truncate">
-          {TIPO_EVENTO_ESOCIAL_LABEL[evento.tipo]}
-          {evento.funcionarioNome ? ` · ${evento.funcionarioNome}` : ""}
+          {evento.funcionarioNome ?? "—"}
         </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-3)] mono flex-wrap">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap">
           <span style={{ fontVariantNumeric: "tabular-nums" }}>
             Competência {evento.competencia}
           </span>

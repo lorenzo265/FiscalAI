@@ -19,8 +19,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Moeda } from "@/components/shared/moeda";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
 import { StatusFuncionarioPill } from "@/components/pessoal/status-funcionario-pill";
@@ -96,7 +94,7 @@ export default function FuncionariosPage() {
           </motion.span>
           <motion.h1
             variants={itemV}
-            className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
           >
             Funcionários
           </motion.h1>
@@ -115,8 +113,8 @@ export default function FuncionariosPage() {
             no eSocial automaticamente.
           </motion.p>
         </div>
-        <motion.div variants={itemV}>
-          <Button asChild>
+        <motion.div variants={itemV} className="shrink-0">
+          <Button asChild size="default" className="h-11 px-5 gap-2">
             <Link href="/pessoal/funcionarios/novo">
               <Plus className="size-4" /> Admitir funcionário
             </Link>
@@ -191,20 +189,20 @@ export default function FuncionariosPage() {
           }
         />
       ) : (
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Cadastro de funcionários" size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Cadastro de funcionários
+            </h2>
           </div>
-          <Ruler />
           <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
             {lista.map((f) => (
               <LinhaFuncionario key={f.id} funcionario={f} />
             ))}
           </ul>
-          <Ruler />
-          <div className="px-5 py-3">
+          <div className="px-5 py-3 border-t border-[var(--color-rule)]">
             <span
-              className="text-xs text-[var(--color-ink-3)] mono"
+              className="text-xs text-[var(--color-ink-2)] mono"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {lista.length} funcionário{lista.length !== 1 ? "s" : ""}
@@ -229,7 +227,7 @@ function LinhaFuncionario({ funcionario }: { funcionario: Funcionario }) {
           <span className="text-sm font-semibold text-[var(--color-ink)] truncate block">
             {funcionario.nome}
           </span>
-          <span className="text-[11px] text-[var(--color-ink-3)] truncate block">
+          <span className="text-[11px] text-[var(--color-ink-2)] truncate block">
             {funcionario.cargo} · {TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}{" "}
             · admitido{" "}
             <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>

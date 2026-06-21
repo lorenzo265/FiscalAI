@@ -28,8 +28,6 @@ import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { PessoalSubnav } from "@/components/pessoal/pessoal-subnav";
 import { AvatarFuncionario } from "@/components/pessoal/avatar-funcionario";
@@ -47,6 +45,8 @@ import {
   type Holerite,
 } from "@/lib/schemas/pessoal";
 import { formatarMesAnoBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -147,6 +147,14 @@ export default function FolhaMensalPage() {
     }
   }
 
+  /* ── número-herói: total líquido da folha ── */
+  const liquidoCentavos = Math.round(totais.liquido * 100);
+  const heroRaw = useCountUp(liquidoCentavos, {
+    id: `folha:liquido:${competencia}`,
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -158,9 +166,9 @@ export default function FolhaMensalPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + número-herói ── */}
       <motion.header
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
@@ -172,7 +180,7 @@ export default function FolhaMensalPage() {
             </Link>
           </Button>
         </motion.div>
-        <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <motion.span
               variants={itemV}
@@ -182,12 +190,12 @@ export default function FolhaMensalPage() {
             </motion.span>
             <motion.h1
               variants={itemV}
-              className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
             >
               {formatarMesAnoBR(competencia)}
             </motion.h1>
           </div>
-          <motion.div variants={itemV} className="flex items-center gap-2">
+          <motion.div variants={itemV} className="flex items-center gap-2 pt-5 md:pt-6">
             <Select value={String(mes)} onValueChange={trocarMes}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
@@ -218,6 +226,33 @@ export default function FolhaMensalPage() {
             </Select>
           </motion.div>
         </div>
+
+        {/* número-herói: total líquido da folha (só quando carregado) */}
+        {!isLoading && holerites && holerites.length > 0 ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none text-[var(--color-ink)] whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+              aria-label={`Total líquido da folha: ${heroFormatado}`}
+            >
+              {heroFormatado}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              total líquido da folha ·{" "}
+              <span
+                className="mono text-[var(--color-ink)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {holerites.length} holerite{holerites.length !== 1 ? "s" : ""}
+              </span>
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <PessoalSubnav />
@@ -304,17 +339,18 @@ export default function FolhaMensalPage() {
             </Button>
           </div>
 
-          {/* ── tabela de holerites ── */}
+          {/* ── tabela de holerites — marks=true é assinatura legítima (tela de print/holerite) ── */}
           <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-            <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2">
-              <Fig n={1} titulo="Holerites do mês" size="sm" />
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center justify-between gap-2">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Holerites do mês
+              </h2>
               {folhaFechada ? (
                 <Carimbo tom="green" sub="folha paga">
                   fechado
                 </Carimbo>
               ) : null}
             </div>
-            <Ruler />
             <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
               {holerites.map((h) => (
                 <LinhaHolerite
@@ -370,7 +406,7 @@ function LinhaHolerite({
           <span className="text-sm font-semibold text-[var(--color-ink)] truncate block">
             {holerite.funcionarioNome}
           </span>
-          <span className="text-[11px] text-[var(--color-ink-3)] truncate block">
+          <span className="text-[11px] text-[var(--color-ink-2)] truncate block">
             {holerite.cargo}
             {funcionario
               ? ` · ${TIPO_CONTRATO_LABEL[funcionario.tipoContrato]}`

@@ -8,12 +8,12 @@ import { Moeda } from "@/components/shared/moeda";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { RelatoriosSubnav } from "@/components/relatorios/relatorios-subnav";
 import { useBalanco } from "@/hooks/use-relatorios";
 import { formatarMesAnoBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -28,6 +28,14 @@ export default function BalancoPage() {
   const { data, isLoading, isError, refetch } = useBalanco();
   const reduced = useReducedMotion();
 
+  /* ── número-herói: ativo total ── */
+  const ativoTotal = data?.totalAtivo ?? 0;
+  const heroRaw = useCountUp(Math.round(ativoTotal * 100), {
+    id: "balanco:ativo-total",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -39,31 +47,58 @@ export default function BalancoPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── cabeçalho + número-herói ── */}
       <motion.header
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Relatórios · Balanço Patrimonial
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-[family-name:var(--font-serif)] text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Balanço Patrimonial
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Tudo que a empresa tem (Ativo) deve ser igual ao que deve mais o
-          capital próprio (Passivo + PL). Os dois lados lado a lado.
-        </motion.p>
+        <div>
+          <motion.span
+            variants={itemV}
+            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+          >
+            Relatórios · Balanço Patrimonial
+          </motion.span>
+          <motion.h1
+            variants={itemV}
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+          >
+            Balanço Patrimonial
+          </motion.h1>
+          <motion.p
+            variants={itemV}
+            className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
+          >
+            Tudo que a empresa tem (Ativo) deve ser igual ao que deve mais o
+            capital próprio (Passivo + PL). Os dois lados lado a lado.
+          </motion.p>
+        </div>
+
+        {/* número-herói: ativo total */}
+        {!isLoading && data ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none text-[var(--color-ink)] whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+              aria-label={`Ativo total: ${heroFormatado}`}
+            >
+              {heroFormatado}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              ativo total em{" "}
+              <span className="text-[var(--color-ink)]">
+                {formatarMesAnoBR(`${data.competencia}-01`)}
+              </span>
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <RelatoriosSubnav />
@@ -81,10 +116,9 @@ export default function BalancoPage() {
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {/* ── Ativo ── */}
+            {/* ── Ativo — marks=true é assinatura legítima (demonstrativo de print) ── */}
             <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
               <CabecalhoLado titulo="Ativo" total={data.totalAtivo} tom="ok" />
-              <Ruler />
               <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
                 {data.ativo.map((l) => (
                   <LinhaItem key={l.codigo} linha={l} />
@@ -92,14 +126,13 @@ export default function BalancoPage() {
               </ul>
             </Framed>
 
-            {/* ── Passivo + PL ── */}
+            {/* ── Passivo + PL — marks=true é assinatura legítima ── */}
             <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
               <CabecalhoLado
                 titulo="Passivo + Patrimônio Líquido"
                 total={data.totalPassivo + data.totalPl}
                 tom="info"
               />
-              <Ruler />
               <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
                 {data.passivoEPl.map((l) => (
                   <LinhaItem key={l.codigo} linha={l} />
@@ -193,11 +226,11 @@ function CabecalhoLado({
   total: number;
   tom: "ok" | "info";
 }) {
-  const cor =
-    tom === "ok" ? "var(--color-green)" : "var(--color-ink-2)";
   return (
-    <div className="flex items-center justify-between gap-2 px-5 py-4">
-      <Fig n={tom === "ok" ? 1 : 2} titulo={titulo} size="sm" />
+    <div className="flex items-center justify-between gap-2 px-5 py-4 border-b border-[var(--color-rule)]">
+      <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+        {titulo}
+      </h2>
       <Pill tom={tom}>
         <span className="mono" style={{ fontVariantNumeric: "tabular-nums" }}>
           <Moeda valor={total} />
@@ -236,7 +269,7 @@ function LinhaItem({ linha }: { linha: LinhaBalanco }) {
             ? "text-sm font-bold text-[var(--color-ink)]"
             : isSubgrupo
               ? "text-sm font-semibold text-[var(--color-ink)]"
-              : "text-xs text-[var(--color-ink-3)]"
+              : "text-xs text-[var(--color-ink-2)]"
         )}
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
