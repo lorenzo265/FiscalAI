@@ -537,3 +537,14 @@ O `reviewer` registra o veredito assim:
 - Sugestões (→ backlog, não-bloqueiam): extrair `projetarMesCruzamento`+`LIMITE_MEI` p/ `lib/fiscal/*`; auto-scroll da subnav p/ o item ativo no mobile.
 - Validação técnica: `tsc src/` limpo; dev server renderiza.
 - **Parecer final: VERDE.** Próximo: X19 motion polish.
+
+### 2026-06-21 · orquestrador · PR-X19 (motion dos overlays) · ATTEMPT + REVERT (diagnóstico preservado)
+- **Objetivo:** animar a ENTRADA dos overlays Radix (dialog/sheet/dropdown/select/tooltip/popover), inertes desde a v1, alinhando ao §4 (surface y+24→0 + overlay ink/35+blur).
+- **O que o `motion-polish` fez (Plano B):** definiu keyframes `arkan-enter/exit` (com base-offset p/ centragem do dialog) + utilidades `animate-in/fade/zoom/slide-*` em `@layer utilities`, e ajustou as classes dos 7 componentes ui.
+- **Por que foi REVERTIDO:** verificação no browser (`getComputedStyle` no dialog aberto) deu `animationName: "none"` — **as utilidades NÃO animam**. Causa-raiz (Tailwind v4): utilidades definidas em `@layer utilities { .animate-in {} }` **não geram as variantes** `data-[state=open]:animate-in` que os componentes usam — só `@utility nome {}` gera variantes no v4. (O overlay **ink/35 + blur 2px JÁ funciona** desde o X7 — confirmado `backdrop-filter: blur(2px)`, `bg oklab(...0.35)`.)
+- **Decisão:** não shipar CSS de animação que não anima (código morto). Revertido por completo (working tree limpo). 
+- **Plano de retomada (para um PR dedicado, NÃO polish-rápido):**
+  - **Opção A:** converter as utilidades de `@layer utilities` → `@utility nome { … }` (Tailwind v4). Os keyframes `arkan-enter/exit` + o base-offset do agente estão CORRETOS — só falta as utilidades serem `@utility` p/ as variantes `data-[state=*]:` gerarem. Risco residual: composição de `transform` no dialog CENTRALIZADO (`-translate-x/y-1/2`) com a viagem do keyframe — o base-offset endereça, validar no browser.
+  - **Opção C (mais fiel ao §4, recomendada):** envolver o `Content` de dialog/sheet em **Framer** (`AnimatePresence` + Radix `forceMount`, spring 260/32, y+24→0). É o motion "real" do app. Mais invasivo, mas determinístico e sem depender de utilidades CSS.
+  - Em ambos: honrar `prefers-reduced-motion` (a rede global no fim do `globals.css` já zera durações).
+- **Estado:** X19 NÃO entrou. `main` segue @ `acc42e4` (X17). Próximo: PR dedicado de overlay-motion (A ou C) OU outros itens da Onda 4 (X15/X16 lógica/backend, X18 brand pack) conforme o PO.

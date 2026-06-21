@@ -34,11 +34,11 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 ---
 
 ## 📍 Estado atual (resumo — detalhe na última entrada do log)
-- **Branch viva:** `main` @ `7b50b96` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
+- **Branch viva:** `main` @ `acc42e4` (= `hardening-fiscal-2026-06`; tudo commitado, frota + infra versionadas; **NÃO pushada**).
 - **Backend:** roadmap 0–22 completo; em hardening + production-ready. Integração 24/24 (fixtures RLS corrigidos).
-- **Frontend:** identidade v2 "Arkan Claro" — **D0→D4 COMPLETO**: tokens, primitivas (X7), gabarito Notas (X8), home (X9) + lotes A/C/D/E (X10–X13). **~40 telas na v2.** `next build` VERDE (48/48 estático).
-- **Próxima onda:** **Onda 4** — o que resta do roadmap, em grande parte dependente de credenciais/backends do PO: X14 (fechar o mês, backend S5) · X15 (onboarding CNPJ-first, lógica) · X16 (assistente real, backend) · X17 (monitores de limite) · X18 (brand pack) · X19 (motion polish/D6).
-- **Backlog:** segurança do webhook · teste de integração do webhook · largura da coluna Contraparte na DataTable · `tailwindcss-animate` não registrado → entrada de overlays inerte (motion-polish/D6).
+- **Frontend:** identidade v2 "Arkan Claro" — **D0→D4 COMPLETO** + **X17 monitores de limite** (`/fiscal/limites`). ~41 telas na v2.
+- **Onda 4 em curso:** X17 ✅. **X19** (motion overlays) investigado e **REVERTIDO** — precisa de PR dedicado (`@utility` ou Framer; CSS `@layer` não gera variante no Tailwind v4). Resto da Onda 4 depende de credenciais/backends do PO: X14 (fechar o mês, S5) · X15 (onboarding lógica) · X16 (assistente backend) · X18 (brand pack).
+- **Backlog:** segurança do webhook · teste de integração do webhook · largura da coluna Contraparte na DataTable · **motion de entrada dos overlays** (dialog/sheet inertes; Plano A/C no `HANDOFF.md`).
 
 ---
 
@@ -80,3 +80,11 @@ Livro de passagem **append-only** da **sessão orquestradora** — a sessão pri
 - **Lição operacional (cara):** rodar `npm run build` (produção) com o **dev server vivo no mesmo `.next`** o corrompe (404 nos chunks / "Cannot find module"). Aconteceu 2×. Fix: matar o dev → (se preciso) `node -e "fs.rmSync('.next',{recursive:true,force:true})"` (o `rm -rf` é bloqueado pelo sandbox) → reiniciar dev. **Regra: gate por lote = tsc + render no dev; `next build` só em ponto controlado com o dev morto.**
 - **Estado:** `main` @ `7b50b96` (+ este write-back), working tree limpo, **NÃO pushado** (ato do PO). `.next` é de produção (build final); um `npm run dev` recompila por cima.
 - **Próximo orquestrador → faça:** Onda 4 = o que sobra do roadmap, em grande parte dependente de credenciais/backends do PO: **X14** "fechar o mês" guiado (depende da orquestração backend S5 eSocial→Reinf→DCTFWeb), **X15** onboarding CNPJ-first (lógica/BrasilAPI — a pele já é v2), **X16** assistente real (religar backend — a pele já é v2), **X17** monitores de limite (RulerGauge já existe), **X18** brand pack (logo/landing/brand book), **X19** motion polish (D6: registrar `tailwindcss-animate` OU Framer nos overlays — a entrada de dialog/sheet segue inerte; dark validado por humano; Lighthouse). Backlog técnico aberto: segurança do webhook + teste de integração do webhook (Onda 1.5); largura da coluna Contraparte na DataTable.
+
+### 2026-06-21 · orquestrador · Onda 4 (parcial) — X17 ✅ · X19 investigado→revertido
+- **Decisão do PO:** "1 Opus focado por lote, em série" (mesmo método da Onda 3); subagentes write-only, orquestrador valida (tsc + Playwright @ :3000) e commita.
+- **X17 — monitores de limite (`/fiscal/limites`) ✅ commitado `acc42e4`:** tela nova reusando RulerGauge + `useApuracaoAtual` (nada inventado): número-herói (faturamento 12m), réguas MEI/sublimite/teto com projeção, medidor de Fator R (só Anexo III/V), aviso de desenquadramento traduzido, Carimbo. Subnav fiscal ganhou "05 Limites" + `overflow-x-auto` (mobile). Fluxo: `explorer` mapeou → `screen-implementer` construiu → `reviewer` VERDE → verificação visual desktop+mobile. Nuance: a empresa em runtime (backend :8000) é **Comércio Anexo I** (o `empresa-demo.ts` estático diz Anexo III, mas não é a fonte) → Fator R/MEI corretamente ocultos p/ esse perfil.
+- **X19 — motion dos overlays: ATTEMPT→REVERT.** `motion-polish` escreveu Plano B (keyframes CSS + utilidades em `@layer utilities`). **Verificação no browser provou que NÃO anima** (`getComputedStyle(dialog).animationName === "none"`): no **Tailwind v4**, utilidade em `@layer utilities` **não gera** a variante `data-[state=open]:animate-in` que os componentes usam — só `@utility` gera. Revertido (não shipar CSS morto). Diagnóstico + plano de retomada (Opção A: converter p/ `@utility`; Opção C **recomendada**: Framer `AnimatePresence`+`forceMount` spring 260/32) em `docs/HANDOFF.md`. O overlay ink/35+blur do §4 **já funcionava** desde o X7. **X19 é PR dedicado, não polish-rápido.**
+- **Lição nova:** **validar motion no browser com `getComputedStyle`/`evaluate`**, não confiar no relatório do subagente (ele não tem shell p/ testar) — o Plano B "parecia certo" mas era inerte. E: **Tailwind v4 = `@utility` (não `@layer utilities`) para utilidade que precisa de variante** (`data-[state]:`, `hover:`, etc.).
+- **Estado:** `main` @ `acc42e4` + write-back; working tree limpo; **NÃO pushado**. Dev server vivo em :3000.
+- **Próximo:** Onda 4 restante conforme o PO: X19 via PR dedicado (Framer) · X15/X16 (lógica/backend) · X18 brand pack. Backlog técnico segue.
