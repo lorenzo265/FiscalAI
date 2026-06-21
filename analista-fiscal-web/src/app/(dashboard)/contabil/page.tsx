@@ -3,19 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertTriangle, BookOpen, CheckCircle2, ChevronRight, EyeOff } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, ChevronRight, EyeOff, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Pill } from "@/components/shared/pill";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ContabilSubnav } from "@/components/contabil/contabil-subnav";
 import { useLancamentos } from "@/hooks/use-contabil";
-import { montarBalancete } from "@/lib/contabil/motor";
+import { montarBalancete, calcularResultadoExercicio } from "@/lib/contabil/motor";
 import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -45,6 +46,19 @@ export default function ContabilBalancetePage() {
     [data]
   );
 
+  /* ── número-herói: resultado do exercício (receita - despesa) ── */
+  const resultado = React.useMemo(
+    () => (data ? calcularResultadoExercicio(data) : { receita: 0, despesa: 0, resultado: 0 }),
+    [data]
+  );
+  const resultadoCentavos = Math.round(Math.abs(resultado.resultado) * 100);
+  const heroRaw = useCountUp(resultadoCentavos, {
+    id: "contabil:resultado",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+  const resultadoPositivo = resultado.resultado >= 0;
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -56,31 +70,73 @@ export default function ContabilBalancetePage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── Bloco 1: cabeçalho + número-herói + ação primária ── */}
       <motion.header
         variants={containerV}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-4"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Módulo contábil
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Balancete
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Saldo de cada conta consolidado a partir dos lançamentos do livro
-          diário.
-        </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Módulo contábil
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Balancete
+            </motion.h1>
+          </div>
+
+          {/* Ação primária — verde 44px */}
+          <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+            <Button asChild size="default" className="h-11 px-5 gap-2">
+              <Link href="/contabil/lancamentos">
+                <Plus className="size-4" aria-hidden />
+                Novo lançamento
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+
+        {/* número-herói: resultado do exercício */}
+        <motion.div variants={itemV} className="flex flex-col gap-1">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-16 w-52" />
+              <Skeleton className="h-4 w-40 mt-1" />
+            </>
+          ) : (
+            <>
+              <span
+                className="mono leading-none whitespace-nowrap"
+                style={{
+                  fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                  fontWeight: 300,
+                  fontVariantNumeric: "tabular-nums",
+                  letterSpacing: "-0.02em",
+                  color: resultadoPositivo
+                    ? "var(--color-green)"
+                    : "var(--color-danger)",
+                }}
+                aria-label={`Resultado do exercício: ${resultadoPositivo ? "lucro" : "prejuízo"} de ${heroFormatado}`}
+              >
+                {heroFormatado}
+              </span>
+              <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+                {resultadoPositivo ? "lucro" : "prejuízo"} do exercício{" "}
+                {balancete?.totais.fechado ? (
+                  <span className="text-[var(--color-green)] font-semibold">· balancete fechado</span>
+                ) : null}
+              </span>
+            </>
+          )}
+        </motion.div>
       </motion.header>
 
       <ContabilSubnav />
@@ -96,7 +152,7 @@ export default function ContabilBalancetePage() {
           {/* ── toggle zeradas ── */}
           <Framed marks={false} tone="rule" surface="card" className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <EyeOff className="size-4 text-[var(--color-ink-3)]" />
+              <EyeOff className="size-4 text-[var(--color-ink-2)]" />
               <span className="text-sm text-[var(--color-ink)]">
                 Esconder contas zeradas
               </span>
@@ -108,13 +164,15 @@ export default function ContabilBalancetePage() {
           </Framed>
 
           {/* ── tabela ── */}
-          <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-            <div className="px-5 pt-4 pb-2">
-              <Fig n={1} titulo="Balancete de verificação" size="sm" />
+          <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center gap-2">
+              <BookOpen className="size-4 text-[var(--color-ink-2)]" aria-hidden />
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Balancete de verificação
+              </h2>
             </div>
-            <Ruler />
             <div
-              className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-3 border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono"
+              className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 px-5 py-3 border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-2)] mono"
               style={{ borderColor: "var(--color-rule)" }}
             >
               <span>Conta</span>
@@ -252,7 +310,7 @@ function Linha({
           {temFilhos ? (
             <ChevronRight
               className={cn(
-                "size-3.5 shrink-0 text-[var(--color-ink-3)] transition-transform",
+                "size-3.5 shrink-0 text-[var(--color-ink-2)] transition-transform",
                 aberto && "rotate-90"
               )}
             />
@@ -296,7 +354,7 @@ function Linha({
           )}
         </button>
         <span
-          className="mono text-xs text-[var(--color-ink-3)] text-right"
+          className="mono text-xs text-[var(--color-ink-2)] text-right"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {formatarMoeda(linha.saldoAnterior)}
@@ -306,7 +364,7 @@ function Linha({
             "mono text-sm text-right",
             linha.debitos > 0
               ? "text-[var(--color-ink)]"
-              : "text-[var(--color-ink-3)]"
+              : "text-[var(--color-ink-2)]"
           )}
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
@@ -317,7 +375,7 @@ function Linha({
             "mono text-sm text-right",
             linha.creditos > 0
               ? "text-[var(--color-ink)]"
-              : "text-[var(--color-ink-3)]"
+              : "text-[var(--color-ink-2)]"
           )}
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
@@ -326,7 +384,7 @@ function Linha({
         <span
           className="mono text-sm font-bold text-right"
           style={{
-            color: linha.saldoAtual !== 0 ? cor : "var(--color-ink-3)",
+            color: linha.saldoAtual !== 0 ? cor : "var(--color-ink-2)",
             fontVariantNumeric: "tabular-nums",
           }}
         >

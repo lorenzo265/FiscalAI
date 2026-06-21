@@ -4,14 +4,12 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, BookOpen, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { OrigemPill } from "@/components/contabil/origem-pill";
 import { useLancamentos } from "@/hooks/use-contabil";
 import { montarRazao } from "@/lib/contabil/motor";
@@ -88,7 +86,7 @@ export default function RazaoContaPage() {
           <motion.div variants={itemV}>
             <Link
               href="/contabil"
-              className="text-[12px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] transition-colors flex items-center gap-1"
+              className="text-[12px] text-[var(--color-ink-2)] hover:text-[var(--color-ink)] transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="size-3" /> Voltar para o balancete
             </Link>
@@ -141,6 +139,7 @@ export default function RazaoContaPage() {
           descricao="Essa conta não tem lançamentos no período."
         />
       ) : (
+        /* Razão = tela de detalhe/impressão: marks permitidos como assinatura */
         <Framed
           marks
           tone="ink"
@@ -148,15 +147,17 @@ export default function RazaoContaPage() {
           padded={false}
           className="overflow-hidden print:bg-white print:border-black/30"
         >
-          <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-3 no-print">
-            <Fig n={1} titulo={`Razão — ${conta.nome}`} size="sm" />
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center gap-2 no-print">
+            <BookOpen className="size-4 text-[var(--color-ink-2)]" aria-hidden />
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Razão — {conta.nome}
+            </h2>
           </div>
-          <Ruler className="no-print" />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr
-                  className="text-left border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono print:text-black"
+                  className="text-left border-b text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-2)] mono print:text-black"
                   style={{ borderColor: "var(--color-rule)" }}
                 >
                   <th className="px-4 py-3">Data</th>
@@ -211,7 +212,7 @@ export default function RazaoContaPage() {
                         className={
                           l.debito > 0
                             ? "text-[var(--color-ochre)] font-bold print:text-black"
-                            : "text-[var(--color-ink-3)]"
+                            : "text-[var(--color-ink-2)]"
                         }
                       >
                         {l.debito > 0 ? formatarMoeda(l.debito) : "—"}
@@ -225,7 +226,7 @@ export default function RazaoContaPage() {
                         className={
                           l.credito > 0
                             ? "text-[var(--color-green)] font-bold print:text-black"
-                            : "text-[var(--color-ink-3)]"
+                            : "text-[var(--color-ink-2)]"
                         }
                       >
                         {l.credito > 0 ? formatarMoeda(l.credito) : "—"}
@@ -247,7 +248,7 @@ export default function RazaoContaPage() {
                 >
                   <td
                     colSpan={3}
-                    className="px-4 py-3 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono print:text-black"
+                    className="px-4 py-3 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-2)] mono print:text-black"
                   >
                     Totais do período
                   </td>

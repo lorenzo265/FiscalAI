@@ -34,11 +34,11 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Moeda } from "@/components/shared/moeda";
 import { StatCard } from "@/components/shared/stat-card";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
+import { Carimbo } from "@/components/blueprint/carimbo";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { StatusContaPill } from "@/components/controles/status-conta-pill";
 import { ContaFormDialog } from "@/components/controles/conta-form-dialog";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import {
   useAdicionarContaPagarReceber,
   useAtualizarContaPagarReceber,
@@ -53,6 +53,8 @@ import {
   type TipoContaPagarReceber,
 } from "@/lib/schemas/controles";
 import { formatarDataBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -88,7 +90,7 @@ export function ContasPagarReceberTela({ tipo }: Props) {
     React.useState<ContaPagarReceber | null>(null);
 
   const titulo = tipo === "pagar" ? "Contas a pagar" : "Contas a receber";
-  const palavraAcao = tipo === "pagar" ? "pagar" : "receber";
+  const labelAcao = tipo === "pagar" ? "Nova conta a pagar" : "Novo recebível";
 
   const lista = React.useMemo(() => {
     if (!data) return [];
@@ -122,9 +124,135 @@ export function ContasPagarReceberTela({ tipo }: Props) {
       }, seed);
   }, [data, tipo]);
 
+  /* ── número-herói: total pendente (o que está em aberto agora) ── */
+  const totalPendenteCentavos = Math.round(
+    (totaisPorStatus.pendente + totaisPorStatus.atrasado) * 100
+  );
+  const heroRaw = useCountUp(totalPendenteCentavos, {
+    id: `${tipo}:totalPendente`,
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
+
+  /* ── colunas DataTable ── */
+  const colunas = React.useMemo<DataTableColumn<ContaPagarReceber>[]>(
+    () => [
+      {
+        id: "vencimento",
+        header: "Vencimento",
+        mono: true,
+        primary: true,
+        cell: (c) => (
+          <div className="flex flex-col gap-1">
+            <span
+              className="mono text-xs font-bold text-[var(--color-ink-2)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {formatarDataBR(c.vencimento)}
+            </span>
+            <StatusContaPill status={c.status} />
+          </div>
+        ),
+        width: "8rem",
+      },
+      {
+        id: "descricao",
+        header: "Descrição",
+        cell: (c) => (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm text-[var(--color-ink)] truncate">
+              {c.descricao}
+            </span>
+            <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] flex-wrap">
+              <span className="truncate">{c.contraparte}</span>
+              <span className="size-1 rounded-full bg-[var(--color-rule-2)]" />
+              <span>{CATEGORIA_CONTA_LABEL[c.categoria]}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "valor",
+        header: "Valor",
+        mono: true,
+        align: "right",
+        cell: (c) => (
+          <span
+            className="mono text-base font-bold text-[var(--color-ink)]"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            <Moeda valor={c.valor} />
+          </span>
+        ),
+        width: "8.5rem",
+      },
+      {
+        id: "acoes",
+        header: "",
+        hideLabelOnCard: true,
+        interactive: true,
+        cell: (c) => (
+          <div className="flex items-center gap-1 justify-end">
+            {c.status === "pago" ? (
+              <Carimbo tom="green" sub={formatarDataBR(c.vencimento)}>
+                {tipo === "pagar" ? "Pago" : "Recebido"}
+              </Carimbo>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void marcarPaga.mutateAsync({
+                  id: c.id,
+                  pagoEm: new Date().toISOString().slice(0, 10),
+                }).then(() =>
+                  toast.success(
+                    tipo === "pagar"
+                      ? `${c.descricao} marcada como paga`
+                      : `${c.descricao} marcada como recebida`
+                  )
+                )}
+                aria-label={
+                  c.tipo === "pagar"
+                    ? "Marcar como paga"
+                    : "Marcar como recebida"
+                }
+              >
+                <Check className="size-3.5" />{" "}
+                {tipo === "pagar" ? "Pagar" : "Recebida"}
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() => {
+                setEditando(c);
+                setAbertoForm(true);
+              }}
+              aria-label="Editar"
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8 text-[var(--color-danger)] hover:text-[var(--color-danger)]"
+              onClick={() => setConfirmandoRemocao(c)}
+              aria-label="Excluir"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        ),
+        width: "10rem",
+      },
+    ],
+    [tipo, marcarPaga]
+  );
 
   return (
     <motion.div
@@ -133,45 +261,71 @@ export function ContasPagarReceberTela({ tipo }: Props) {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── Bloco 1: cabeçalho + número-herói + ação primária ── */}
       <motion.header
-        className="flex items-end justify-between gap-3 flex-wrap"
+        className="flex flex-col gap-4"
         variants={containerV}
         initial="hidden"
         animate="show"
       >
-        <div>
-          <motion.span
-            variants={itemV}
-            className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-          >
-            Controles · {titulo}
-          </motion.span>
-          <motion.h1
-            variants={itemV}
-            className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-          >
-            {titulo}
-          </motion.h1>
-          <motion.p
-            variants={itemV}
-            className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
-          >
-            Cada conta cadastrada entra automaticamente no fluxo de caixa.
-            Marcar como {palavraAcao === "pagar" ? "paga" : "recebida"} já
-            atualiza a projeção.
-          </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Controles · {titulo}
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              {titulo}
+            </motion.h1>
+          </div>
+
+          {/* Ação primária — verde 44px */}
+          <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+            <Button
+              size="default"
+              className="h-11 px-5 gap-2"
+              onClick={() => {
+                setEditando(null);
+                setAbertoForm(true);
+              }}
+            >
+              <Plus className="size-4" aria-hidden />
+              {labelAcao}
+            </Button>
+          </motion.div>
         </div>
-        <motion.div variants={itemV}>
-          <Button
-            onClick={() => {
-              setEditando(null);
-              setAbertoForm(true);
+
+        {/* número-herói: total pendente + atrasado */}
+        <motion.div variants={itemV} className="flex flex-col gap-1">
+          <span
+            className="mono leading-none whitespace-nowrap"
+            style={{
+              fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+              fontWeight: 300,
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em",
+              color:
+                totaisPorStatus.atrasado > 0
+                  ? "var(--color-danger)"
+                  : "var(--color-ink)",
             }}
+            aria-label={`Total pendente: ${heroFormatado}`}
           >
-            <Plus className="size-4" />{" "}
-            {tipo === "pagar" ? "Nova conta a pagar" : "Novo recebível"}
-          </Button>
+            {heroFormatado}
+          </span>
+          <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+            pendente{" "}
+            {totaisPorStatus.atrasado > 0 ? (
+              <span className="text-[var(--color-danger)] font-semibold">
+                · inclui atrasados
+              </span>
+            ) : null}
+          </span>
         </motion.div>
       </motion.header>
 
@@ -267,42 +421,24 @@ export function ContasPagarReceberTela({ tipo }: Props) {
           }
         />
       ) : (
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo={titulo} size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              {titulo}
+            </h2>
           </div>
-          <Ruler />
-          <ul
-            className="divide-y"
-            style={{ borderColor: "var(--color-rule)" }}
-          >
-            {lista.map((conta) => (
-              <LinhaConta
-                key={conta.id}
-                conta={conta}
-                onEditar={() => {
-                  setEditando(conta);
-                  setAbertoForm(true);
-                }}
-                onMarcarPaga={async () => {
-                  await marcarPaga.mutateAsync({
-                    id: conta.id,
-                    pagoEm: new Date().toISOString().slice(0, 10),
-                  });
-                  toast.success(
-                    tipo === "pagar"
-                      ? `${conta.descricao} marcada como paga`
-                      : `${conta.descricao} marcada como recebida`
-                  );
-                }}
-                onRemover={() => setConfirmandoRemocao(conta)}
-              />
-            ))}
-          </ul>
-          <Ruler />
-          <div className="px-5 py-2.5">
+
+          <DataTable<ContaPagarReceber>
+            data={lista}
+            columns={colunas}
+            getRowKey={(c) => c.id}
+            getRowLabel={(c) => `${c.descricao} — ${c.contraparte}`}
+            caption={titulo}
+          />
+
+          <div className="px-5 py-2.5 border-t border-[var(--color-rule)]">
             <span
-              className="text-xs text-[var(--color-ink-3)] mono"
+              className="text-xs text-[var(--color-ink-2)] mono"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {lista.length} {tipo === "pagar" ? "conta(s) a pagar" : "conta(s) a receber"}
@@ -373,80 +509,6 @@ export function ContasPagarReceberTela({ tipo }: Props) {
         </DialogContent>
       </Dialog>
     </motion.div>
-  );
-}
-
-function LinhaConta({
-  conta,
-  onEditar,
-  onMarcarPaga,
-  onRemover,
-}: {
-  conta: ContaPagarReceber;
-  onEditar: () => void;
-  onMarcarPaga: () => Promise<void> | void;
-  onRemover: () => void;
-}) {
-  return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-28 gap-1">
-        <span
-          className="mono text-xs font-bold text-[var(--color-ink-2)]"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {formatarDataBR(conta.vencimento)}
-        </span>
-        <StatusContaPill status={conta.status} />
-      </div>
-      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-ink)] truncate">
-          {conta.descricao}
-        </span>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] flex-wrap">
-          <span className="truncate">{conta.contraparte}</span>
-          <span className="size-1 rounded-full bg-[var(--color-rule-2)]" />
-          <span>{CATEGORIA_CONTA_LABEL[conta.categoria]}</span>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
-        <span
-          className="mono text-base font-bold text-[var(--color-ink)]"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          <Moeda valor={conta.valor} />
-        </span>
-        {conta.status !== "pago" ? (
-          <Button
-            variant="outline"
-            onClick={() => void onMarcarPaga()}
-            aria-label={
-              conta.tipo === "pagar"
-                ? "Marcar como paga"
-                : "Marcar como recebida"
-            }
-          >
-            <Check className="size-4" />{" "}
-            {conta.tipo === "pagar" ? "Marcar paga" : "Recebida"}
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          onClick={onEditar}
-          aria-label="Editar"
-          className="px-2"
-        >
-          <Pencil className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={onRemover}
-          aria-label="Excluir"
-          className="px-2 text-[var(--color-danger)] hover:text-[var(--color-danger)]"
-        >
-          <Trash2 className="size-4" />
-        </Button>
-      </div>
-    </li>
   );
 }
 

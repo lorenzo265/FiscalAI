@@ -12,18 +12,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Pill } from "@/components/shared/pill";
 import { Moeda } from "@/components/shared/moeda";
 import { LoadingState } from "@/components/shared/loading-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { Carimbo } from "@/components/blueprint/carimbo";
 import { ContabilSubnav } from "@/components/contabil/contabil-subnav";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
 import { useLancamentos } from "@/hooks/use-contabil";
 import { calcularResultadoExercicio } from "@/lib/contabil/motor";
 import { formatarMoeda } from "@/lib/format/moeda";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import {
   reveal,
   staggerChildren,
@@ -70,6 +68,15 @@ export default function EncerramentoPage() {
     [lancamentosMes]
   );
 
+  /* ── número-herói: resultado do exercício do mês ── */
+  const resultadoCentavos = Math.round(Math.abs(resultado.resultado) * 100);
+  const heroRaw = useCountUp(resultadoCentavos, {
+    id: "encerramento:resultado",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+  const resultadoPositivo = resultado.resultado >= 0;
+
   const [estado, setEstado] = React.useState<Estado>("pronto");
 
   const fechar = async () => {
@@ -92,31 +99,71 @@ export default function EncerramentoPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── Bloco 1: cabeçalho + número-herói + ação primária ── */}
       <motion.header
         variants={containerV}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-4"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Módulo contábil
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Encerramento do exercício
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-xl mt-1"
-        >
-          Apura o resultado do mês, transfere para Lucros Acumulados e
-          consolida o balancete.
-        </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Módulo contábil
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Encerramento do exercício
+            </motion.h1>
+          </div>
+
+          {/* Ação primária — verde 44px */}
+          {estado === "pronto" ? (
+            <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+              <Button
+                size="default"
+                className="h-11 px-5 gap-2"
+                onClick={fechar}
+                disabled={lancamentosMes.length === 0 || isLoading}
+              >
+                <CalendarCheck className="size-4" aria-hidden />
+                Fechar {NOMES_MES[mesRef - 1]}/{anoRef}
+              </Button>
+            </motion.div>
+          ) : null}
+        </div>
+
+        {/* número-herói: resultado do exercício do mês */}
+        {!isLoading && lancamentosMes.length > 0 ? (
+          <motion.div variants={itemV} className="flex flex-col gap-1">
+            <span
+              className="mono leading-none whitespace-nowrap"
+              style={{
+                fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                fontWeight: 300,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+                color: resultadoPositivo
+                  ? "var(--color-green)"
+                  : "var(--color-danger)",
+              }}
+              aria-label={`Resultado do exercício: ${resultadoPositivo ? "lucro" : "prejuízo"} de ${heroFormatado}`}
+            >
+              {heroFormatado}
+            </span>
+            <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+              {resultadoPositivo ? "lucro" : "prejuízo"} de{" "}
+              <span className="text-[var(--color-ink)] capitalize">
+                {NOMES_MES[mesRef - 1]}/{anoRef}
+              </span>
+            </span>
+          </motion.div>
+        ) : null}
       </motion.header>
 
       <ContabilSubnav />
@@ -125,24 +172,30 @@ export default function EncerramentoPage() {
         <LoadingState titulo="Lendo movimentação do mês..." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
-          {/* ── painel principal ── */}
+          {/* ── painel principal — confirmação: marks como assinatura ── */}
           <Framed marks tone="ink" surface="card" padded={false} className="flex flex-col">
-            <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-3">
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <CalendarCheck className="size-4 text-[var(--color-ink-2)]" />
-                <Fig n="01" titulo="Período de referência" size="sm" />
+                <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                  Período de referência
+                </h2>
               </div>
-              <Pill tom={estado === "fechado" ? "ok" : "info"}>
+              <span
+                className={`text-[11px] mono font-semibold uppercase tracking-[0.1em] ${
+                  estado === "fechado"
+                    ? "text-[var(--color-green)]"
+                    : "text-[var(--color-ink-2)]"
+                }`}
+              >
                 {estado === "fechado" ? "encerrado" : "em aberto"}
-              </Pill>
+              </span>
             </div>
 
-            <Ruler />
-
             <div className="px-5 py-4 flex flex-col gap-4">
-              <h2 className="font-serif text-2xl text-[var(--color-ink)] tracking-tight capitalize">
+              <h3 className="font-serif text-2xl text-[var(--color-ink)] tracking-tight capitalize">
                 {NOMES_MES[mesRef - 1]} de {anoRef}
-              </h2>
+              </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <BlocoResultado
@@ -170,17 +223,6 @@ export default function EncerramentoPage() {
                 />
               </div>
 
-              {estado === "pronto" ? (
-                <Button
-                  size="lg"
-                  className="self-start mt-2"
-                  onClick={fechar}
-                  disabled={lancamentosMes.length === 0}
-                >
-                  Fechar {NOMES_MES[mesRef - 1]}/{anoRef}
-                </Button>
-              ) : null}
-
               {estado === "fechando" ? (
                 <div
                   className="rounded-[var(--radius-sm)] border p-4 flex items-center gap-3"
@@ -194,7 +236,7 @@ export default function EncerramentoPage() {
                     <span className="text-sm font-semibold text-[var(--color-ink)]">
                       Apurando resultado do exercício...
                     </span>
-                    <span className="text-[12px] text-[var(--color-ink-3)]">
+                    <span className="text-[12px] text-[var(--color-ink-2)]">
                       Transferindo saldos de receita e despesa para Lucros
                       Acumulados (3.2.1).
                     </span>
@@ -262,9 +304,11 @@ export default function EncerramentoPage() {
             </div>
           </Framed>
 
-          {/* ── painel lateral: fluxo ── */}
-          <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3 self-start">
-            <Fig n="02" titulo="O que acontece quando você fecha" size="sm" />
+          {/* ── painel lateral: o que acontece ── */}
+          <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-4 self-start">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              O que acontece quando você fecha
+            </h2>
             <ol className="flex flex-col gap-3 text-[13px] text-[var(--color-ink-2)] leading-relaxed">
               <Passo
                 n={1}
@@ -284,7 +328,7 @@ export default function EncerramentoPage() {
             </ol>
 
             <div
-              className="rounded-[var(--radius-sm)] border p-3 mt-2 text-[11px] text-[var(--color-ink-3)] leading-snug"
+              className="rounded-[var(--radius-sm)] border p-3 text-[11px] text-[var(--color-ink-2)] leading-snug"
               style={{
                 background: "var(--color-paper-2)",
                 borderColor: "var(--color-rule)",
@@ -327,7 +371,7 @@ function BlocoResultado({
     >
       <div className="flex items-center gap-1.5">
         <Icon className="size-3.5" style={{ color: cor }} />
-        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+        <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-2)] mono">
           {label}
         </span>
       </div>
@@ -368,7 +412,7 @@ function Passo({
       </span>
       <div className="flex flex-col gap-0.5">
         <span className="text-[var(--color-ink)] font-semibold">{titulo}</span>
-        <span className="text-[var(--color-ink-3)] leading-snug">
+        <span className="text-[var(--color-ink-2)] leading-snug">
           {descricao}
         </span>
       </div>

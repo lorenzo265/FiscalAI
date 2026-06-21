@@ -33,8 +33,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pill } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { ContabilSubnav } from "@/components/contabil/contabil-subnav";
 import { OrigemPill } from "@/components/contabil/origem-pill";
 import { SeletorConta } from "@/components/contabil/seletor-conta";
@@ -107,6 +106,96 @@ export default function LivroDiarioPage() {
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
 
+  /* ── colunas DataTable ── */
+  const colunas = React.useMemo<DataTableColumn<LancamentoContabil>[]>(
+    () => [
+      {
+        id: "data",
+        header: "Data",
+        mono: true,
+        primary: true,
+        cell: (l) => (
+          <div className="flex flex-col gap-1">
+            <span
+              className="mono text-xs font-bold text-[var(--color-ink-2)]"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {formatarDataBR(l.data)}
+            </span>
+            <OrigemPill origem={l.origem} />
+          </div>
+        ),
+        width: "8rem",
+      },
+      {
+        id: "historico",
+        header: "Histórico",
+        cell: (l) => {
+          const cD = buscarConta(l.contaDebito);
+          const cC = buscarConta(l.contaCredito);
+          return (
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm text-[var(--color-ink)] truncate">
+                {l.historico}
+              </span>
+              {/* D/C — cor+palavra, nunca só cor */}
+              <div
+                className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                <span>
+                  <abbr title={`Débito: conta ${l.contaDebito}`} className="no-underline">
+                    <span className="text-[var(--color-ochre)] font-bold">D</span>
+                  </abbr>{" "}
+                  <span className="text-[var(--color-ink-2)]">{l.contaDebito}</span>{" "}
+                  {cD?.nome ?? ""}
+                </span>
+                <ArrowLeftRight className="size-3 shrink-0 text-[var(--color-ink-2)]" />
+                <span>
+                  <abbr title={`Crédito: conta ${l.contaCredito}`} className="no-underline">
+                    <span className="text-[var(--color-green)] font-bold">C</span>
+                  </abbr>{" "}
+                  <span className="text-[var(--color-ink-2)]">{l.contaCredito}</span>{" "}
+                  {cC?.nome ?? ""}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "valor",
+        header: "Valor",
+        mono: true,
+        align: "right",
+        cell: (l) => {
+          const baixa = l.confianca < 0.7;
+          return (
+            <div className="flex items-center gap-2 justify-end">
+              {baixa ? (
+                <span
+                  title={`Confiança da classificação: ${Math.round(l.confianca * 100)}%`}
+                  className="flex items-center gap-1 text-[11px] mono text-[var(--color-ochre)]"
+                >
+                  <AlertTriangle className="size-3.5" />
+                  {Math.round(l.confianca * 100)}%
+                </span>
+              ) : null}
+              <span
+                className="mono text-base font-bold text-[var(--color-ink)]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {formatarMoeda(l.valor)}
+              </span>
+            </div>
+          );
+        },
+        width: "9rem",
+      },
+    ],
+    []
+  );
+
   return (
     <motion.div
       className="flex flex-col gap-6"
@@ -130,7 +219,7 @@ export default function LivroDiarioPage() {
           </motion.span>
           <motion.h1
             variants={itemV}
-            className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
+            className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
           >
             Livro Diário
           </motion.h1>
@@ -142,9 +231,12 @@ export default function LivroDiarioPage() {
             automaticamente — você ajusta só o que é incomum.
           </motion.p>
         </div>
+
+        {/* Ação primária — verde 44px */}
         <motion.div variants={itemV}>
-          <Button onClick={() => setAberto(true)}>
-            <Plus className="size-4" /> Novo lançamento manual
+          <Button size="default" className="h-11 px-5 gap-2" onClick={() => setAberto(true)}>
+            <Plus className="size-4" aria-hidden />
+            Novo lançamento manual
           </Button>
         </motion.div>
       </motion.header>
@@ -233,22 +325,24 @@ export default function LivroDiarioPage() {
           }
         />
       ) : (
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Livro Diário" size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Livro Diário
+            </h2>
           </div>
-          <Ruler />
-          <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
-            {[...filtrados]
-              .sort((a, b) => b.data.localeCompare(a.data))
-              .map((l) => (
-                <LinhaLancamento key={l.id} lancamento={l} />
-              ))}
-          </ul>
-          <Ruler />
-          <div className="px-5 py-2.5">
+
+          <DataTable<LancamentoContabil>
+            data={[...filtrados].sort((a, b) => b.data.localeCompare(a.data))}
+            columns={colunas}
+            getRowKey={(l) => l.id}
+            getRowLabel={(l) => `${formatarDataBR(l.data)} — ${l.historico}`}
+            caption="Livro Diário — lançamentos contábeis"
+          />
+
+          <div className="px-5 py-2.5 border-t border-[var(--color-rule)]">
             <span
-              className="text-xs text-[var(--color-ink-3)] mono"
+              className="text-xs text-[var(--color-ink-2)] mono"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {filtrados.length} lançamento(s)
@@ -268,70 +362,6 @@ export default function LivroDiarioPage() {
         salvando={adicionar.isPending}
       />
     </motion.div>
-  );
-}
-
-function LinhaLancamento({ lancamento }: { lancamento: LancamentoContabil }) {
-  const cD = buscarConta(lancamento.contaDebito);
-  const cC = buscarConta(lancamento.contaCredito);
-  const baixa = lancamento.confianca < 0.7;
-  return (
-    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[var(--color-paper-2)] transition-colors">
-      <div className="flex flex-col shrink-0 w-28 gap-1">
-        <span
-          className="mono text-xs font-bold text-[var(--color-ink-2)]"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {formatarDataBR(lancamento.data)}
-        </span>
-        <OrigemPill origem={lancamento.origem} />
-      </div>
-
-      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-sm text-[var(--color-ink)] truncate">
-          {lancamento.historico}
-        </span>
-        {/* D/C — cor+palavra, nunca só cor */}
-        <div
-          className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          <span>
-            <abbr title={`Débito: conta ${lancamento.contaDebito}`} className="no-underline">
-              <span className="text-[var(--color-ochre)] font-bold">D</span>
-            </abbr>{" "}
-            <span className="text-[var(--color-ink-2)]">{lancamento.contaDebito}</span>{" "}
-            {cD?.nome ?? ""}
-          </span>
-          <ArrowLeftRight className="size-3 shrink-0 text-[var(--color-ink-3)]" />
-          <span>
-            <abbr title={`Crédito: conta ${lancamento.contaCredito}`} className="no-underline">
-              <span className="text-[var(--color-green)] font-bold">C</span>
-            </abbr>{" "}
-            <span className="text-[var(--color-ink-2)]">{lancamento.contaCredito}</span>{" "}
-            {cC?.nome ?? ""}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        {baixa ? (
-          <span
-            title={`Confiança da classificação: ${Math.round(lancamento.confianca * 100)}%`}
-            className="flex items-center gap-1 text-[11px] mono text-[var(--color-ochre)]"
-          >
-            <AlertTriangle className="size-3.5" />
-            {Math.round(lancamento.confianca * 100)}%
-          </span>
-        ) : null}
-        <span
-          className="mono text-base font-bold text-[var(--color-ink)]"
-          style={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {formatarMoeda(lancamento.valor)}
-        </span>
-      </div>
-    </li>
   );
 }
 

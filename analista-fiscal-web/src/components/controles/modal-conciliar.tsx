@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/shared/pill";
 import { Moeda } from "@/components/shared/moeda";
-import { Fig } from "@/components/blueprint/fig";
 import { useConciliarTransacao } from "@/hooks/use-controles";
 import { useLancamentos } from "@/hooks/use-contabil";
 import { buscarConta } from "@/lib/mocks/seeds/plano-contas";
@@ -95,7 +94,9 @@ export function ModalConciliar({ transacao, aberto, onAbertoChange }: Props) {
         </div>
 
         {/* Lista de sugestões */}
-        <Fig n={1} titulo="Lançamentos sugeridos" size="sm" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
+          Lançamentos sugeridos
+        </span>
         <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
           {sugestoes.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-2)] text-center py-6">
@@ -187,7 +188,7 @@ function Sugestao({
           </span>
         </div>
         <span
-          className="mono text-[11px] text-[var(--color-ink-3)] mt-1 block"
+          className="mono text-[11px] text-[var(--color-ink-2)] mt-1 block"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {formatarDataBR(lancamento.data)}

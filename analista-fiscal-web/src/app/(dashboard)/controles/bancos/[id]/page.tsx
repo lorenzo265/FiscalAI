@@ -31,8 +31,6 @@ import { Pill } from "@/components/shared/pill";
 import { StatCard } from "@/components/shared/stat-card";
 import { Moeda } from "@/components/shared/moeda";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { BancoLogo } from "@/components/controles/banco-logo";
 import { ModalConciliar } from "@/components/controles/modal-conciliar";
@@ -208,7 +206,7 @@ export default function ExtratoBancoPage() {
           valor={
             <span className="text-2xl mono" style={{ fontVariantNumeric: "tabular-nums" }}>
               {totalConciliadas}
-              <span className="text-base text-[var(--color-ink-3)]">
+              <span className="text-base text-[var(--color-ink-2)]">
                 {" / "}
                 {(transacoes ?? []).length}
               </span>
@@ -286,11 +284,12 @@ export default function ExtratoBancoPage() {
           descricao="Ajuste o período ou os filtros."
         />
       ) : (
-        <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-          <div className="px-5 pt-4 pb-2">
-            <Fig n={1} titulo="Extrato de movimentações" size="sm" />
+        <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)]">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+              Extrato de movimentações
+            </h2>
           </div>
-          <Ruler />
           <ul
             className="divide-y"
             style={{ borderColor: "var(--color-rule)" }}
@@ -310,10 +309,9 @@ export default function ExtratoBancoPage() {
               />
             ))}
           </ul>
-          <Ruler />
-          <div className="px-5 py-2.5">
+          <div className="px-5 py-2.5 border-t border-[var(--color-rule)]">
             <span
-              className="text-xs text-[var(--color-ink-3)] mono"
+              className="text-xs text-[var(--color-ink-2)] mono"
               style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {filtradas.length} transação(ões) exibida(s)
@@ -322,6 +320,7 @@ export default function ExtratoBancoPage() {
         </Framed>
       )}
 
+      {/* ── modal de conciliação — lógica 100% preservada ── */}
       <ModalConciliar
         transacao={conciliando}
         aberto={!!conciliando}
@@ -352,7 +351,7 @@ function LinhaTransacao({
         >
           {formatarDataBR(transacao.data)}
         </span>
-        <span className="mono text-[10px] text-[var(--color-ink-3)] uppercase tracking-[0.12em]">
+        <span className="mono text-[10px] text-[var(--color-ink-2)] uppercase tracking-[0.12em]">
           {CATEGORIA_LABEL[transacao.categoria]}
         </span>
       </div>

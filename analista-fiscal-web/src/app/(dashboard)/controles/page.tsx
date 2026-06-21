@@ -4,7 +4,7 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,11 +14,11 @@ import { StatCard } from "@/components/shared/stat-card";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Framed } from "@/components/blueprint/framed";
-import { Fig } from "@/components/blueprint/fig";
-import { Ruler } from "@/components/blueprint/ruler";
 import { ControlesSubnav } from "@/components/controles/controles-subnav";
 import { useFluxoCaixa, useContasPagarReceber } from "@/hooks/use-controles";
+import { useCountUp } from "@/lib/motion/use-count-up";
 import { formatarDataBR } from "@/lib/format/data";
+import { formatarMoeda } from "@/lib/format/moeda";
 import {
   reveal,
   staggerChildren,
@@ -40,6 +40,15 @@ export default function ControlesPage() {
   const { data: contas } = useContasPagarReceber();
   const reduced = useReducedMotion();
 
+  /* ── número-herói: saldo de hoje ("como está o caixa agora?") ── */
+  const saldoHoje = fluxo?.saldoHoje ?? 0;
+  const saldoCentavos = Math.round(saldoHoje * 100);
+  const heroRaw = useCountUp(saldoCentavos, {
+    id: "controles:saldoHoje",
+    format: Math.round,
+  });
+  const heroFormatado = formatarMoeda(heroRaw / 100);
+
   const containerV = reduced ? staticVariants : staggerChildren;
   const itemV = reduced ? staticVariants : revealChild;
   const pageV = reduced ? staticVariants : reveal;
@@ -51,32 +60,80 @@ export default function ControlesPage() {
       initial="hidden"
       animate="show"
     >
-      {/* ── cabeçalho ── */}
+      {/* ── Bloco 1: cabeçalho + número-herói + ação primária ── */}
       <motion.header
         variants={containerV}
         initial="hidden"
         animate="show"
+        className="flex flex-col gap-4"
       >
-        <motion.span
-          variants={itemV}
-          className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
-        >
-          Controles · Fluxo de caixa
-        </motion.span>
-        <motion.h1
-          variants={itemV}
-          className="font-serif text-[26px] md:text-3xl tracking-tight text-[var(--color-ink)] leading-tight"
-        >
-          Como o caixa vai estar nos próximos 90 dias
-        </motion.h1>
-        <motion.p
-          variants={itemV}
-          className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1"
-        >
-          Combinamos saldo atual + contas a pagar + contas a receber. A linha
-          tracejada é projeção. Toda parcela paga ou recebida atualiza o
-          gráfico em tempo real.
-        </motion.p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <motion.span
+              variants={itemV}
+              className="text-[10px] mono uppercase tracking-[0.18em] text-[var(--color-ink-3)] font-bold block"
+            >
+              Controles · Fluxo de caixa
+            </motion.span>
+            <motion.h1
+              variants={itemV}
+              className="font-serif text-[28px] md:text-[32px] tracking-tight text-[var(--color-ink)] leading-tight"
+            >
+              Visão de caixa
+            </motion.h1>
+          </div>
+
+          {/* Ação primária — verde 44px */}
+          <motion.div variants={itemV} className="shrink-0 pt-5 md:pt-6">
+            <Button asChild size="default" className="h-11 px-5 gap-2">
+              <Link href="/controles/bancos/conectar">
+                <Plus className="size-4" aria-hidden />
+                Conectar banco
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+
+        {/* número-herói: saldo de hoje */}
+        <motion.div variants={itemV} className="flex flex-col gap-1">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-16 w-52" />
+              <Skeleton className="h-4 w-40 mt-1" />
+            </>
+          ) : (
+            <>
+              <span
+                className="mono leading-none text-[var(--color-ink)] whitespace-nowrap"
+                style={{
+                  fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
+                  fontWeight: 300,
+                  fontVariantNumeric: "tabular-nums",
+                  letterSpacing: "-0.02em",
+                }}
+                aria-label={`Saldo hoje: ${heroFormatado}`}
+              >
+                {heroFormatado}
+              </span>
+              <span className="text-[13px] text-[var(--color-ink-2)] font-medium">
+                saldo de hoje{" "}
+                {saldoHoje < 0 ? (
+                  <span className="text-[var(--color-danger)] font-semibold">· atenção: negativo</span>
+                ) : (
+                  <span className="text-[var(--color-green)] font-semibold">· saudável</span>
+                )}
+              </span>
+              {fluxo?.saldo90d !== undefined ? (
+                <span
+                  className="mono text-[11px] text-[var(--color-ink-2)]"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  projeção 90 dias: {formatarMoeda(fluxo.saldo90d)}
+                </span>
+              ) : null}
+            </>
+          )}
+        </motion.div>
       </motion.header>
 
       <ControlesSubnav />
@@ -120,15 +177,16 @@ export default function ControlesPage() {
           </div>
 
           {/* ── gráfico de fluxo ── */}
-          <Framed marks tone="ink" surface="card" padded={false} className="overflow-hidden">
-            <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-2 flex-wrap">
-              <Fig n={1} titulo="Saldo histórico (30d) + projeção (90d)" size="sm" />
+          <Framed marks={false} tone="rule" surface="card" padded={false} className="overflow-hidden">
+            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-rule)] flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+                Saldo histórico (30d) + projeção (90d)
+              </h2>
               <div className="flex items-center gap-3 text-[10px] text-[var(--color-ink-2)] mono">
                 <Legenda cor="var(--color-green)" texto="Histórico" />
                 <Legenda cor="var(--color-ink-2)" texto="Projeção" tracejado />
               </div>
             </div>
-            <Ruler />
             <div className="px-4 py-3">
               <GraficoFluxoCaixa pontos={fluxo.pontos} />
             </div>
@@ -239,7 +297,7 @@ function ResumoPagarReceber({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
             Contas a pagar pendentes
           </span>
           {atrasadosPagar > 0 ? (
@@ -260,7 +318,7 @@ function ResumoPagarReceber({
       </Framed>
       <Framed marks={false} tone="rule" surface="card" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--color-ink-3)] mono">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-ink-2)]">
             Contas a receber pendentes
           </span>
           {atrasadosReceber > 0 ? (
