@@ -3,11 +3,19 @@
 **Última atualização:** 2026-06-21
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
-**Branch:** `fix/auditoria-onda-c` (Onda A+B já em `main` via fast-forward; não pushado)
-**Suite atual:** **2681 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Branch:** `fix/fiscal-followups` (Ondas A+B+C já em `main` via fast-forward; não pushado)
+**Suite atual:** **2682 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
+
+---
+
+## Auditoria Fiscal 2026-06-21 — Follow-ups fiscais (solo) · branch `fix/fiscal-followups`
+
+Ondas A+B+C consolidadas em `main` (`bfe1351`, não pushado). Follow-ups fechando os pontos abertos, feitos pelo orquestrador (sem subagente — os delicados). **Suite: 2682 passed, 3 skipped. mypy strict ✅. integração 24 ✅.**
+
+- **Persistir a retenção de dividendos (FECHADO):** migration `0060` adiciona `retencao_dividendos_10pct NUMERIC(14,2) NOT NULL DEFAULT 0` a `distribuicao_lucros` (RLS preservada — coluna nova não mexe na policy; aplicada no dev via `alembic upgrade head`). Modelo (`models.py`), `DistribuicaoRepo.soma_retencao_no_mes` (espelho do `soma_bruta_no_mes`) e `socio_service` agora **persistem** a retenção e consultam o **já recolhido no mês** → o 2º+ pagamento não retém mais a mais (era o follow-up #1 da Onda A). Golden: 60k retém 6k; +10k com já_retido 6k → retém só 1k.
 
 ---
 

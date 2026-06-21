@@ -2189,6 +2189,12 @@ class DistribuicaoLucros(Base):
     irrf_retido: Mapped[Decimal] = mapped_column(
         NUMERIC(14, 2), nullable=False, server_default="0"
     )
+    # Lei 15.270/2025 — retenção antecipada de 10% na fonte sobre dividendos
+    # que excedam R$ 50.000/mês da mesma PJ → mesma PF (inclusive Simples).
+    # 0 para distribuições históricas ou abaixo do limite.
+    retencao_dividendos_10pct: Mapped[Decimal] = mapped_column(
+        NUMERIC(14, 2), nullable=False, server_default="0"
+    )
     base_calculo_referencia: Mapped[str] = mapped_column(String(40), nullable=False)
     algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
     criado_em: Mapped[datetime] = mapped_column(

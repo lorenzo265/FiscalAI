@@ -245,6 +245,16 @@ class DistribuicaoService:
             ano=payload.data_distribuicao.year,
             mes=payload.data_distribuicao.month,
         )
+        # Lei 15.270/2025 — retenção de 10% já recolhida no mês (persistida na
+        # coluna retencao_dividendos_10pct, migration 0060). Permite o recálculo
+        # incremental EXATO de múltiplos pagamentos: a retenção devida agora é
+        # 10%×total_do_mês − já_retido. Sem isto, o 2º+ pagamento retém a mais.
+        retencao_ja_retida_no_mes = await repo_dist.soma_retencao_no_mes(
+            empresa_id=empresa_id,
+            socio_id=socio_id,
+            ano=payload.data_distribuicao.year,
+            mes=payload.data_distribuicao.month,
+        )
 
         try:
             resultado = calcular_distribuicao(
@@ -256,20 +266,11 @@ class DistribuicaoService:
                 faixas_irrf=faixas_irrf,
                 dependentes=socio.dependentes_irrf,
                 dividendos_ja_pagos_no_mes=dividendos_ja_pagos_no_mes,
-                # retencao_lei_15270_ja_retida_no_mes: quando os campos estiverem
-                # na tabela (após migration), buscar via repo. Por ora, default 0
-                # (conservador: pode reter a mais no 2º pagamento do mês; ajuste
-                # pós-migration ao somar coluna retencao_dividendos_10pct).
-                retencao_lei_15270_ja_retida_no_mes=_ZERO,
+                retencao_lei_15270_ja_retida_no_mes=retencao_ja_retida_no_mes,
             )
         except ValueError as exc:
             raise DistribuicaoInvalida(str(exc)) from exc
 
-        # NOTA: campos retencao_dividendos_10pct e total_acumulado_mes ainda
-        # não existem no modelo DistribuicaoLucros — aguardam migration-smith
-        # (adicionar colunas NULLABLE + NOT NULL em 2 fases com RLS).
-        # O cálculo já é correto; a persistência desses campos virá no PR de
-        # migration + model update.
         distribuicao = DistribuicaoLucros(
             tenant_id=tenant_id,
             empresa_id=empresa_id,
@@ -280,6 +281,7 @@ class DistribuicaoService:
             valor_isento=resultado.valor_isento,
             valor_tributavel=resultado.valor_tributavel,
             irrf_retido=resultado.irrf_retido,
+            retencao_dividendos_10pct=resultado.retencao_dividendos_10pct,
             base_calculo_referencia=payload.base_calculo_referencia.value,
             algoritmo_versao=resultado.algoritmo_versao,
         )

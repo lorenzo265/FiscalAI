@@ -360,6 +360,43 @@ class TestRetencaoLei15270:
         # líquido = 30k − 0 − 6k = 24k
         assert r2.valor_liquido_socio == Decimal("24000.00")
 
+    def test_segundo_pagamento_subtrai_retencao_ja_recolhida(self) -> None:
+        """Recálculo incremental quando o 1º pagamento JÁ reteve (subtração).
+
+        É o caminho que a persistência da coluna ``retencao_dividendos_10pct``
+        (migration 0060 + ``DistribuicaoRepo.soma_retencao_no_mes``) alimenta:
+        sem subtrair o já recolhido, o 2º pagamento reteria a mais.
+
+        1º: R$ 60.000 (total 60k > 50k) → retém 10%×60k = 6.000,00.
+        2º: +R$ 10.000 (total 70k) → devida 10%×70k = 7.000 − já_retido 6.000
+            = 1.000,00 (NÃO 7.000).
+        """
+        r1 = calcular_distribuicao(
+            valor_distribuido=Decimal("60000.00"),
+            limite_isento_apurado=Decimal("200000.00"),
+            base_calculo_referencia=BaseCalculoReferencia.LUCRO_CONTABIL,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+            dividendos_ja_pagos_no_mes=Decimal("0.00"),
+            retencao_lei_15270_ja_retida_no_mes=Decimal("0.00"),
+        )
+        assert r1.retencao_dividendos_10pct == Decimal("6000.00")
+
+        r2 = calcular_distribuicao(
+            valor_distribuido=Decimal("10000.00"),
+            limite_isento_apurado=Decimal("200000.00"),
+            base_calculo_referencia=BaseCalculoReferencia.LUCRO_CONTABIL,
+            faixas_irrf=IRRF_FAIXAS,
+            dependentes=0,
+            dividendos_ja_pagos_no_mes=Decimal("60000.00"),
+            retencao_lei_15270_ja_retida_no_mes=Decimal("6000.00"),
+        )
+        assert r2.total_acumulado_mes == Decimal("70000.00")
+        # 10% × 70.000 = 7.000 − 6.000 já retido = 1.000,00
+        assert r2.retencao_dividendos_10pct == Decimal("1000.00")
+        # líquido = 10k − 0 (isento, limite 200k) − 1k = 9k
+        assert r2.valor_liquido_socio == Decimal("9000.00")
+
     def test_simples_nacional_retem_igual(self) -> None:
         """Simples Nacional: retenção da Lei 15.270 é idêntica ao LP.
 

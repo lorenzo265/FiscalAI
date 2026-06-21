@@ -293,6 +293,36 @@ class DistribuicaoRepo:
         result = (await self._s.execute(stmt)).scalar_one()
         return Decimal(str(result))
 
+    async def soma_retencao_no_mes(
+        self,
+        empresa_id: UUID,
+        socio_id: UUID,
+        ano: int,
+        mes: int,
+    ) -> Decimal:
+        """Soma da retenção de 10% (Lei 15.270/2025) já retida no mês p/ a PJ×PF.
+
+        Usado para o recálculo incremental de múltiplos pagamentos no mês: a
+        retenção devida no pagamento atual é ``10% × total_do_mês`` menos o que
+        já foi retido (este valor). Sem isso, o 2º+ pagamento reteria a mais.
+
+        Returns:
+            Soma de ``retencao_dividendos_10pct`` no mês. Zero se não houver.
+        """
+        stmt = select(
+            func.coalesce(
+                func.sum(DistribuicaoLucros.retencao_dividendos_10pct),
+                Decimal("0"),
+            )
+        ).where(
+            DistribuicaoLucros.empresa_id == empresa_id,
+            DistribuicaoLucros.socio_id == socio_id,
+            extract("year", DistribuicaoLucros.data_distribuicao) == ano,
+            extract("month", DistribuicaoLucros.data_distribuicao) == mes,
+        )
+        result = (await self._s.execute(stmt)).scalar_one()
+        return Decimal(str(result))
+
 
 class EventoESocialRepo:
     def __init__(self, session: AsyncSession) -> None:
