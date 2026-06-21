@@ -1,5 +1,104 @@
 @import "tailwindcss";
 
+/* ─── Motion dos overlays Radix (X19 / D6) ───────────────────────────────
+   Os componentes ui/{dialog,sheet,dropdown,select,popover,tooltip} já carregam
+   o vocabulário tailwindcss-animate (`data-[state=open]:animate-in fade-in-0
+   zoom-in-95 slide-in-from-bottom-6` …), mas ele estava INERTE: em Tailwind v4
+   não há o plugin v3 nem `tailwind.config`, e utilidade precisa ser `@utility`
+   (NÃO `.x{}` em `@layer utilities`, que não gera a variante `data-[state=*]:`).
+   Definimos aqui as utilidades + keyframes. Só anima opacity/transform (60fps);
+   a rede `prefers-reduced-motion` no fim do arquivo zera a duração (cai seco no
+   estado final, que é visível por causa do `animation-fill-mode: both`).
+   §4: surface (dialog/sheet) entra y+24→0 + fade; menus = fade + zoom-95.
+   CENTRAGEM: o dialog usa `-translate-x/y-1/2` — em Tailwind v4 isso vira a
+   propriedade CSS `translate` (independente de `transform`). Como o keyframe
+   anima só `transform`, as duas se COMPÕEM: `translate` mantém a centragem e
+   `transform` faz a viagem (slide/scale). Por isso NÃO há base-offset aqui —
+   adicioná-lo dobrava o deslocamento (-100% → modal fora do centro). */
+
+@keyframes arkan-enter {
+  from {
+    opacity: var(--arkan-enter-opacity, 1);
+    transform: translate3d(
+        var(--arkan-enter-translate-x, 0px),
+        var(--arkan-enter-translate-y, 0px),
+        0
+      )
+      scale(var(--arkan-enter-scale, 1));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes arkan-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: var(--arkan-exit-opacity, 1);
+    transform: translate3d(
+        var(--arkan-exit-translate-x, 0px),
+        var(--arkan-exit-translate-y, 0px),
+        0
+      )
+      scale(var(--arkan-exit-scale, 1));
+  }
+}
+
+@utility animate-in {
+  animation-name: arkan-enter;
+  animation-duration: var(--dur-base, 320ms);
+  animation-timing-function: var(--ease-reveal, cubic-bezier(0.16, 1, 0.3, 1));
+  animation-fill-mode: both;
+}
+@utility animate-out {
+  animation-name: arkan-exit;
+  animation-duration: var(--dur-fast, 160ms);
+  animation-timing-function: var(--ease-settle, cubic-bezier(0.2, 0.8, 0.2, 1));
+  animation-fill-mode: both;
+}
+@utility fade-in-0 {
+  --arkan-enter-opacity: 0;
+}
+@utility fade-out-0 {
+  --arkan-exit-opacity: 0;
+}
+@utility zoom-in-95 {
+  --arkan-enter-scale: 0.95;
+}
+@utility slide-in-from-top {
+  --arkan-enter-translate-y: -100%;
+}
+@utility slide-in-from-bottom {
+  --arkan-enter-translate-y: 100%;
+}
+@utility slide-in-from-bottom-6 {
+  --arkan-enter-translate-y: 1.5rem;
+}
+@utility slide-in-from-left {
+  --arkan-enter-translate-x: -100%;
+}
+@utility slide-in-from-right {
+  --arkan-enter-translate-x: 100%;
+}
+@utility slide-out-to-top {
+  --arkan-exit-translate-y: -100%;
+}
+@utility slide-out-to-bottom {
+  --arkan-exit-translate-y: 100%;
+}
+@utility slide-out-to-bottom-6 {
+  --arkan-exit-translate-y: 1.5rem;
+}
+@utility slide-out-to-left {
+  --arkan-exit-translate-x: -100%;
+}
+@utility slide-out-to-right {
+  --arkan-exit-translate-x: 100%;
+}
+
 @theme {
   /* ─── Fontes (carregadas em layout.tsx via next/font) ───────────────── */
   --font-serif: var(--font-serif-loaded), Georgia, "Times New Roman", serif;
