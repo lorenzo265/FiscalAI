@@ -3,11 +3,26 @@
 **Última atualização:** 2026-06-21
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
-**Branch:** `feat/producao-marco1` (auditoria fiscal A+B+C+followup já em `main`, pushada)
-**Suite atual:** **2684 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
-**mypy strict:** ✅ 0 erros
+**Branch:** `feat/billing-m2` (auditoria A+B+C+followup + Marco 1 já em `main`, pushados)
+**Suite atual:** **2700 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração +2 billing
+**mypy strict:** ✅ 0 erros (365 arquivos)
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀
+
+---
+
+## Production-Readiness — Marco 2 (Billing/assinatura Stripe) · branch `feat/billing-m2`
+
+Negócio cobrável (o maior buraco da auditoria de production-readiness). Módulo `app/modules/billing/` espelhando o padrão do marketplace (Protocol + provider + service idempotente). **Suite: 2700 passed, 3 skipped; integração billing 2 passed; mypy strict 0; ruff ✅.** Gateway = **Stripe**; planos MOCK inventados (catálogo versionado).
+
+- **Planos** (`planos.py`, `PLANOS_VERSAO`): Essencial R$149 · Profissional R$299 · Avançado R$499 (mensal) · trial 14 dias · `max_empresas` 1/1/5. Cada plano referencia a env do Stripe Price ID.
+- **Models** + **migration 0061** (RLS multi-tenant, ENABLE não FORCE p/ o webhook superuser; GRANT explícito a `fiscal_app`): `assinatura` (trial→ativa→inadimplente↔ativa→cancelada terminal), `fatura` (espelho invoice), `evento_billing` (idempotência via `stripe_event_id` UNIQUE).
+- **Provider** (`provider.py`): `BillingProvider` Protocol + `StripeProvider` (SDK lazy, **valida `Stripe-Signature` via `construct_event` antes de processar**, `send_default_pii` n/a) + `_FakeBillingProvider` (dev/teste). Factory: Stripe real só com `STRIPE_SECRET_KEY` + SDK; senão fake. **Sem mock em prod — a credencial liga o real.**
+- **Service**: `iniciar_assinatura` (trial + checkout, idempotente: 1 viva/tenant) · `processar_webhook` (idempotente por event_id; sincroniza ativa/inadimplente/cancelada; guard anti-revival) · `cancelar_assinatura`. Faturas idempotentes por `stripe_invoice_id`.
+- **Router**: `GET /v1/billing/planos` (público) · `POST /assinar` · `GET /assinatura` · `POST /cancelar` · `POST /v1/webhooks/stripe` (raw body, assinatura validada antes). Plugado no `main.py`.
+- **Config**: `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_*`/`BILLING_CHECKOUT_*_URL`. Grupo opcional `[billing]` (`stripe ^11`) + mypy override.
+
+**Ativação em prod (PO):** `poetry install --with billing` + setar `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, criar os 3 Prices no Stripe e setar `STRIPE_PRICE_*`. **Follow-ups M2:** nota da própria assinatura (NFS-e da receita) · dunning (Celery) · tela `/assinatura` no frontend.
 
 ---
 

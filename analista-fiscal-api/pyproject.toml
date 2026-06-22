@@ -75,6 +75,15 @@ optional = true
 [tool.poetry.group.storage.dependencies]
 boto3 = "^1.35"
 
+# Marco 2 — billing/assinatura via Stripe. Import lazy no StripeProvider;
+# sem a chave (STRIPE_SECRET_KEY) cai no _FakeBillingProvider. Em prod:
+#   poetry install --with billing
+[tool.poetry.group.billing]
+optional = true
+
+[tool.poetry.group.billing.dependencies]
+stripe = "^11.0"
+
 # Sprint 19.7 PR2 (#13) — eSocial transmissão real:
 #   esocial — XMLDSig (lxml para C14N + cryptography para RSA+pkcs12) +
 #             signxml (orquestra ds:Signature padrão XMLDSig W3C).
@@ -143,7 +152,7 @@ ignore_missing_imports = true
 # Grupos opt-in da Sprint 19.6 PR3 (#1, #41, #2). Quando não instalados,
 # imports lazy nos módulos correspondentes ainda passam mypy.
 [[tool.mypy.overrides]]
-module = ["celery.*", "pdfplumber.*", "boto3.*", "botocore.*"]
+module = ["celery.*", "pdfplumber.*", "boto3.*", "botocore.*", "stripe.*"]
 ignore_missing_imports = true
 
 # Sprint 19.7 PR2 (#13) — grupo opt-in esocial.

@@ -3204,3 +3204,113 @@ class SugestaoVigenciaTabela(Base):
             "ix_sugestao_status", "status", "criado_em"
         ),
     )
+
+
+# ── Billing — assinatura SaaS (Marco 2 produção) ─────────────────────────────
+
+
+class Assinatura(Base):
+    """Assinatura do cliente (tenant) ao Arkan — cobrança recorrente via Stripe.
+
+    Uma assinatura viva por tenant. Status: trial → ativa →
+    (inadimplente → ativa | cancelada). RLS por ``tenant_id``; o webhook do
+    Stripe escreve via sessão superuser (que bypassa RLS, sem FORCE).
+    """
+
+    __tablename__ = "assinatura"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    plano_codigo: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="trial"
+    )
+    trial_ends_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    checkout_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    planos_versao: Mapped[str] = mapped_column(String(40), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('trial','ativa','inadimplente','cancelada')",
+            name="ck_assinatura_status",
+        ),
+        Index("ix_assinatura_tenant", "tenant_id"),
+        Index("ix_assinatura_stripe_sub", "stripe_subscription_id"),
+    )
+
+
+class Fatura(Base):
+    """Fatura de uma assinatura — espelho da invoice do Stripe."""
+
+    __tablename__ = "fatura"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assinatura_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("assinatura.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    valor: Mapped[Decimal] = mapped_column(NUMERIC(14, 2), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="aberta"
+    )
+    stripe_invoice_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    competencia: Mapped[date] = mapped_column(DATE, nullable=False)
+    pago_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('aberta','paga','falhou','cancelada')",
+            name="ck_fatura_status",
+        ),
+        UniqueConstraint("stripe_invoice_id", name="uq_fatura_stripe_invoice"),
+        Index("ix_fatura_tenant", "tenant_id"),
+        Index("ix_fatura_assinatura", "assinatura_id"),
+    )
+
+
+class EventoBilling(Base):
+    """Evento de webhook do Stripe — idempotencia via ``stripe_event_id`` UNIQUE.
+
+    ``tenant_id`` nullable: eventos globais do Stripe podem nao mapear a um
+    tenant. Escrito pelo webhook (sessao superuser, bypassa RLS).
+    """
+
+    __tablename__ = "evento_billing"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    stripe_event_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(80), nullable=False)
+    payload: Mapped[JsonObject] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    processado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "stripe_event_id", name="uq_evento_billing_stripe_event"
+        ),
+        Index("ix_evento_billing_stripe", "stripe_event_id"),
+    )

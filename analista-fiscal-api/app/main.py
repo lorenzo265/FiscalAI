@@ -22,6 +22,8 @@ from app.modules.advisor.router import router as advisor_router
 from app.modules.agenda.router import router as agenda_router
 from app.modules.assistente.router import router as assistente_router
 from app.modules.auth.router import router as auth_router
+from app.modules.billing.router import router as billing_router
+from app.modules.billing.router import webhook_router as billing_webhook_router
 from app.modules.certidoes.router import router as certidoes_router
 from app.modules.conciliacao.router import router as conciliacao_router
 from app.modules.contabil.router import router as contabil_router
@@ -289,6 +291,8 @@ app.include_router(relatorios_router)
 app.include_router(marketplace_router)
 app.include_router(marketplace_parceiros_router)
 app.include_router(marketplace_webhook_router)
+app.include_router(billing_router)
+app.include_router(billing_webhook_router)
 app.include_router(reforma_router)
 app.include_router(advisor_router)
 app.include_router(sped_ecd_router)

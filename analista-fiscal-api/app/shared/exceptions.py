@@ -1113,3 +1113,38 @@ class ChecklistLpNaoConcluido(DomainError):
     """
 
     http_status = 409
+
+
+# ── Billing — assinatura SaaS (Marco 2 produção) ─────────────────────────────
+
+
+class PlanoInexistente(DomainError):
+    """Código de plano fora do catálogo (``billing/planos.py``)."""
+
+    http_status = 404
+
+
+class AssinaturaNaoEncontrada(DomainError):
+    """Assinatura não encontrada para o tenant atual."""
+
+    http_status = 404
+
+
+class AssinaturaForaDeFluxo(DomainError):
+    """Transição de status de assinatura não permitida pela máquina.
+
+    Máquina: trial → ativa → (inadimplente → ativa | cancelada);
+    trial → cancelada; ativa → cancelada. ``cancelada`` é terminal.
+    """
+
+    http_status = 409
+
+
+class WebhookStripeAssinaturaInvalida(DomainError):
+    """Assinatura (``Stripe-Signature``) do webhook do Stripe ausente/ inválida.
+
+    Fail-closed: payload sem assinatura válida é rejeitado antes de qualquer
+    processamento (§8.9 — integração externa autenticada).
+    """
+
+    http_status = 401

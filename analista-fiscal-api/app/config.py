@@ -110,6 +110,31 @@ class Settings(BaseSettings):
         description="Expõe /metrics (Prometheus, métricas agregadas sem PII).",
     )
 
+    # Billing — Stripe (Marco 2). Vazios = _FakeBillingProvider (dev/teste).
+    STRIPE_SECRET_KEY: str = Field(
+        default="", description="Stripe secret key (sk_...). Vazio = fake provider."
+    )
+    STRIPE_WEBHOOK_SECRET: str = Field(
+        default="", description="Stripe webhook signing secret (whsec_...)."
+    )
+    STRIPE_PRICE_ESSENCIAL: str = Field(
+        default="", description="Stripe Price ID do plano Essencial."
+    )
+    STRIPE_PRICE_PROFISSIONAL: str = Field(
+        default="", description="Stripe Price ID do plano Profissional."
+    )
+    STRIPE_PRICE_AVANCADO: str = Field(
+        default="", description="Stripe Price ID do plano Avancado."
+    )
+    BILLING_CHECKOUT_SUCCESS_URL: str = Field(
+        default="https://app.arkan.com.br/assinatura/sucesso",
+        description="URL de retorno do checkout Stripe (sucesso).",
+    )
+    BILLING_CHECKOUT_CANCEL_URL: str = Field(
+        default="https://app.arkan.com.br/assinatura",
+        description="URL de retorno do checkout Stripe (cancelado).",
+    )
+
     # JWT — Sprint 1
     JWT_SECRET: str = Field(
         default="TROCAR_EM_PRODUCAO_gere_com_openssl_rand_hex_32",  # nosec B105
