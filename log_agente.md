@@ -1,13 +1,23 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-21
-**Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
-**Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
-**Branch:** `feat/billing-m2` (auditoria A+B+C+followup + Marco 1 já em `main`, pushados)
-**Suite atual:** **2700 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração +2 billing
-**mypy strict:** ✅ 0 erros (365 arquivos)
+**Última atualização:** 2026-06-22
+**Agente:** claude-opus-4-8 (orquestrador, solo)
+**Skill ativa:** `fiscalai-backend`
+**Branch:** `feat/m3-lgpd-seguranca` (M1/M2 + auditoria já em `main`, pushados @ `0a076f2`)
+**Suite atual:** **2704 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **26 passed**
+**mypy strict:** ✅ 0 erros (366 arquivos)
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀 + **M3 LGPD/segurança (em andamento)** 🔐
+
+---
+
+## Production-Readiness — Marco 3 (LGPD & Segurança) · branch `feat/m3-lgpd-seguranca`
+
+Terceiro marco de produção (LGPD-first §8.7 + hardening de segurança). Tudo código do orquestrador, solo, em PRs pequenos validados (pytest+mypy+ruff+integração). Base em `docs/PROMPT-PROXIMO-AGENTE-M3.md` §6 e `docs/PLANO_GO_LIVE.md §B`.
+
+> **Nota de estado (ruff):** o gate `ruff check .` acusa ~1607 findings **pré-existentes** (1101 = RUF001/002/003, ruído de tipografia portuguesa — em-dash/aspas curvas/`×` em comentários; não auto-corrigíveis). Não é escopo do M3; delegado a uma sessão separada (`chore/ruff-lint-cleanup`). Política do M3: cada arquivo novo/tocado meu sai `ruff check`-limpo.
+
+- **PR 6.1 — Security headers middleware** (✅): `SecurityHeadersMiddleware` (`app/shared/middleware/security_headers.py`, espelha o `correlation_id.py`) injeta em toda resposta, via `setdefault`: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 0` (recomendação OWASP atual), `Permissions-Policy` (nega geo/mic/cam), e `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'` — **isento nos paths de docs** (`/docs`, `/redoc`, `/openapi.json`) que servem o Swagger UI. `Strict-Transport-Security` (2 anos, preload) **só com `hsts_enabled`** (injetado pelo `main.py` quando `ENVIRONMENT in {staging, prod}`; nunca em local/http). Plugado no `main.py` entre CORS e Correlation → aninhamento `Correlation → Security → CORS → RateLimit → app` (headers caem também nas 429/erros). Golden `tests/unit/middleware/test_security_headers.py` (4 testes: headers básicos, HSTS on/off, isenção CSP em docs). **+4 testes (2700→2704), mypy 0, ruff limpo nos meus arquivos, integração 26 ✅.**
 
 ---
 

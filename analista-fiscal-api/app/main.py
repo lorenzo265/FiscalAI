@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 
-from app.config import Settings, get_settings
+from app.config import Environment, Settings, get_settings
 from app.modules.advisor.router import router as advisor_router
 from app.modules.agenda.router import router as agenda_router
 from app.modules.assistente.router import router as assistente_router
@@ -89,6 +89,7 @@ from app.shared.llm.client import LLMClient
 from app.shared.logging import configurar_logging
 from app.shared.middleware.correlation_id import CorrelationIdMiddleware
 from app.shared.middleware.rate_limit import RateLimitMiddleware
+from app.shared.middleware.security_headers import SecurityHeadersMiddleware
 from app.shared.storage import build_storage
 from app.shared.types import JsonObject
 
@@ -248,6 +249,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+)
+# Security headers: adicionado depois do CORS, roda OUTER em relacao a CORS e
+# rate-limit, entao os headers de seguranca caem tambem nas respostas 429 do
+# rate-limit, nos erros e no preflight. HSTS so com TLS garantido no edge
+# (staging/prod); em local/dev (http) ficaria perigoso e e desligado.
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    hsts_enabled=_settings.ENVIRONMENT in (Environment.STAGING, Environment.PROD),
 )
 # Correlation-ID por último → roda OUTERMOST: vincula request_id aos contextvars
 # do structlog antes de tudo (inclusive do rate-limit) e ecoa X-Request-ID na
