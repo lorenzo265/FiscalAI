@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta
 from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac as hmac_module
+
 from app.shared.types import JsonObject
 
 _SIGNATURE_PREFIX = "sha256="

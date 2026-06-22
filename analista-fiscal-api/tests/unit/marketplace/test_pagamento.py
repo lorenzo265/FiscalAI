@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac as hmac_module
-import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -100,11 +99,10 @@ async def test_gerar_cobranca_consulta_inexistente_levanta() -> None:
     with patch(
         "app.modules.marketplace.pagamento.ConsultaRepo",
         return_value=consulta_repo,
-    ):
-        with pytest.raises(ConsultaNaoEncontrada):
-            await ConsultaPagamentoService().gerar_cobranca(
-                session, tenant_id=uuid.uuid4(), consulta_id=uuid.uuid4()
-            )
+    ), pytest.raises(ConsultaNaoEncontrada):
+        await ConsultaPagamentoService().gerar_cobranca(
+            session, tenant_id=uuid.uuid4(), consulta_id=uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -116,11 +114,10 @@ async def test_gerar_cobranca_consulta_nao_concluida_levanta() -> None:
     with patch(
         "app.modules.marketplace.pagamento.ConsultaRepo",
         return_value=consulta_repo,
-    ):
-        with pytest.raises(CobrancaInvalida, match="concluida"):
-            await ConsultaPagamentoService().gerar_cobranca(
-                session, tenant_id=consulta.tenant_id, consulta_id=consulta.id
-            )
+    ), pytest.raises(CobrancaInvalida, match="concluida"):
+        await ConsultaPagamentoService().gerar_cobranca(
+            session, tenant_id=consulta.tenant_id, consulta_id=consulta.id
+        )
 
 
 @pytest.mark.asyncio
@@ -202,11 +199,10 @@ async def test_webhook_cobranca_inexistente_levanta() -> None:
         ConsultaPagamentoService,
         "_buscar_por_externo_id",
         new=AsyncMock(return_value=None),
-    ):
-        with pytest.raises(CobrancaNaoEncontrada):
-            await ConsultaPagamentoService().processar_webhook(
-                session, provider_externo_id="x", status="paga"
-            )
+    ), pytest.raises(CobrancaNaoEncontrada):
+        await ConsultaPagamentoService().processar_webhook(
+            session, provider_externo_id="x", status="paga"
+        )
 
 
 @pytest.mark.asyncio
@@ -264,13 +260,12 @@ async def test_webhook_estado_terminal_bloqueia_transicao() -> None:
         ConsultaPagamentoService,
         "_buscar_por_externo_id",
         new=AsyncMock(return_value=cobranca),
-    ):
-        with pytest.raises(CobrancaInvalida, match="terminal"):
-            await ConsultaPagamentoService().processar_webhook(
-                session,
-                provider_externo_id=cobranca.provider_externo_id,
-                status="cancelada",
-            )
+    ), pytest.raises(CobrancaInvalida, match="terminal"):
+        await ConsultaPagamentoService().processar_webhook(
+            session,
+            provider_externo_id=cobranca.provider_externo_id,
+            status="cancelada",
+        )
 
 
 # ── FIX #11 — HMAC webhook (_verificar_hmac_webhook_pagamento) ──────────────

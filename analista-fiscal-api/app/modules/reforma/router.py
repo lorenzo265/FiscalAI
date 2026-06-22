@@ -148,7 +148,7 @@ async def recalcular_historico(
     summary="Fase atual da Reforma (informativo)",
 )
 async def fase_atual(
-    empresa_id: UUID,  # noqa: ARG001 — empresa-aware para RLS uniforme
+    empresa_id: UUID,
     session: SessionDep,
     competencia: date | None = Query(default=None),
 ) -> FaseAtualOut:

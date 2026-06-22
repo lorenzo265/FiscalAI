@@ -24,8 +24,7 @@ Severidades:
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections import Counter
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 

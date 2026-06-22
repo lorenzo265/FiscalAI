@@ -15,8 +15,6 @@ from __future__ import annotations
 import time
 from typing import cast
 
-from app.shared.types import JsonObject
-
 import httpx
 import redis.asyncio as redis_async
 import structlog
@@ -30,6 +28,7 @@ from tenacity import (
 from app.config import Settings
 from app.shared.exceptions import ItemNaoEncontrado, PluggyErro, PluggyTimeout
 from app.shared.integrations.pluggy.auth import PluggyAuthClient
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

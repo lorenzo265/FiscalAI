@@ -165,7 +165,6 @@ async def test_pipeline_completo_sprints_10_a_12(live_client: AsyncClient) -> No
     assert Decimal(folha["total_proventos"]) == Decimal("3000.00")
     total_inss = Decimal(folha["total_inss_empregado"])
     total_fgts = Decimal(folha["total_fgts_empregador"])
-    total_liquido = Decimal(folha["total_liquido"])
     assert total_inss > Decimal("0")
     assert total_fgts > Decimal("0")
 

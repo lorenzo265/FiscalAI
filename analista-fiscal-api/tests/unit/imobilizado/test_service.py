@@ -21,7 +21,6 @@ from app.modules.imobilizado.schemas import (
     BaixarBemIn,
     CadastrarBemIn,
     CategoriaBem,
-    MetodoDepreciacao,
 )
 from app.modules.imobilizado.service import ImobilizadoService
 from app.shared.exceptions import (
@@ -72,19 +71,18 @@ async def test_cadastrar_empresa_inexistente() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.imobilizado.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ImobilizadoService().cadastrar(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                CadastrarBemIn(
-                    descricao="Bem teste",
-                    categoria=CategoriaBem.COMPUTADOR,
-                    data_aquisicao=date(2026, 1, 1),
-                    valor_aquisicao=Decimal("5000"),
-                ),
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ImobilizadoService().cadastrar(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            CadastrarBemIn(
+                descricao="Bem teste",
+                categoria=CategoriaBem.COMPUTADOR,
+                data_aquisicao=date(2026, 1, 1),
+                valor_aquisicao=Decimal("5000"),
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -153,19 +151,19 @@ async def test_cadastrar_tabela_ausente_levanta() -> None:
             "app.modules.imobilizado.service.TabelaDepreciacaoRepo",
             return_value=tabela_repo,
         ),
+        pytest.raises(TabelaTributariaAusente),
     ):
-        with pytest.raises(TabelaTributariaAusente):
-            await ImobilizadoService().cadastrar(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                CadastrarBemIn(
-                    descricao="Bem teste",
-                    categoria=CategoriaBem.COMPUTADOR,
-                    data_aquisicao=date(2026, 1, 1),
-                    valor_aquisicao=Decimal("5000"),
-                ),
-            )
+        await ImobilizadoService().cadastrar(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CadastrarBemIn(
+                descricao="Bem teste",
+                categoria=CategoriaBem.COMPUTADOR,
+                data_aquisicao=date(2026, 1, 1),
+                valor_aquisicao=Decimal("5000"),
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -224,14 +222,13 @@ async def test_baixar_bem_inexistente_levanta() -> None:
     bem_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.imobilizado.service.BemImobilizadoRepo", return_value=bem_repo
-    ):
-        with pytest.raises(BemNaoEncontrado):
-            await ImobilizadoService().baixar(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                BaixarBemIn(data_baixa=date.today(), motivo_baixa="venda"),
-            )
+    ), pytest.raises(BemNaoEncontrado):
+        await ImobilizadoService().baixar(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            BaixarBemIn(data_baixa=date.today(), motivo_baixa="venda"),
+        )
 
 
 @pytest.mark.asyncio
@@ -243,14 +240,13 @@ async def test_baixar_bem_outra_empresa_levanta() -> None:
     bem_repo.por_id = AsyncMock(return_value=bem)
     with patch(
         "app.modules.imobilizado.service.BemImobilizadoRepo", return_value=bem_repo
-    ):
-        with pytest.raises(BemNaoEncontrado):
-            await ImobilizadoService().baixar(
-                session,
-                uuid.uuid4(),
-                bem.id,
-                BaixarBemIn(data_baixa=date.today(), motivo_baixa="venda"),
-            )
+    ), pytest.raises(BemNaoEncontrado):
+        await ImobilizadoService().baixar(
+            session,
+            uuid.uuid4(),
+            bem.id,
+            BaixarBemIn(data_baixa=date.today(), motivo_baixa="venda"),
+        )
 
 
 @pytest.mark.asyncio
@@ -262,14 +258,13 @@ async def test_baixar_ja_baixado_levanta() -> None:
     bem_repo.por_id = AsyncMock(return_value=bem)
     with patch(
         "app.modules.imobilizado.service.BemImobilizadoRepo", return_value=bem_repo
-    ):
-        with pytest.raises(BemJaBaixado):
-            await ImobilizadoService().baixar(
-                session,
-                empresa_id,
-                bem.id,
-                BaixarBemIn(data_baixa=date(2026, 4, 1), motivo_baixa="venda"),
-            )
+    ), pytest.raises(BemJaBaixado):
+        await ImobilizadoService().baixar(
+            session,
+            empresa_id,
+            bem.id,
+            BaixarBemIn(data_baixa=date(2026, 4, 1), motivo_baixa="venda"),
+        )
 
 
 @pytest.mark.asyncio
@@ -282,14 +277,13 @@ async def test_baixar_data_anterior_a_aquisicao_levanta() -> None:
     bem_repo.por_id = AsyncMock(return_value=bem)
     with patch(
         "app.modules.imobilizado.service.BemImobilizadoRepo", return_value=bem_repo
-    ):
-        with pytest.raises(BemJaBaixado, match="anterior"):
-            await ImobilizadoService().baixar(
-                session,
-                empresa_id,
-                bem.id,
-                BaixarBemIn(data_baixa=date(2026, 5, 30), motivo_baixa="venda"),
-            )
+    ), pytest.raises(BemJaBaixado, match="anterior"):
+        await ImobilizadoService().baixar(
+            session,
+            empresa_id,
+            bem.id,
+            BaixarBemIn(data_baixa=date(2026, 5, 30), motivo_baixa="venda"),
+        )
 
 
 @pytest.mark.asyncio
@@ -488,21 +482,21 @@ async def test_coerencia_taxa_20pct_vida_120_meses_rejeita() -> None:
         patch(
             "app.modules.imobilizado.service.BemImobilizadoRepo", return_value=bem_repo
         ),
+        pytest.raises(LancamentoInvalido, match="162/1998"),
     ):
-        with pytest.raises(LancamentoInvalido, match="162/1998"):
-            await ImobilizadoService().cadastrar(
-                session,
-                uuid.uuid4(),
-                empresa_id,
-                CadastrarBemIn(
-                    descricao="Computador",
-                    categoria=CategoriaBem.COMPUTADOR,
-                    data_aquisicao=date(2026, 1, 1),
-                    valor_aquisicao=Decimal("5000"),
-                    taxa_depreciacao_anual=Decimal("0.2000"),
-                    vida_util_meses=120,
-                ),
-            )
+        await ImobilizadoService().cadastrar(
+            session,
+            uuid.uuid4(),
+            empresa_id,
+            CadastrarBemIn(
+                descricao="Computador",
+                categoria=CategoriaBem.COMPUTADOR,
+                data_aquisicao=date(2026, 1, 1),
+                valor_aquisicao=Decimal("5000"),
+                taxa_depreciacao_anual=Decimal("0.2000"),
+                vida_util_meses=120,
+            ),
+        )
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -66,14 +65,13 @@ async def test_sync_empresa_inexistente_levanta() -> None:
     session = AsyncMock()
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=None)
-    with patch("app.modules.e_cac.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ECacService().sincronizar(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                serpro_client=AsyncMock(),
-            )
+    with patch("app.modules.e_cac.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(EmpresaNaoEncontrada):
+        await ECacService().sincronizar(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            serpro_client=AsyncMock(),
+        )
 
 
 @pytest.mark.asyncio

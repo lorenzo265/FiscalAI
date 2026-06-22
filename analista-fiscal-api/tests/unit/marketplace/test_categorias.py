@@ -35,7 +35,7 @@ def test_nove_categorias_do_plano() -> None:
         "holding",
         "sucessao",
     }
-    assert CATEGORIAS == esperadas
+    assert esperadas == CATEGORIAS
 
 
 def test_pricing_consulta_rapida() -> None:

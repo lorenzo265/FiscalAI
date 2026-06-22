@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.tabelas_admin.recheck_llm import (
     CitacaoLLM,
-    RecheckResultado,
     rechecar_extracao_llm,
 )
 from app.modules.tabelas_admin.schemas import (

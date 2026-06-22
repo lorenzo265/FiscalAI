@@ -7,7 +7,6 @@ Para executar contra LLM real: RUN_EVAL_LIVE=true poetry run pytest tests/eval/t
 from __future__ import annotations
 
 import os
-from typing import Any
 
 import pytest
 

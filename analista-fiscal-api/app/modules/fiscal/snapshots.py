@@ -32,12 +32,11 @@ Tipos cobertos hoje (todos os outputs das Sprints 2, 11):
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Annotated, Literal, TypeAlias, Union
+from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from app.shared.types import JsonObject
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Schema comum
@@ -234,15 +233,10 @@ class _GenericSnapshot(_BaseSnapshot):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-ApuracaoSnapshot: TypeAlias = Annotated[
-    Union[
-        DasSnapshot,
-        IrpjLpSnapshot,
-        CsllLpSnapshot,
-        PisCofinsSnapshot,
-        IcmsSnapshot,
-        IssSnapshot,
-    ],
+# UP040 suprimido abaixo: alias consumido em runtime por TypeAdapter; `type`
+# (PEP 695) embrulha em TypeAliasType e mudaria a parsing da union do Pydantic.
+ApuracaoSnapshot: TypeAlias = Annotated[  # noqa: UP040
+    DasSnapshot | IrpjLpSnapshot | CsllLpSnapshot | PisCofinsSnapshot | IcmsSnapshot | IssSnapshot,
     Field(discriminator="tipo"),
 ]
 

@@ -34,7 +34,6 @@ from app.modules.tabelas_admin.schemas import (
 )
 from app.shared.exceptions import VigenciaTributariaInvalida
 
-
 # ── Constantes de plausibilidade ────────────────────────────────────────────
 
 

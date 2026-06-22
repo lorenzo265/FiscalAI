@@ -28,7 +28,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-
 _SALARIO_MINIMO_POR_ANO: dict[int, Decimal] = {
     2022: Decimal("1212.00"),
     2023: Decimal("1320.00"),

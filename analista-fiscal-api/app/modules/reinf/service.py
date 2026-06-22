@@ -128,7 +128,7 @@ class ReinfService:
         return evento
 
 
-def _stringify(o: Any) -> Any:  # noqa: ANN401 — helper recursivo dinâmico
+def _stringify(o: Any) -> Any:
     if isinstance(o, Decimal):
         return str(o)
     if isinstance(o, date):

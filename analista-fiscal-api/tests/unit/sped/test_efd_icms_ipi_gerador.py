@@ -22,7 +22,6 @@ from app.modules.sped.efd.gerador_icms_ipi import (
 )
 from app.modules.sped.validador import validar_efd_icms_ipi
 
-
 # ── Fixtures de entrada ─────────────────────────────────────────────────────
 
 

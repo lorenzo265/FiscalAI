@@ -169,6 +169,5 @@ async def test_valor_error_nao_selic_nao_mascarado() -> None:
     ), patch(
         "app.modules.multa_juros.service.calcular_mora",
         side_effect=_raise_non_selic,
-    ):
-        with pytest.raises(ValueError, match="erro interno genérico"):
-            await simular_mora(payload, session)
+    ), pytest.raises(ValueError, match="erro interno genérico"):
+        await simular_mora(payload, session)

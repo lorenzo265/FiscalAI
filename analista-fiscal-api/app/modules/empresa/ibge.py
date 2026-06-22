@@ -16,7 +16,7 @@ Princípios aplicados:
 from __future__ import annotations
 
 import unicodedata
-from typing import Mapping
+from collections.abc import Mapping
 
 
 def _normalizar(texto: str) -> str:

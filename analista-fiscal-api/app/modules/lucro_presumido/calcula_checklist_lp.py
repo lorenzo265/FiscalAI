@@ -20,7 +20,7 @@ Sprint 20 PR2.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 ALGORITMO_VERSAO = "lp.checklist.v1"

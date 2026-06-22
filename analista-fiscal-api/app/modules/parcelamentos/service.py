@@ -19,7 +19,6 @@ from app.modules.parcelamentos.schemas import (
     CancelarParcelamentoIn,
     CriarParcelamentoIn,
     TipoContribuinteIn,
-    TipoParcelamentoIn,
 )
 from app.shared.db.models import ParcelaFiscal, ParcelamentoFiscal
 from app.shared.exceptions import (

@@ -12,6 +12,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.modules.tabelas_admin.salario_minimo import salario_minimo_oficial
 from app.modules.tabelas_admin.schemas import (
     AliquotaCbsIbsIn,
     AliquotaFgtsIn,
@@ -20,7 +21,6 @@ from app.modules.tabelas_admin.schemas import (
     FaixaIrrfIn,
     PresuncaoLpIn,
 )
-from app.modules.tabelas_admin.salario_minimo import salario_minimo_oficial
 from app.modules.tabelas_admin.validadores import (
     validar_vigencia_cbs_ibs,
     validar_vigencia_fgts,
@@ -31,7 +31,6 @@ from app.modules.tabelas_admin.validadores import (
     validar_vigencia_simples_nacional,
 )
 from app.shared.exceptions import VigenciaTributariaInvalida
-
 from tests.unit.tabelas_admin._helpers import (
     faixas_inss_2026,
     faixas_irrf_2026,
@@ -44,7 +43,6 @@ from tests.unit.tabelas_admin._helpers import (
     vigencia_presuncao_valida,
     vigencia_simples_valida,
 )
-
 
 # ── INSS ────────────────────────────────────────────────────────────────────
 

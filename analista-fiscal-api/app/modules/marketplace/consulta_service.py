@@ -123,24 +123,24 @@ class ConsultaService:
         pergunta_hash = _hash_pergunta(empresa_id, categoria, pergunta)
         idem_key = _idempotency_key(empresa_id, categoria, pergunta_hash, dia_brt)
 
-        values = dict(
-            tenant_id=tenant_id,
-            empresa_id=empresa_id,
-            usuario_id=usuario_id,
-            contador_id=contador_id,
-            categoria=categoria,
-            pergunta=pergunta.strip(),
-            pergunta_hash=pergunta_hash,
-            contexto_empresa_jsonb=snapshot_empresa(empresa),
-            snapshot_versao=SNAPSHOT_VERSAO,
-            consentimento_compartilhamento=True,
-            status=status_inicial,
-            valor_consulta=valor,
-            comissao_plataforma=comissao_plataforma,
-            idempotency_key=idem_key,
-            sla_aceitar_ate=agora + pricing.sla_aceitar,
-            sla_responder_ate=agora + pricing.sla_responder,
-        )
+        values = {
+            "tenant_id": tenant_id,
+            "empresa_id": empresa_id,
+            "usuario_id": usuario_id,
+            "contador_id": contador_id,
+            "categoria": categoria,
+            "pergunta": pergunta.strip(),
+            "pergunta_hash": pergunta_hash,
+            "contexto_empresa_jsonb": snapshot_empresa(empresa),
+            "snapshot_versao": SNAPSHOT_VERSAO,
+            "consentimento_compartilhamento": True,
+            "status": status_inicial,
+            "valor_consulta": valor,
+            "comissao_plataforma": comissao_plataforma,
+            "idempotency_key": idem_key,
+            "sla_aceitar_ate": agora + pricing.sla_aceitar,
+            "sla_responder_ate": agora + pricing.sla_responder,
+        }
 
         consulta = await ConsultaRepo(session).inserir_idempotente(values)
         await session.commit()

@@ -15,7 +15,6 @@ from app.modules.advisor.simula_fator_r import SimulacaoFatorR
 from app.modules.advisor.sugestoes_otimizacao import ApuracaoPendente
 from app.shared.exceptions import EmpresaNaoEncontrada
 
-
 _COMP = date(2026, 5, 15)
 
 
@@ -207,9 +206,8 @@ async def test_empresa_nao_encontrada_levanta_404() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).listar_sugestoes(uuid.uuid4())
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).listar_sugestoes(uuid.uuid4())
 
 
 # ── Sem faixas no banco (defeito operacional) ───────────────────────────────

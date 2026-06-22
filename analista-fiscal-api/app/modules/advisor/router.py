@@ -11,14 +11,11 @@ da própria empresa.
 
 from __future__ import annotations
 
-from uuid import UUID
-
-from fastapi import APIRouter, HTTPException, Query, Request
-
 from datetime import datetime
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from app.shared.integrations.meta_whatsapp.sender import MetaWhatsAppSender
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.modules.advisor.schemas import (
     AnomaliaOut,
@@ -38,6 +35,7 @@ from app.modules.advisor.schemas import (
 from app.modules.advisor.service import AdvisorService
 from app.shared.db.deps import SessionDep, TenantDep
 from app.shared.db.models import DigestSemanal
+from app.shared.integrations.meta_whatsapp.sender import MetaWhatsAppSender
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 

@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.shared.types import JsonObject
 
-
 StatusSugestao = Literal["pendente", "aprovada", "rejeitada", "expirada"]
 
 

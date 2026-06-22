@@ -30,7 +30,7 @@ _UF_VALIDA = frozenset(
 class BrasilApiClient:
     """Cliente assíncrono para BrasilAPI — CNPJ lookup com cache Redis 30 dias."""
 
-    def __init__(self, settings: Settings, redis: "redis_async.Redis[str]") -> None:
+    def __init__(self, settings: Settings, redis: redis_async.Redis[str]) -> None:
         self._base = settings.BRASIL_API_URL.rstrip("/")
         self._redis = redis
         self._http = httpx.AsyncClient(timeout=10.0)

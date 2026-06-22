@@ -85,10 +85,11 @@ def _passa_filtros(
     if especialidade_requerida not in parceiro.especialidades:
         return False
     # UF: None em uf_atuacao = atende todas. Filtro só se cliente declarou UF.
-    if uf is not None and parceiro.uf_atuacao is not None:
-        if uf not in parceiro.uf_atuacao:
-            return False
-    return True
+    return not (
+        uf is not None
+        and parceiro.uf_atuacao is not None
+        and uf not in parceiro.uf_atuacao
+    )
 
 
 def _chave_ordenacao(

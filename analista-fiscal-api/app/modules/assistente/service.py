@@ -231,7 +231,7 @@ async def _sugerir_parceiros(
             [ParceiroSugeridoOut.model_validate(p) for p in ranked],
             categoria_mkt,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning(
             "assistente.parceiros_lookup_falhou",
             empresa_id=str(empresa_id),

@@ -15,7 +15,6 @@ import redis.asyncio as redis_async
 from app.shared.cache import Cache
 from app.shared.cache.keys import aliquota_cbs_ibs_key, scd_cache_pattern
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FakeRedis — mock manual dos métodos consumidos pelo Cache
 # ─────────────────────────────────────────────────────────────────────────────

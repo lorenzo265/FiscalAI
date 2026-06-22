@@ -15,7 +15,6 @@ from app.modules.lucro_presumido.calcula_checklist_lp import (
     calcular_checklist_trimestre,
 )
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _apuracoes_t1_completas() -> frozenset[str]:

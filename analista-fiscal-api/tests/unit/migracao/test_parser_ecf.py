@@ -56,10 +56,7 @@ def _plano() -> tuple[ContaPlanoEcf, ...]:
 def _apuracao_trimestre(numero: int, receita: str = "100000.00") -> ApuracaoTrimestralLp:
     inicio = date(2025, 3 * (numero - 1) + 1, 1)
     mes_fim = 3 * (numero - 1) + 3
-    if mes_fim == 12:
-        fim = date(2025, 12, 31)
-    else:
-        fim = date(2025, mes_fim + 1, 1) - timedelta(days=1)
+    fim = date(2025, 12, 31) if mes_fim == 12 else date(2025, mes_fim + 1, 1) - timedelta(days=1)
     rec = Decimal(receita)
     pres = Decimal("0.3200")
     base = rec * pres

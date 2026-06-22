@@ -37,7 +37,7 @@ def _xml_evt(id_: str = "ID1") -> bytes:
         f"<eSocial xmlns='ns'><evtRemun Id='{id_}'>"
         "<ideEvento><nrInsc>X</nrInsc></ideEvento>"
         "</evtRemun></eSocial>"
-    ).encode("utf-8")
+    ).encode()
 
 
 # ── Construção do envelope ──────────────────────────────────────────────────

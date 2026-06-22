@@ -63,12 +63,11 @@ class PresuncaoLpRepo:
         for v in vigentes:
             if v.cnae_pattern is None:
                 # Regra condicional por faturamento (ex.: serviços ≤ 120k)
-                if v.limite_receita_anual is not None:
-                    if (
-                        faturamento_12m is None
-                        or faturamento_12m > v.limite_receita_anual
-                    ):
-                        continue
+                if v.limite_receita_anual is not None and (
+                    faturamento_12m is None
+                    or faturamento_12m > v.limite_receita_anual
+                ):
+                    continue
                 candidatos.append(v)
                 continue
             pattern_norm = _normalizar_cnae(v.cnae_pattern)

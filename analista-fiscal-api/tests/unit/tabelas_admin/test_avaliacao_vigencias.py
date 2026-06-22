@@ -19,7 +19,6 @@ from app.modules.tabelas_admin.avaliacao_vigencias import (
     avaliar_simples_nacional,
 )
 
-
 # ── INSS / IRRF ─────────────────────────────────────────────────────────────
 
 

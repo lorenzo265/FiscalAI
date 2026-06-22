@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from app.modules.sped.ecd.gerador import (
     ContaPlano,
     EntradaEcd,
@@ -53,7 +51,6 @@ from app.modules.sped.validador import (
     validar_efd_icms_ipi,
     validar_por_tipo,
 )
-
 
 # ── Fixtures: arquivos sem erros (gerados pelos próprios geradores) ────────
 

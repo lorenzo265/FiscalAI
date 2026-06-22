@@ -9,7 +9,6 @@ import pytest
 
 from app.config import Settings
 
-
 # ── JWT_SECRET guards ─────────────────────────────────────────────────────────
 
 

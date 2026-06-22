@@ -28,7 +28,6 @@ from datetime import UTC, datetime
 from typing import Final
 
 import defusedxml.ElementTree as _dET  # para parsear respostas externas (XXE-safe)
-
 import httpx
 import structlog
 from tenacity import (

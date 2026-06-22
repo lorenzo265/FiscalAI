@@ -27,7 +27,6 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final, Literal
 
-
 Severidade = Literal["info", "aviso", "critico"]
 
 

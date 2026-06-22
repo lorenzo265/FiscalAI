@@ -14,7 +14,6 @@ from app.modules.advisor.simula_fator_r import (
 from app.modules.fiscal.calcula_das import FaixaDAS
 from app.shared.exceptions import SemDadosParaSugestao
 
-
 # ── Tabelas vigentes (LC 123/2006 anexo III e V — Resolução CGSN 140/2018) ──
 
 

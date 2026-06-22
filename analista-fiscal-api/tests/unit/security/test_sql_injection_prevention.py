@@ -15,8 +15,7 @@ from uuid import UUID
 import pytest
 from pydantic import UUID4, BaseModel, ConfigDict, ValidationError
 
-from app.shared.db.rls import set_tenant_id, set_contador_id
-
+from app.shared.db.rls import set_contador_id, set_tenant_id
 
 # ── RLS usa bind parameter ────────────────────────────────────────────────────
 
@@ -94,5 +93,5 @@ def test_rls_nao_usa_fstring_com_tenant():
     # Padrões que indicariam interpolação insegura:
     assert "f\"SELECT set_config" not in src
     assert "f'SELECT set_config" not in src
-    assert f"{{tenant_id}}" not in src
-    assert f"{{contador_id}}" not in src
+    assert "{tenant_id}" not in src
+    assert "{contador_id}" not in src

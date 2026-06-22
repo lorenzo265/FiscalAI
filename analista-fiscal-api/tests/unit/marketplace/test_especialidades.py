@@ -18,14 +18,14 @@ def test_versao_estavel() -> None:
 
 
 def test_especialidades_fechadas() -> None:
-    assert ESPECIALIDADES == {
+    assert {
         "tributario",
         "trabalhista",
         "societario",
         "contencioso",
         "planejamento",
         "operacoes",
-    }
+    } == ESPECIALIDADES
 
 
 def test_mapping_cobre_todas_as_categorias() -> None:

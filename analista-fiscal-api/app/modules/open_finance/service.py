@@ -5,8 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 from typing import Protocol
-
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -26,6 +24,7 @@ from app.shared.exceptions import (
     PluggyErro,
     PluggyTimeout,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

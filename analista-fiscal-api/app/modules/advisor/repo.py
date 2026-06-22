@@ -19,13 +19,13 @@ from app.modules.advisor.calcula_anomalias import (
     PontoApuracao,
     TipoTributoAnomalia,
 )
-from app.modules.advisor.sugestoes_otimizacao import ApuracaoPendente
-from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.modules.advisor.gera_digest_semanal import (
-    ApuracaoResumo,
     AnomaliaResumo,
+    ApuracaoResumo,
     VencimentoResumo,
 )
+from app.modules.advisor.sugestoes_otimizacao import ApuracaoPendente
+from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.shared.db.models import (
     AgendaItem,
     AnomaliaFiscal,
@@ -36,7 +36,6 @@ from app.shared.db.models import (
     Holerite,
     ProlaboreMensal,
 )
-
 
 _TIPOS_APURACAO_ANOMALIA: tuple[str, ...] = tuple(t.value for t in TipoTributoAnomalia)
 

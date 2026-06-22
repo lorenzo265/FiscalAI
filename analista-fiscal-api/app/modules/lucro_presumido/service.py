@@ -24,16 +24,13 @@ import structlog
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.types import JsonObject
-
 from app.modules.empresa.repo import EmpresaRepo
-from app.modules.lucro_presumido.calcula_csll import (
-    ResultadoCsllLp,
-    calcular_csll_trimestral,
-)
 from app.modules.lucro_presumido.calcula_checklist_lp import (
     ChecklistTrimestre,
     calcular_checklist_trimestre,
+)
+from app.modules.lucro_presumido.calcula_csll import (
+    calcular_csll_trimestral,
 )
 from app.modules.lucro_presumido.calcula_darf_lp import (
     calcular_darf_cofins,
@@ -42,11 +39,9 @@ from app.modules.lucro_presumido.calcula_darf_lp import (
     calcular_darf_pis,
 )
 from app.modules.lucro_presumido.calcula_irpj import (
-    ResultadoIrpjLp,
     calcular_irpj_trimestral,
 )
 from app.modules.lucro_presumido.calcula_pis_cofins import (
-    ResultadoTributoCumulativo,
     calcular_cofins_cumulativo_mensal,
     calcular_pis_cumulativo_mensal,
 )
@@ -69,6 +64,7 @@ from app.shared.exceptions import (
     EmpresaNaoEncontrada,
     PresuncaoNaoEncontrada,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 
@@ -524,7 +520,7 @@ def _log_apuracao(
     )
 
 
-def _stringify(o: Any) -> Any:  # noqa: ANN401 — helper recursivo dinâmico
+def _stringify(o: Any) -> Any:
     """Converte Decimals e datas em strings JSON-safe."""
     if isinstance(o, Decimal):
         return str(o)

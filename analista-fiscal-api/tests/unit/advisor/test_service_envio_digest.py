@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -150,11 +150,10 @@ async def test_digest_inexistente_levanta_404() -> None:
     digest_repo = AsyncMock()
     digest_repo.por_id = AsyncMock(return_value=None)
     sender = AsyncMock()
-    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                uuid.uuid4(), uuid.uuid4(), sender=sender, settings=_settings(),
-            )
+    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            uuid.uuid4(), uuid.uuid4(), sender=sender, settings=_settings(),
+        )
 
 
 @pytest.mark.asyncio
@@ -165,11 +164,10 @@ async def test_digest_de_outra_empresa_levanta_404() -> None:
     digest = _digest_preparado(uuid.uuid4())  # outra empresa
     digest_repo.por_id = AsyncMock(return_value=digest)
     sender = AsyncMock()
-    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                uuid.uuid4(), digest.id, sender=sender, settings=_settings(),
-            )
+    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            uuid.uuid4(), digest.id, sender=sender, settings=_settings(),
+        )
 
 
 @pytest.mark.asyncio
@@ -180,11 +178,10 @@ async def test_digest_superseded_levanta_404() -> None:
     digest_repo = AsyncMock()
     digest_repo.por_id = AsyncMock(return_value=digest)
     sender = AsyncMock()
-    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                empresa.id, digest.id, sender=sender, settings=_settings(),
-            )
+    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            empresa.id, digest.id, sender=sender, settings=_settings(),
+        )
 
 
 @pytest.mark.asyncio
@@ -196,11 +193,10 @@ async def test_digest_ja_enviado_levanta_409() -> None:
     digest_repo = AsyncMock()
     digest_repo.por_id = AsyncMock(return_value=digest)
     sender = AsyncMock()
-    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo):
-        with pytest.raises(DigestJaEnviado):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                empresa.id, digest.id, sender=sender, settings=_settings(),
-            )
+    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo), pytest.raises(DigestJaEnviado):
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            empresa.id, digest.id, sender=sender, settings=_settings(),
+        )
 
 
 @pytest.mark.asyncio
@@ -216,11 +212,11 @@ async def test_empresa_sem_whatsapp_levanta_422() -> None:
     with (
         patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo),
         patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo),
+        pytest.raises(EmpresaSemWhatsapp),
     ):
-        with pytest.raises(EmpresaSemWhatsapp):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                empresa.id, digest.id, sender=sender, settings=_settings(),
-            )
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            empresa.id, digest.id, sender=sender, settings=_settings(),
+        )
     sender.enviar_template.assert_not_awaited()
 
 
@@ -245,11 +241,11 @@ async def test_falha_meta_registra_tentativa_e_propaga_excecao() -> None:
     with (
         patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo),
         patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo),
+        pytest.raises(EnvioWhatsappFalhou),
     ):
-        with pytest.raises(EnvioWhatsappFalhou):
-            await AdvisorService(session).enviar_digest_via_whatsapp(
-                empresa.id, digest.id, sender=sender, settings=_settings(),
-            )
+        await AdvisorService(session).enviar_digest_via_whatsapp(
+            empresa.id, digest.id, sender=sender, settings=_settings(),
+        )
 
     digest_repo.registrar_falha_envio.assert_awaited_once()
     digest_repo.marcar_enviado.assert_not_awaited()

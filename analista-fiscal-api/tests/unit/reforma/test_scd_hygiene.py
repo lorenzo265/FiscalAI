@@ -17,20 +17,19 @@ Invariantes verificados:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Iterator
 
 import pytest
 
 from app.modules.reforma.periodo_transicao import (
-    FaseReforma,
     INICIO_PLENO,
     INICIO_TESTE_2026,
     INICIO_TRANSICAO,
+    FaseReforma,
     fase,
 )
-
 
 # ── Representação das vigências conforme seed 0034 + migration 0054 ──────────
 

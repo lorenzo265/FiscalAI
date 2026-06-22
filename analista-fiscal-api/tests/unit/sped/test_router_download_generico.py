@@ -152,7 +152,6 @@ async def test_download_filename_inclui_periodo() -> None:
 async def test_download_ecd_legado_rejeita_tipo_errado() -> None:
     """FIX #7: arquivo ECF não deve ser servido pelo endpoint legado ECD."""
     from app.modules.sped.ecd.router import download_ecd
-    from app.modules.sped.ecd.repo import ArquivoSpedRepo as EcdArquivoSpedRepo
 
     arquivo = _arquivo_fake(tipo="ecf")  # tipo errado para rota ECD
     fake_repo = MagicMock()

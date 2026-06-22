@@ -18,7 +18,6 @@ from app.modules.lucro_presumido.calcula_darf_lp import (
     calcular_darf_pis,
 )
 
-
 # ── IRPJ ─────────────────────────────────────────────────────────────────────
 
 

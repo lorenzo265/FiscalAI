@@ -83,14 +83,13 @@ async def test_gerar_defis_empresa_inexistente() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.declaracao_anual.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await DeclaracaoAnualService().gerar_defis(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                GerarDefisIn(ano_base=2025),
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await DeclaracaoAnualService().gerar_defis(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            GerarDefisIn(ano_base=2025),
+        )
 
 
 @pytest.mark.asyncio
@@ -101,14 +100,13 @@ async def test_gerar_defis_regime_lp_levanta() -> None:
     empresa_repo.por_id = AsyncMock(return_value=empresa)
     with patch(
         "app.modules.declaracao_anual.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(RegimeIncompativel):
-            await DeclaracaoAnualService().gerar_defis(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                GerarDefisIn(ano_base=2025),
-            )
+    ), pytest.raises(RegimeIncompativel):
+        await DeclaracaoAnualService().gerar_defis(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            GerarDefisIn(ano_base=2025),
+        )
 
 
 @pytest.mark.asyncio
@@ -127,14 +125,14 @@ async def test_gerar_defis_duplicado_levanta() -> None:
             "app.modules.declaracao_anual.service.DeclaracaoAnualRepo",
             return_value=decl_repo,
         ),
+        pytest.raises(ApuracaoJaExiste),
     ):
-        with pytest.raises(ApuracaoJaExiste):
-            await DeclaracaoAnualService().gerar_defis(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                GerarDefisIn(ano_base=2025),
-            )
+        await DeclaracaoAnualService().gerar_defis(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            GerarDefisIn(ano_base=2025),
+        )
 
 
 @pytest.mark.asyncio
@@ -246,14 +244,13 @@ async def test_gerar_dasn_simei_regime_sn_levanta() -> None:
     empresa_repo.por_id = AsyncMock(return_value=empresa)
     with patch(
         "app.modules.declaracao_anual.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(RegimeIncompativel):
-            await DeclaracaoAnualService().gerar_dasn_simei(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                GerarDasnSimeiIn(ano_base=2025),
-            )
+    ), pytest.raises(RegimeIncompativel):
+        await DeclaracaoAnualService().gerar_dasn_simei(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            GerarDasnSimeiIn(ano_base=2025),
+        )
 
 
 @pytest.mark.asyncio

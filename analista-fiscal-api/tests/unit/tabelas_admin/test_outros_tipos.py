@@ -24,7 +24,6 @@ from app.modules.tabelas_admin.schemas import (
 )
 from app.modules.tabelas_admin.service import TabelaAdminService
 from app.shared.exceptions import VigenciaTributariaInvalida
-
 from tests.unit.tabelas_admin._helpers import (
     vigencia_cbs_ibs_valida,
     vigencia_fgts_valida,

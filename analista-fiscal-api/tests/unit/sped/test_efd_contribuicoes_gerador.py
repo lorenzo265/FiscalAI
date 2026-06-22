@@ -31,7 +31,6 @@ from app.modules.sped.efd.gerador_contribuicoes import (
 )
 from app.modules.sped.validador import validar_efd_contribuicoes
 
-
 # ── Fixtures de entrada mínima ──────────────────────────────────────────────
 
 

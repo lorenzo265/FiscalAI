@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
-
-_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
-
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -39,7 +35,6 @@ from app.modules.pessoal.repo import (
     EventoESocialRepo,
     EventoFolhaRepo,
     FuncionarioRepo,
-    HoleriteRepo,
     ProlaboreRepo,
     SocioRepo,
     TabelasTributariasRepo,
@@ -72,11 +67,13 @@ from app.shared.exceptions import (
     SocioNaoEncontrado,
     TabelaTributariaAusente,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 _ZERO = Decimal("0.00")
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 
 
 class SocioService:
@@ -328,14 +325,12 @@ class DistribuicaoService:
         cai em 0 e loga warning — distribuição continua mas vira 100%
         tributada (cliente revisa no painel).
         """
-        from app.modules.lucro_presumido.repo import PresuncaoLpRepo
+        from sqlalchemy import select
+
         from app.modules.pessoal.calcula_limite_isento import (
             _ZERO as _ZERO_LIMITE,
-            calcular_limite_isento_lucro_presumido,
-            calcular_limite_isento_simples_nacional,
         )
-        from app.shared.db.models import ApuracaoFiscal, Empresa
-        from sqlalchemy import select
+        from app.shared.db.models import Empresa
 
         empresa = (
             await session.execute(
@@ -364,16 +359,19 @@ class DistribuicaoService:
     async def _limite_isento_lp(
         self,
         session: AsyncSession,
-        empresa: "Empresa",
+        empresa: Empresa,
         data: date,
     ) -> Decimal:
+        from sqlalchemy import select
+
         from app.modules.lucro_presumido.repo import PresuncaoLpRepo
         from app.modules.pessoal.calcula_limite_isento import (
             _ZERO as _ZERO_LIMITE,
+        )
+        from app.modules.pessoal.calcula_limite_isento import (
             calcular_limite_isento_lucro_presumido,
         )
         from app.shared.db.models import ApuracaoFiscal
-        from sqlalchemy import select
 
         # Período do trimestre — 1º dia do trimestre até último dia do trimestre.
         trimestre = (data.month - 1) // 3 + 1
@@ -449,15 +447,18 @@ class DistribuicaoService:
     async def _limite_isento_sn(
         self,
         session: AsyncSession,
-        empresa: "Empresa",
+        empresa: Empresa,
         data: date,
     ) -> Decimal:
+        from sqlalchemy import select
+
         from app.modules.pessoal.calcula_limite_isento import (
             _ZERO as _ZERO_LIMITE,
+        )
+        from app.modules.pessoal.calcula_limite_isento import (
             calcular_limite_isento_simples_nacional,
         )
         from app.shared.db.models import ApuracaoFiscal
-        from sqlalchemy import select
 
         # SN — apura sobre o ano-calendário corrente até o mês da
         # distribuição.

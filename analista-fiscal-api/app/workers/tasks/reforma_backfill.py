@@ -12,9 +12,10 @@ Roda como superuser fiscal (bypass RLS — operação cross-tenant de sistema).
 
 from __future__ import annotations
 
-import structlog
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 

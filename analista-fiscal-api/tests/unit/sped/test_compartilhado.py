@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from app.modules.sped.compartilhado import (
     calcular_hash_sha256,
     contar_registros,

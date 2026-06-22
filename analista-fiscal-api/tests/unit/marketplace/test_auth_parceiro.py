@@ -125,12 +125,11 @@ async def test_login_senha_errada_levanta() -> None:
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo",
         return_value=repo,
-    ):
-        with pytest.raises(CredenciaisParceiroInvalidas):
-            await ContadorParceiroService().login(
-                session,
-                LoginParceiroIn(email="joana@x.com", senha="errada123"),
-            )
+    ), pytest.raises(CredenciaisParceiroInvalidas):
+        await ContadorParceiroService().login(
+            session,
+            LoginParceiroIn(email="joana@x.com", senha="errada123"),
+        )
 
 
 @pytest.mark.asyncio
@@ -142,12 +141,11 @@ async def test_login_parceiro_inativo_levanta() -> None:
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo",
         return_value=repo,
-    ):
-        with pytest.raises(CredenciaisParceiroInvalidas, match="inativo"):
-            await ContadorParceiroService().login(
-                session,
-                LoginParceiroIn(email="joana@x.com", senha="minhasenha123"),
-            )
+    ), pytest.raises(CredenciaisParceiroInvalidas, match="inativo"):
+        await ContadorParceiroService().login(
+            session,
+            LoginParceiroIn(email="joana@x.com", senha="minhasenha123"),
+        )
 
 
 @pytest.mark.asyncio
@@ -159,12 +157,11 @@ async def test_login_parceiro_sem_senha_levanta() -> None:
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo",
         return_value=repo,
-    ):
-        with pytest.raises(ParceiroSemSenhaDefinida):
-            await ContadorParceiroService().login(
-                session,
-                LoginParceiroIn(email="joana@x.com", senha="minhasenha123"),
-            )
+    ), pytest.raises(ParceiroSemSenhaDefinida):
+        await ContadorParceiroService().login(
+            session,
+            LoginParceiroIn(email="joana@x.com", senha="minhasenha123"),
+        )
 
 
 @pytest.mark.asyncio
@@ -175,12 +172,11 @@ async def test_login_email_inexistente_levanta() -> None:
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo",
         return_value=repo,
-    ):
-        with pytest.raises(CredenciaisParceiroInvalidas):
-            await ContadorParceiroService().login(
-                session,
-                LoginParceiroIn(email="ninguem@x.com", senha="senha12345"),
-            )
+    ), pytest.raises(CredenciaisParceiroInvalidas):
+        await ContadorParceiroService().login(
+            session,
+            LoginParceiroIn(email="ninguem@x.com", senha="senha12345"),
+        )
 
 
 # ── definir_senha ───────────────────────────────────────────────────────────

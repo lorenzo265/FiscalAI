@@ -33,15 +33,14 @@ async def test_empresa_inexistente_levanta() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.provisoes.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ProvisoesService().gerar_provisao_mensal(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                date(2026, 5, 1),
-                GerarProvisaoIn(folha_mes_total=Decimal("1000")),
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ProvisoesService().gerar_provisao_mensal(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            date(2026, 5, 1),
+            GerarProvisaoIn(folha_mes_total=Decimal("1000")),
+        )
 
 
 @pytest.mark.asyncio

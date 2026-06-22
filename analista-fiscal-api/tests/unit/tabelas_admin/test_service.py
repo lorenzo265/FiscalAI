@@ -9,13 +9,11 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
-from app.modules.tabelas_admin.schemas import VigenciaInssIn
 from app.modules.tabelas_admin.service import (
     TabelaAdminService,
     computar_idempotency_key,
@@ -25,7 +23,6 @@ from app.shared.exceptions import (
     VigenciaTributariaJaPostada,
 )
 from app.shared.idempotency import NS_TABELA_ADMIN
-
 from tests.unit.tabelas_admin._helpers import vigencia_inss_valida
 
 
@@ -37,7 +34,7 @@ def _service_mocks(
     """Constrói o service com repos AsyncMock."""
     log_repo = AsyncMock()
     log_repo.por_idempotency_key = AsyncMock(return_value=log_existente)
-    log_repo.criar = AsyncMock(side_effect=lambda l: l)
+    log_repo.criar = AsyncMock(side_effect=lambda obj: obj)
 
     scd_repo = AsyncMock()
     scd_repo.max_valid_from_inss = AsyncMock(return_value=max_inss)

@@ -17,7 +17,7 @@ identificados por prefixo de path (ver ``SENSITIVE_PREFIXES``).
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 import redis.asyncio as redis_async
@@ -265,7 +265,8 @@ def _extrair_tenant_id_sem_validar(request: Request) -> str | None:
     if len(parts) != 3:
         return None
     try:
-        import base64, json
+        import base64
+        import json
         payload_b64 = parts[1]
         # Adiciona padding se necessário
         padding = 4 - len(payload_b64) % 4

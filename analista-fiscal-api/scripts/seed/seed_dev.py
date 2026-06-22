@@ -36,7 +36,7 @@ from app.modules.auth.repo import TenantRepo, UsuarioRepo
 from app.modules.auth.schemas import RegisterIn
 from app.modules.auth.service import AuthService
 from app.modules.empresa.repo import EmpresaRepo
-from app.modules.empresa.schemas import EmpresaIn, RegimeTributario, AnexoSimples
+from app.modules.empresa.schemas import AnexoSimples, EmpresaIn, RegimeTributario
 from app.modules.empresa.service import EmpresaService
 from app.shared.auth.jwt import TenantContext
 from app.shared.db.perf import build_async_engine

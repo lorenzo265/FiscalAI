@@ -47,19 +47,20 @@ from app.modules.contabil.lancador_auto import (
     gerar_partidas_de_provisao,
     gerar_partidas_de_transacao,
 )
-from app.modules.contabil.partidas import PartidaIn as _PartidaInDomain, validar_partidas as _validar_partidas
+from app.modules.contabil.partidas import PartidaIn as _PartidaInDomain
+from app.modules.contabil.partidas import validar_partidas as _validar_partidas
 from app.modules.contabil.plano_referencial import (
-    CODIGOS_PADRAO_LANCAMENTO_AUTO,
     _CHAVES_CORE,
     _CHAVES_IMPOSTOS,
+    CODIGOS_PADRAO_LANCAMENTO_AUTO,
 )
-from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.modules.contabil.repo import (
     ContaContabilRepo,
     LancamentoRepo,
     PartidaRepo,
 )
 from app.modules.empresa.repo import EmpresaRepo
+from app.modules.fiscal.snapshots import parse_apuracao_output
 from app.shared.db.models import (
     ApuracaoFiscal,
     DepreciacaoMensal,
@@ -637,9 +638,7 @@ class LancadorService:
         # — validação estrutural sem I/O de banco nesta camada).
         erros_bloqueantes: list[str] = []
         for e in resultado_validacao.erros:
-            if "partidas_desbalanceadas" in e:
-                erros_bloqueantes.append(e)
-            elif "_valor_nao_positivo" in e:
+            if "partidas_desbalanceadas" in e or "_valor_nao_positivo" in e:
                 erros_bloqueantes.append(e)
 
         if erros_bloqueantes:

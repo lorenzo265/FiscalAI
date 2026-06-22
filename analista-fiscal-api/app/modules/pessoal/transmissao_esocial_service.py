@@ -59,7 +59,6 @@ from app.shared.exceptions import (
 )
 from app.shared.integrations.esocial.client import EsocialClient, EsocialError
 from app.shared.integrations.esocial.types import (
-    EstadoLote,
     EventoLote,
     ReciboLote,
 )

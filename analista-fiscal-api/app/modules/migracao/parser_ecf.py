@@ -26,13 +26,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from app.modules.migracao.parser_ecd import _campo, _decompor
 from app.modules.sped.compartilhado import (
     calcular_hash_sha256,
     parse_data,
     parse_decimal,
 )
-
-from app.modules.migracao.parser_ecd import _campo, _decompor
 
 ALGORITMO_VERSAO = "migracao.ecf.v1"
 

@@ -18,7 +18,6 @@ from app.modules.parcelamentos.calcula_parcelamento import (
     gerar_parcelamento_ordinario,
 )
 
-
 # ── Reconciliação de centavos ─────────────────────────────────────────────────
 
 

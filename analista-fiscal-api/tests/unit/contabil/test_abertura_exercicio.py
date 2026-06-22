@@ -48,11 +48,10 @@ async def test_empresa_inexistente_levanta() -> None:
     with patch(
         "app.modules.contabil.encerramento_service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await EncerramentoService().abrir_exercicio(
-                session, uuid.uuid4(), uuid.uuid4(), 2025
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await EncerramentoService().abrir_exercicio(
+            session, uuid.uuid4(), uuid.uuid4(), 2025
+        )
 
 
 @pytest.mark.asyncio
@@ -70,11 +69,10 @@ async def test_dezembro_anterior_nao_encerrado_levanta() -> None:
     with patch(
         "app.modules.contabil.encerramento_service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EncerramentoMensalAusente, match="Dezembro/2024"):
-            await EncerramentoService().abrir_exercicio(
-                session, uuid.uuid4(), uuid.uuid4(), 2025
-            )
+    ), pytest.raises(EncerramentoMensalAusente, match="Dezembro/2024"):
+        await EncerramentoService().abrir_exercicio(
+            session, uuid.uuid4(), uuid.uuid4(), 2025
+        )
 
 
 @pytest.mark.asyncio

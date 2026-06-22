@@ -14,7 +14,6 @@ from app.modules.migracao.parser_csv import (
     parse_razao_csv,
 )
 
-
 # ── Balancete ───────────────────────────────────────────────────────────────
 
 
@@ -79,9 +78,9 @@ def test_balancete_so_cabecalho_levanta() -> None:
 
 def test_balancete_hash_estavel_idempotente() -> None:
     csv = (
-        "codigo_conta;descricao;saldo_inicial;debito;credito;saldo_final\n"
-        "1.1.1.01;Caixa;0,00;100,00;0,00;100,00\n"
-    ).encode("utf-8")
+        b"codigo_conta;descricao;saldo_inicial;debito;credito;saldo_final\n"
+        b"1.1.1.01;Caixa;0,00;100,00;0,00;100,00\n"
+    )
     a = parse_balancete_csv(csv)
     b = parse_balancete_csv(csv)
     assert a.hash_arquivo == b.hash_arquivo

@@ -31,7 +31,7 @@ try:
     _VECTOR_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _VECTOR_AVAILABLE = False
-    PG_VECTOR = None  # noqa: N816
+    PG_VECTOR = None
 
 
 class Tenant(Base):

@@ -10,8 +10,8 @@ from app.modules.parcelamentos.repo import ParcelamentoRepo
 from app.modules.parcelamentos.schemas import (
     CancelarParcelamentoIn,
     CriarParcelamentoIn,
-    ParcelaOut,
     ParcelamentoOut,
+    ParcelaOut,
     StatusParcelamentoIn,
 )
 from app.modules.parcelamentos.service import ParcelamentoService

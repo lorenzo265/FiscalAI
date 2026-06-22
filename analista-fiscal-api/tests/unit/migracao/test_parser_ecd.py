@@ -30,7 +30,6 @@ from app.modules.sped.ecd.gerador import (
     gerar_ecd,
 )
 
-
 # ── Fixtures (reusam padrão do test_ecd_gerador) ────────────────────────────
 
 

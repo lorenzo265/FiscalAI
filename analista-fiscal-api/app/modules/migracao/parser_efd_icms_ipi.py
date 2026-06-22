@@ -22,13 +22,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
-
-from app.modules.sped.compartilhado import (
-    calcular_hash_sha256,
-    parse_data,
-    parse_decimal,
-)
 
 from app.modules.migracao.parser_ecd import _campo, _decompor
 from app.modules.migracao.parser_efd_contribuicoes import (
@@ -37,6 +30,11 @@ from app.modules.migracao.parser_efd_contribuicoes import (
     _decimal_opt,
     _direcao_pelo_ind,
     _extrair_mapa_participantes,
+)
+from app.modules.sped.compartilhado import (
+    calcular_hash_sha256,
+    parse_data,
+    parse_decimal,
 )
 
 ALGORITMO_VERSAO = "migracao.efd_icms_ipi.v2"

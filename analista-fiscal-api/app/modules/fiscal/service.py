@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -10,7 +8,12 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.empresa.repo import EmpresaRepo
-from app.modules.fiscal.calcula_das import FaixaDAS, ResultadoDAS, calcular_das, resolver_anexo_fator_r
+from app.modules.fiscal.calcula_das import (
+    FaixaDAS,
+    ResultadoDAS,
+    calcular_das,
+    resolver_anexo_fator_r,
+)
 from app.modules.fiscal.repo import ApuracaoFiscalRepo, TabelaSimplesRepo
 from app.modules.fiscal.schemas import ApuracaoDASIn
 from app.shared.db.models import ApuracaoFiscal

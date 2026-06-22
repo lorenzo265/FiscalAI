@@ -6,7 +6,6 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock, patch
 from zoneinfo import ZoneInfo
 
@@ -20,7 +19,6 @@ from app.shared.exceptions import (
     SemDadosParaSped,
     SpedJaGerado,
 )
-
 
 # ── Fixtures de stub ──────────────────────────────────────────────────────
 
@@ -187,12 +185,11 @@ async def test_mei_rejeitado() -> None:
     p_emp, p_apur, p_docs, p_sped, sped_repo, *_ = _patch_repos(
         empresa=empresa, apuracao=_apuracao_canonica(),
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(EmpresaNaoElegivelEfd, match="Lucro Presumido"):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(EmpresaNaoElegivelEfd, match="Lucro Presumido"):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -203,12 +200,11 @@ async def test_simples_nacional_rejeitado() -> None:
     p_emp, p_apur, p_docs, p_sped, sped_repo, *_ = _patch_repos(
         empresa=empresa, apuracao=_apuracao_canonica(),
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(EmpresaNaoElegivelEfd, match="DEFIS"):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(EmpresaNaoElegivelEfd, match="DEFIS"):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -218,12 +214,11 @@ async def test_empresa_inexistente_levanta_404() -> None:
     p_emp, p_apur, p_docs, p_sped, *_ = _patch_repos(
         empresa=None, apuracao=None,
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(EmpresaNaoEncontrada):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), uuid.uuid4(),
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(EmpresaNaoEncontrada):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), uuid.uuid4(),
+            competencia=date(2026, 3, 1),
+        )
 
 
 @pytest.mark.asyncio
@@ -233,12 +228,11 @@ async def test_sem_apuracao_levanta_sem_dados() -> None:
     p_emp, p_apur, p_docs, p_sped, *_ = _patch_repos(
         empresa=empresa, apuracao=None,
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(SemDadosParaSped, match="Apuração PIS"):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(SemDadosParaSped, match="Apuração PIS"):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
 
 
 @pytest.mark.asyncio
@@ -249,12 +243,11 @@ async def test_idempotencia_sem_forcar_levanta_conflito() -> None:
     p_emp, p_apur, p_docs, p_sped, sped_repo, *_ = _patch_repos(
         empresa=empresa, apuracao=_apuracao_canonica(), ativo=ativo,
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(SpedJaGerado, match="já gerada"):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(SpedJaGerado, match="já gerada"):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
     sped_repo.criar.assert_not_awaited()
     sped_repo.marcar_superseded.assert_not_awaited()
 
@@ -311,9 +304,8 @@ async def test_sem_codigo_municipio_levanta_sem_dados() -> None:
         apuracao=_apuracao_canonica(),
         documentos=[],
     )
-    with p_emp, p_apur, p_docs, p_sped:
-        with pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
-            await EfdContribuicoesService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
+        await EfdContribuicoesService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )

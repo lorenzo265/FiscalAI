@@ -16,12 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any
 
 import pytest
 
 from app.modules.lucro_presumido.repo import _normalizar_cnae
-
 
 # ── Stub mínimo de PresuncaoLucroPresumido (sem banco) ────────────────────────
 
@@ -50,9 +48,10 @@ def _resolver(
     candidatos: list[_FakePresuncao] = []
     for v in vigentes:
         if v.cnae_pattern is None:
-            if v.limite_receita_anual is not None:
-                if faturamento_12m is None or faturamento_12m > v.limite_receita_anual:
-                    continue
+            if v.limite_receita_anual is not None and (
+                faturamento_12m is None or faturamento_12m > v.limite_receita_anual
+            ):
+                continue
             candidatos.append(v)
             continue
         pattern_norm = _normalizar_cnae(v.cnae_pattern)

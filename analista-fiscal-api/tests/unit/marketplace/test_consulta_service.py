@@ -170,17 +170,16 @@ async def test_criar_empresa_inexistente_levanta() -> None:
     with patch(
         "app.modules.marketplace.consulta_service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ConsultaService().criar(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                usuario_id=uuid.uuid4(),
-                categoria="consulta_rapida",
-                pergunta="Pergunta",
-                consentimento=True,
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ConsultaService().criar(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            usuario_id=uuid.uuid4(),
+            categoria="consulta_rapida",
+            pergunta="Pergunta",
+            consentimento=True,
+        )
 
 
 @pytest.mark.asyncio
@@ -298,18 +297,18 @@ async def test_criar_com_contador_sem_especialidade_levanta() -> None:
             "app.modules.marketplace.consulta_service.ContadorParceiroRepo",
             return_value=parceiro_repo,
         ),
+        pytest.raises(ParceiroIndisponivel, match="especialidade"),
     ):
-        with pytest.raises(ParceiroIndisponivel, match="especialidade"):
-            await ConsultaService().criar(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=empresa.id,
-                usuario_id=uuid.uuid4(),
-                categoria="holding",
-                pergunta="Holding patrimonial?",
-                consentimento=True,
-                contador_id=parceiro.id,
-            )
+        await ConsultaService().criar(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=empresa.id,
+            usuario_id=uuid.uuid4(),
+            categoria="holding",
+            pergunta="Holding patrimonial?",
+            consentimento=True,
+            contador_id=parceiro.id,
+        )
 
 
 @pytest.mark.asyncio
@@ -367,11 +366,11 @@ async def test_aceitar_consulta_inexistente_levanta() -> None:
             "app.modules.marketplace.consulta_service.set_contador_id",
             new=AsyncMock(),
         ),
+        pytest.raises(ConsultaNaoEncontrada),
     ):
-        with pytest.raises(ConsultaNaoEncontrada):
-            await ConsultaService().aceitar(
-                session, consulta_id=uuid.uuid4(), contador_id=uuid.uuid4()
-            )
+        await ConsultaService().aceitar(
+            session, consulta_id=uuid.uuid4(), contador_id=uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -389,11 +388,11 @@ async def test_aceitar_contador_errado_levanta() -> None:
             "app.modules.marketplace.consulta_service.set_contador_id",
             new=AsyncMock(),
         ),
+        pytest.raises(ConsultaForaDeFluxo, match="não está atribuída"),
     ):
-        with pytest.raises(ConsultaForaDeFluxo, match="não está atribuída"):
-            await ConsultaService().aceitar(
-                session, consulta_id=consulta.id, contador_id=uuid.uuid4()
-            )
+        await ConsultaService().aceitar(
+            session, consulta_id=consulta.id, contador_id=uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -412,11 +411,11 @@ async def test_aceitar_status_invalido_levanta() -> None:
             "app.modules.marketplace.consulta_service.set_contador_id",
             new=AsyncMock(),
         ),
+        pytest.raises(ConsultaForaDeFluxo, match="status 'concluida'"),
     ):
-        with pytest.raises(ConsultaForaDeFluxo, match="status 'concluida'"):
-            await ConsultaService().aceitar(
-                session, consulta_id=consulta.id, contador_id=contador_id
-            )
+        await ConsultaService().aceitar(
+            session, consulta_id=consulta.id, contador_id=contador_id
+        )
 
 
 @pytest.mark.asyncio
@@ -439,11 +438,11 @@ async def test_aceitar_sla_expirado_levanta() -> None:
             "app.modules.marketplace.consulta_service.set_contador_id",
             new=AsyncMock(),
         ),
+        pytest.raises(ConsultaSlaExpirado),
     ):
-        with pytest.raises(ConsultaSlaExpirado):
-            await ConsultaService().aceitar(
-                session, consulta_id=consulta.id, contador_id=contador_id
-            )
+        await ConsultaService().aceitar(
+            session, consulta_id=consulta.id, contador_id=contador_id
+        )
 
 
 @pytest.mark.asyncio
@@ -525,14 +524,14 @@ async def test_responder_status_aberta_levanta() -> None:
             "app.modules.marketplace.consulta_service.set_contador_id",
             new=AsyncMock(),
         ),
+        pytest.raises(ConsultaForaDeFluxo),
     ):
-        with pytest.raises(ConsultaForaDeFluxo):
-            await ConsultaService().responder(
-                session,
-                consulta_id=consulta.id,
-                contador_id=contador_id,
-                resposta_resumo="x" * 20,
-            )
+        await ConsultaService().responder(
+            session,
+            consulta_id=consulta.id,
+            contador_id=contador_id,
+            resposta_resumo="x" * 20,
+        )
 
 
 # ── avaliar ──────────────────────────────────────────────────────────────────
@@ -600,14 +599,13 @@ async def test_avaliar_ja_avaliada_levanta() -> None:
     with patch(
         "app.modules.marketplace.consulta_service.ConsultaRepo",
         return_value=consulta_repo,
-    ):
-        with pytest.raises(ConsultaJaAvaliada):
-            await ConsultaService().avaliar(
-                session,
-                consulta_id=consulta.id,
-                empresa_id=consulta.empresa_id,
-                rating=5,
-            )
+    ), pytest.raises(ConsultaJaAvaliada):
+        await ConsultaService().avaliar(
+            session,
+            consulta_id=consulta.id,
+            empresa_id=consulta.empresa_id,
+            rating=5,
+        )
 
 
 @pytest.mark.asyncio
@@ -619,14 +617,13 @@ async def test_avaliar_consulta_nao_concluida_levanta() -> None:
     with patch(
         "app.modules.marketplace.consulta_service.ConsultaRepo",
         return_value=consulta_repo,
-    ):
-        with pytest.raises(ConsultaForaDeFluxo):
-            await ConsultaService().avaliar(
-                session,
-                consulta_id=consulta.id,
-                empresa_id=consulta.empresa_id,
-                rating=4,
-            )
+    ), pytest.raises(ConsultaForaDeFluxo):
+        await ConsultaService().avaliar(
+            session,
+            consulta_id=consulta.id,
+            empresa_id=consulta.empresa_id,
+            rating=4,
+        )
 
 
 # ── FIX #10 — empresa_id validado ANTES do commit ───────────────────────────
@@ -657,14 +654,13 @@ async def test_avaliar_empresa_errada_levanta_antes_de_mutacao() -> None:
     with patch(
         "app.modules.marketplace.consulta_service.ConsultaRepo",
         return_value=consulta_repo,
-    ):
-        with pytest.raises(ConsultaNaoEncontrada):
-            await ConsultaService().avaliar(
-                session,
-                consulta_id=consulta.id,
-                empresa_id=empresa_a,  # empresa errada no path
-                rating=5,
-            )
+    ), pytest.raises(ConsultaNaoEncontrada):
+        await ConsultaService().avaliar(
+            session,
+            consulta_id=consulta.id,
+            empresa_id=empresa_a,  # empresa errada no path
+            rating=5,
+        )
 
     # Nenhuma mutação deve ter ocorrido
     assert consulta.rating_cliente == original_rating, "rating_cliente não deve ser alterado"

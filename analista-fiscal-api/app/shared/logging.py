@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import re
 import sys
-from typing import Any
 
 import structlog
 from structlog.types import EventDict, WrappedLogger
@@ -55,8 +54,8 @@ def _mask_patterns_in_string(text: str) -> str:
 
 
 def _redact_pii(
-    logger: WrappedLogger,  # noqa: ARG001
-    method_name: str,  # noqa: ARG001
+    logger: WrappedLogger,
+    method_name: str,
     event_dict: EventDict,
 ) -> EventDict:
     """Processador structlog que redige PII antes de qualquer renderer.
@@ -74,7 +73,7 @@ def _redact_pii(
 
     Não levanta — qualquer exceção interna retorna o event_dict sem crash.
     """
-    try:
+    try:  # noqa: SIM105  # comentário interno justifica try/except explícito
         _redact_pii_inplace(event_dict)
     except Exception:
         # Redação não pode derrubar o log — silencia qualquer falha interna.

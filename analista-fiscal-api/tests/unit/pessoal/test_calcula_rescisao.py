@@ -13,8 +13,8 @@ from app.modules.pessoal.calcula_rescisao import (
     calcular_rescisao,
 )
 from tests.unit.pessoal.test_calcula_inss import FAIXAS_2025 as INSS_FAIXAS
-from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_inss_2026 import FAIXAS_2026 as INSS_FAIXAS_2026
+from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_irrf_2026 import FAIXAS_2026 as IRRF_FAIXAS_2026
 
 
@@ -260,19 +260,19 @@ class TestTerminoDeterminado:
 class TestBordas:
     @pytest.fixture
     def kwargs_base(self) -> dict:
-        return dict(
-            tipo=RescisaoTipo.SEM_JUSTA_CAUSA,
-            salario=Decimal("3000"),
-            anos_completos_servico=1,
-            dias_trabalhados_mes_demissao=15,
-            avos_13o=6,
-            avos_ferias_proporcionais=6,
-            ferias_vencidas_dias=0,
-            saldo_fgts_acumulado=Decimal("1000"),
-            faixas_inss=INSS_FAIXAS,
-            faixas_irrf=IRRF_FAIXAS,
-            dependentes=0,
-        )
+        return {
+            "tipo": RescisaoTipo.SEM_JUSTA_CAUSA,
+            "salario": Decimal("3000"),
+            "anos_completos_servico": 1,
+            "dias_trabalhados_mes_demissao": 15,
+            "avos_13o": 6,
+            "avos_ferias_proporcionais": 6,
+            "ferias_vencidas_dias": 0,
+            "saldo_fgts_acumulado": Decimal("1000"),
+            "faixas_inss": INSS_FAIXAS,
+            "faixas_irrf": IRRF_FAIXAS,
+            "dependentes": 0,
+        }
 
     def test_salario_negativo(self, kwargs_base: dict) -> None:
         kwargs_base["salario"] = Decimal("-1")

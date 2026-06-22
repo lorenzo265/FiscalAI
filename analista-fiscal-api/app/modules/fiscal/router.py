@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 from app.modules.fiscal.schemas import ApuracaoDASIn, ApuracaoDASOut
 from app.modules.fiscal.service import FiscalService

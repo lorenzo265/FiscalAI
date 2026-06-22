@@ -137,11 +137,13 @@ async def test_emitir_nfse_falha_quando_empresa_sem_ibge() -> None:
         return_value=_empresa_mock(empresa_id, codigo_ibge=None)
     )
 
-    with patch("app.modules.notas.service.EmpresaRepo", return_value=empresa_repo_mock):
-        with pytest.raises(MunicipioIbgeAusente) as exc_info:
-            await NotasService().emitir_nfse(
-                session, tenant_id, empresa_id, _payload(), focus_client=focus_client
-            )
+    with (
+        patch("app.modules.notas.service.EmpresaRepo", return_value=empresa_repo_mock),
+        pytest.raises(MunicipioIbgeAusente) as exc_info,
+    ):
+        await NotasService().emitir_nfse(
+            session, tenant_id, empresa_id, _payload(), focus_client=focus_client
+        )
 
     assert exc_info.value.http_status == 422
     # Focus não foi chamado — guard preserva idempotência da numeração RPS

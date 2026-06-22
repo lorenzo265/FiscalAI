@@ -16,7 +16,6 @@ from app.modules.contabil.relatorios import (
     consolidar_razao,
 )
 
-
 # ── calcular_saldo_final ────────────────────────────────────────────────────
 
 
@@ -89,7 +88,7 @@ class TestConsolidarBalancete:
             _mov(codigo="4.1.01"),
         ]
         linhas = consolidar_balancete(movs)
-        codigos = [l.codigo for l in linhas]
+        codigos = [lin.codigo for lin in linhas]
         assert codigos == ["1.1.1.01", "2.1.1.01", "4.1.01"]
 
     def test_saldo_final_calculado_por_natureza(self) -> None:

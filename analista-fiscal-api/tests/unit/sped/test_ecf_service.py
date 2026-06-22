@@ -6,7 +6,6 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,7 +13,6 @@ import pytest
 from app.modules.fiscal.snapshots import CsllLpSnapshot, IrpjLpSnapshot
 from app.modules.sped.ecf.repo import (
     ApuracaoTrimestreLp,
-    SaldoTrimestreConta,
 )
 from app.modules.sped.ecf.service import EcfService
 from app.shared.exceptions import (
@@ -23,7 +21,6 @@ from app.shared.exceptions import (
     SemDadosParaSped,
     SpedJaGerado,
 )
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -206,11 +203,10 @@ async def test_mei_rejeitado() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=empresa, apuracoes=[], plano=[],
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(EmpresaNaoElegivelEcd, match="MEI"):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(EmpresaNaoElegivelEcd, match="MEI"):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )
 
 
 @pytest.mark.asyncio
@@ -221,11 +217,10 @@ async def test_simples_nacional_rejeitado() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=empresa, apuracoes=[], plano=[],
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(EmpresaNaoElegivelEcd, match="simples"):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(EmpresaNaoElegivelEcd, match="simples"):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )
 
 
 @pytest.mark.asyncio
@@ -235,11 +230,10 @@ async def test_sem_apuracoes_levanta_sem_dados() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=empresa, apuracoes=[], plano=_plano(),
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(SemDadosParaSped, match="apuração"):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(SemDadosParaSped, match="apuração"):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )
 
 
 @pytest.mark.asyncio
@@ -250,11 +244,10 @@ async def test_plano_vazio_levanta_sem_dados() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=empresa, apuracoes=apuracoes, plano=[],
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(SemDadosParaSped, match="Plano de contas"):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(SemDadosParaSped, match="Plano de contas"):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )
 
 
 @pytest.mark.asyncio
@@ -265,11 +258,10 @@ async def test_idempotencia_409_sem_forcar() -> None:
     pE, pA, pC, pS, pEcd, pSped, sped_repo = _patch_repos(
         empresa=empresa, apuracoes=[], plano=_plano(), ativo=ativo,
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(SpedJaGerado):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(SpedJaGerado):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -321,11 +313,10 @@ async def test_empresa_inexistente_levanta_404() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=None, apuracoes=[], plano=[],
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(EmpresaNaoEncontrada):
-            await EcfService().gerar(
-                session, uuid.uuid4(), uuid.uuid4(), ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(EmpresaNaoEncontrada):
+        await EcfService().gerar(
+            session, uuid.uuid4(), uuid.uuid4(), ano=2025,
+        )
 
 
 @pytest.mark.asyncio
@@ -337,8 +328,7 @@ async def test_empresa_sem_ibge_levanta_sem_dados() -> None:
     pE, pA, pC, pS, pEcd, pSped, _ = _patch_repos(
         empresa=empresa, apuracoes=apuracoes, plano=_plano(),
     )
-    with pE, pA, pC, pS, pEcd, pSped:
-        with pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
-            await EcfService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025,
-            )
+    with pE, pA, pC, pS, pEcd, pSped, pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
+        await EcfService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025,
+        )

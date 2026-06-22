@@ -5,8 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from typing import Protocol
-
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -21,6 +19,7 @@ from app.shared.exceptions import (
     SerproErro,
     SerproTimeout,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

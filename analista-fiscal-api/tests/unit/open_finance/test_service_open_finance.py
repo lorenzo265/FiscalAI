@@ -51,11 +51,10 @@ async def test_connect_token_empresa_inexistente() -> None:
 
     with patch(
         "app.modules.open_finance.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await OpenFinanceService().emitir_connect_token(
-                session, uuid.uuid4(), pluggy_client=AsyncMock()
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await OpenFinanceService().emitir_connect_token(
+            session, uuid.uuid4(), pluggy_client=AsyncMock()
+        )
 
 
 @pytest.mark.asyncio
@@ -66,11 +65,10 @@ async def test_connect_token_sem_pluggy_levanta() -> None:
     empresa_repo.por_id = AsyncMock(return_value=empresa)
     with patch(
         "app.modules.open_finance.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(PluggyErro, match="não disponível"):
-            await OpenFinanceService().emitir_connect_token(
-                session, empresa.id, pluggy_client=None
-            )
+    ), pytest.raises(PluggyErro, match="não disponível"):
+        await OpenFinanceService().emitir_connect_token(
+            session, empresa.id, pluggy_client=None
+        )
 
 
 @pytest.mark.asyncio
@@ -136,11 +134,10 @@ async def test_connect_token_sem_access_token_levanta() -> None:
 
     with patch(
         "app.modules.open_finance.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(PluggyErro, match="accessToken"):
-            await OpenFinanceService().emitir_connect_token(
-                session, empresa.id, pluggy_client=pluggy
-            )
+    ), pytest.raises(PluggyErro, match="accessToken"):
+        await OpenFinanceService().emitir_connect_token(
+            session, empresa.id, pluggy_client=pluggy
+        )
 
 
 # ── registrar_item ───────────────────────────────────────────────────────────
@@ -159,15 +156,15 @@ async def test_registrar_item_idempotente_levanta_se_existe() -> None:
     with (
         patch("app.modules.open_finance.service.EmpresaRepo", return_value=empresa_repo),
         patch("app.modules.open_finance.service.PluggyItemRepo", return_value=repo),
+        pytest.raises(ItemJaRegistrado),
     ):
-        with pytest.raises(ItemJaRegistrado):
-            await OpenFinanceService().registrar_item(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                RegistrarItemIn(pluggy_item_id="abcd1234"),
-                pluggy_client=AsyncMock(),
-            )
+        await OpenFinanceService().registrar_item(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            RegistrarItemIn(pluggy_item_id="abcd1234"),
+            pluggy_client=AsyncMock(),
+        )
 
 
 @pytest.mark.asyncio

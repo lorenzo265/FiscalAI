@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Annotated, Final
-
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -36,15 +35,6 @@ from app.modules.tabelas_admin.repo import (
     SCDTabelasRepo,
     VigenciaTabelaLogRepo,
 )
-from app.modules.tabelas_admin.sugestoes_repo import SugestaoVigenciaRepo
-from app.modules.tabelas_admin.sugestoes_schemas import (
-    RejeitarSugestaoIn,
-    StatusSugestao,
-    SugestaoVigenciaOut,
-)
-from app.modules.tabelas_admin.sugestoes_service import (
-    SugestaoVigenciaService,
-)
 from app.modules.tabelas_admin.schemas import (
     TIPOS_TABELA_SUPORTADOS,
     VigenciaCbsIbsIn,
@@ -58,6 +48,15 @@ from app.modules.tabelas_admin.schemas import (
     VigenciaTabelaLogOut,
 )
 from app.modules.tabelas_admin.service import TabelaAdminService
+from app.modules.tabelas_admin.sugestoes_repo import SugestaoVigenciaRepo
+from app.modules.tabelas_admin.sugestoes_schemas import (
+    RejeitarSugestaoIn,
+    StatusSugestao,
+    SugestaoVigenciaOut,
+)
+from app.modules.tabelas_admin.sugestoes_service import (
+    SugestaoVigenciaService,
+)
 from app.shared.db.deps import TaxTableAdminSessionDep
 from app.shared.exceptions import TipoTabelaDesconhecido
 

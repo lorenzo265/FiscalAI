@@ -282,7 +282,6 @@ def _gerar_bloco_0(entrada: EntradaEcf) -> list[str]:
     # 0001 — abertura do bloco 0.
     out.append(linha("0001", "0"))
     # 0010 — parâmetros de tributação.
-    hash_ecd = entrada.ecd_vinculada.hash_ecd if entrada.ecd_vinculada else ""
     out.append(
         linha(
             "0010",

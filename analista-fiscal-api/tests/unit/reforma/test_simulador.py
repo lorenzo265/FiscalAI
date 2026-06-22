@@ -15,8 +15,8 @@ from app.modules.reforma.calcula_cbs_ibs import (
 from app.modules.reforma.periodo_transicao import FaseReforma
 from app.modules.reforma.simulador import (
     ALGORITMO_VERSAO,
-    Cenario,
     CargaTributariaAnualizada,
+    Cenario,
     projetar_impacto,
 )
 
