@@ -3314,3 +3314,39 @@ class EventoBilling(Base):
         ),
         Index("ix_evento_billing_stripe", "stripe_event_id"),
     )
+
+
+class LgpdSolicitacao(Base):
+    """Trilha de auditoria de solicitacao de direito do titular (LGPD art. 18).
+
+    Marco 3. Uma linha por exportacao (portabilidade) ou exclusao
+    (esquecimento por anonimizacao). ``detalhes`` guarda o RESUMO do ato
+    (contagens, campos anonimizados) -- nunca a PII em si. Migration 0062.
+    """
+
+    __tablename__ = "lgpd_solicitacao"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    usuario_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="concluida"
+    )
+    detalhes: Mapped[JsonObject] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('exportacao','exclusao')", name="ck_lgpd_solicitacao_tipo"
+        ),
+        CheckConstraint(
+            "status IN ('concluida','agendada','erro')",
+            name="ck_lgpd_solicitacao_status",
+        ),
+        Index("ix_lgpd_solicitacao_tenant", "tenant_id"),
+    )

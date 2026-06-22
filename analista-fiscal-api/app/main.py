@@ -35,6 +35,7 @@ from app.modules.fiscal.router import router as fiscal_router
 from app.modules.icms.router import router as icms_router
 from app.modules.imobilizado.router import router as imobilizado_router
 from app.modules.ingestao.router import router as ingestao_router
+from app.modules.lgpd.router import router as lgpd_router
 from app.modules.lucro_presumido.router import router as lucro_presumido_router
 from app.modules.marketplace.parceiros_router import router as marketplace_parceiros_router
 from app.modules.marketplace.router import (
@@ -233,6 +234,7 @@ app = FastAPI(
         {"name": "agenda", "description": "Calendário fiscal personalizado."},
         {"name": "marketplace", "description": "Marketplace de contadores parceiros."},
         {"name": "tabelas_admin", "description": "Administração de tabelas tributárias SCD (admin)."},
+        {"name": "lgpd", "description": "Direito do titular (LGPD): exportação/portabilidade dos dados."},
         {"name": "health", "description": "Probes de saúde (liveness/readiness)."},
     ],
     lifespan=lifespan,
@@ -302,6 +304,7 @@ app.include_router(marketplace_parceiros_router)
 app.include_router(marketplace_webhook_router)
 app.include_router(billing_router)
 app.include_router(billing_webhook_router)
+app.include_router(lgpd_router)
 app.include_router(reforma_router)
 app.include_router(advisor_router)
 app.include_router(sped_ecd_router)

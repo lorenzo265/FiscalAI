@@ -4,8 +4,8 @@
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `feat/m3-lgpd-seguranca` (M1/M2 + auditoria já em `main`, pushados @ `0a076f2`)
-**Suite atual:** **2704 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **26 passed**
-**mypy strict:** ✅ 0 erros (366 arquivos)
+**Suite atual:** **2711 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **28 passed**
+**mypy strict:** ✅ 0 erros (371 arquivos)
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀 + **M3 LGPD/segurança (em andamento)** 🔐
 
@@ -18,6 +18,8 @@ Terceiro marco de produção (LGPD-first §8.7 + hardening de segurança). Tudo 
 > **Nota de estado (ruff):** o gate `ruff check .` acusa ~1607 findings **pré-existentes** (1101 = RUF001/002/003, ruído de tipografia portuguesa — em-dash/aspas curvas/`×` em comentários; não auto-corrigíveis). Não é escopo do M3; delegado a uma sessão separada (`chore/ruff-lint-cleanup`). Política do M3: cada arquivo novo/tocado meu sai `ruff check`-limpo.
 
 - **PR 6.1 — Security headers middleware** (✅): `SecurityHeadersMiddleware` (`app/shared/middleware/security_headers.py`, espelha o `correlation_id.py`) injeta em toda resposta, via `setdefault`: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 0` (recomendação OWASP atual), `Permissions-Policy` (nega geo/mic/cam), e `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'` — **isento nos paths de docs** (`/docs`, `/redoc`, `/openapi.json`) que servem o Swagger UI. `Strict-Transport-Security` (2 anos, preload) **só com `hsts_enabled`** (injetado pelo `main.py` quando `ENVIRONMENT in {staging, prod}`; nunca em local/http). Plugado no `main.py` entre CORS e Correlation → aninhamento `Correlation → Security → CORS → RateLimit → app` (headers caem também nas 429/erros). Golden `tests/unit/middleware/test_security_headers.py` (4 testes: headers básicos, HSTS on/off, isenção CSP em docs). **+4 testes (2700→2704), mypy 0, ruff limpo nos meus arquivos, integração 26 ✅.**
+
+- **PR 6.2a — Endpoints LGPD (parte 1: exportação/portabilidade)** (✅): módulo `app/modules/lgpd/` + `GET /v1/lgpd/exportar` (`SessionDep`, RLS-isolado) que reúne TODOS os dados do tenant num JSON estruturado (tenant + usuários + empresas + sócios + funcionários + documentos fiscais + apurações + guias + folhas + holerites + pró-labores + distribuições + certidões) e registra a solicitação na trilha de auditoria. **Migration 0062** cria `lgpd_solicitacao` (tipo exportacao|exclusao, status, detalhes JSONB; RLS + GRANT explícito `fiscal_app`). Serializador genérico via `inspect()` do mapper: exporta todas as colunas, EXCETO denylist de PII (`senha_hash`) e blobs binários (XML/PDF → omitidos). Todas as entidades têm `tenant_id` (verificado) → `select()` isolado por RLS. Golden `tests/unit/lgpd/test_serializar.py` (7 testes: coerção de tipos + exclusão de senha_hash) + integração `tests/integration/test_lgpd.py` (2: estrutura/audit + isolamento RLS cross-tenant). **🐞 Bug latente CORRIGIDO:** `guia_pagamento` (Sprint 2) tinha RLS mas **ACL vazia** — zero GRANT a `fiscal_app`; o módulo `lucro_presumido` a acessa sob `get_session`, então o fluxo de DARF do LP estava quebrado em prod (nenhum teste de integração cobria). A 0062 concede o CRUD a `fiscal_app` (alinha ao padrão). **+7 unit (2704→2711) · +2 integração (26→28) · mypy 0 (371 arq) · ruff limpo nos meus arquivos.** Falta a parte 2 (6.2b: `POST /v1/lgpd/excluir` por anonimização).
 
 ---
 
