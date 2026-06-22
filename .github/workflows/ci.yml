@@ -31,8 +31,12 @@ jobs:
         run: poetry run mypy app/
       - name: Bandit (security)
         run: poetry run bandit -r app/ -c pyproject.toml
-      - name: Pytest — unit + eval (golden é a barreira)
-        run: poetry run python -m pytest tests/unit tests/eval --tb=short
+      - name: Pytest — unit + eval (golden é a barreira) + cobertura
+        # Cobertura é REPORTADA (term-missing), sem --cov-fail-under por ora —
+        # o PO define o limiar quando o baseline estiver estabelecido.
+        run: >-
+          poetry run python -m pytest tests/unit tests/eval --tb=short
+          --cov=app --cov-report=term-missing:skip-covered
 
   backend-integration:
     name: Backend — integração (RLS, DB real)
@@ -86,6 +90,8 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
+      - name: Type-check (tsc)
+        run: npm run type-check
       - name: Build
         run: npm run build
       - name: Lint

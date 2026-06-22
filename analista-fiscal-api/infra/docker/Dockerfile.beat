@@ -1,2 +1,36 @@
-# Placeholder — Celery beat entra na Sprint 2.
-# Será derivado do Dockerfile.api com CMD apontando para celery beat.
+# syntax=docker/dockerfile:1.7
+# Beat Celery — scheduler que dispara as ~20 tasks periódicas (Marco 1 produção).
+# Singleton: rodar UMA única réplica (senão duplica os disparos do beat_schedule).
+
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_VERSION=1.8.4 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install "poetry==${POETRY_VERSION}"
+
+WORKDIR /app
+
+COPY pyproject.toml poetry.lock* ./
+
+# ---------- prod ----------
+FROM base AS prod
+RUN poetry install --no-root --without dev --with workers --with storage
+COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
+RUN useradd --system --uid 1000 fiscal && chown -R fiscal:fiscal /app
+USER fiscal
+
+CMD ["celery", "-A", "app.workers.celery_app", "beat", "-l", "info"]

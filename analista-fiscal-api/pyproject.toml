@@ -27,6 +27,8 @@ google-genai = ">=1.0"
 langfuse = ">=2.0"
 pgvector = ">=0.3"
 tenacity = ">=8.2"
+sentry-sdk = {version = "^2.20", extras = ["fastapi"]}
+prometheus-fastapi-instrumentator = "^7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

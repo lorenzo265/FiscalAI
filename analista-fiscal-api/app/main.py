@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from app.shared.types import JsonObject
 
 import redis.asyncio as redis_async
+import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -29,20 +30,33 @@ from app.modules.det.router import router as det_router
 from app.modules.e_cac.router import router as e_cac_router
 from app.modules.empresa.router import router as empresa_router
 from app.modules.fiscal.router import router as fiscal_router
-from app.modules.imobilizado.router import router as imobilizado_router
 from app.modules.icms.router import router as icms_router
+from app.modules.imobilizado.router import router as imobilizado_router
 from app.modules.ingestao.router import router as ingestao_router
 from app.modules.lucro_presumido.router import router as lucro_presumido_router
 from app.modules.marketplace.parceiros_router import router as marketplace_parceiros_router
 from app.modules.marketplace.router import (
     router as marketplace_router,
+)
+from app.modules.marketplace.router import (
     webhook_router as marketplace_webhook_router,
 )
+from app.modules.migracao.router import router as migracao_router
 from app.modules.monitor_cadastral.router import router as monitor_cadastral_router
 from app.modules.multa_juros.router import router as multa_juros_router
+from app.modules.notas.router import router as notas_router
+from app.modules.open_finance.router import (
+    router as open_finance_router,
+)
+from app.modules.open_finance.router import (
+    webhook_router as open_finance_webhook_router,
+)
 from app.modules.parcelamentos.router import router as parcelamentos_router
+from app.modules.pessoal.router import router as pessoal_router
+from app.modules.pgdas.router import router as pgdas_router
+from app.modules.provisoes.router import router as provisoes_router
+from app.modules.reforma.router import router as reforma_router
 from app.modules.reinf.router import router as reinf_router
-from app.modules.migracao.router import router as migracao_router
 from app.modules.relatorios.router import router as relatorios_router
 from app.modules.sped.ecd.router import router as sped_ecd_router
 from app.modules.sped.ecf.router import router as sped_ecf_router
@@ -50,23 +64,18 @@ from app.modules.sped.efd.router import router as sped_efd_router
 from app.modules.sped.router import router as sped_router
 from app.modules.tabelas_admin.router import (
     alertas_router as tabelas_admin_alertas_router,
+)
+from app.modules.tabelas_admin.router import (
     router as tabelas_admin_router,
+)
+from app.modules.tabelas_admin.router import (
     stats_router as tabelas_admin_stats_router,
+)
+from app.modules.tabelas_admin.router import (
     sugestoes_router as tabelas_admin_sugestoes_router,
 )
-from app.modules.notas.router import router as notas_router
-from app.modules.open_finance.router import (
-    router as open_finance_router,
-    webhook_router as open_finance_webhook_router,
-)
-from app.modules.pessoal.router import router as pessoal_router
-from app.modules.pgdas.router import router as pgdas_router
-from app.modules.provisoes.router import router as provisoes_router
-from app.modules.reforma.router import router as reforma_router
 from app.modules.whatsapp.router import router as whatsapp_router
 from app.shared.cache import Cache
-from app.shared.middleware.rate_limit import RateLimitMiddleware
-from app.shared.storage import build_storage
 from app.shared.db.perf import build_async_engine, install_slow_query_listener
 from app.shared.exceptions import DomainError
 from app.shared.integrations.brasil_api.client import BrasilApiClient
@@ -76,6 +85,10 @@ from app.shared.integrations.pluggy.client import PluggyClient
 from app.shared.integrations.serpro.client import SerproClient
 from app.shared.llm.client import LLMClient
 from app.shared.logging import configurar_logging
+from app.shared.middleware.correlation_id import CorrelationIdMiddleware
+from app.shared.middleware.rate_limit import RateLimitMiddleware
+from app.shared.storage import build_storage
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 
@@ -137,6 +150,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ollama=settings.OLLAMA_URL,
         gemini_configurado=bool(settings.GEMINI_API_KEY),
         langfuse_configurado=bool(settings.LANGFUSE_HOST),
+        sentry_configurado=bool(settings.SENTRY_DSN),
+        metrics_expostas=settings.ENABLE_METRICS,
         focus_nfe_sandbox=settings.FOCUS_NFE_SANDBOX,
         focus_nfe_configurado=bool(settings.FOCUS_NFE_TOKEN),
         whatsapp_configurado=bool(settings.META_WHATSAPP_TOKEN),
@@ -159,6 +174,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await redis_client.aclose()  # type: ignore[attr-defined]
         log.info("api.shutdown")
 
+
+_settings = get_settings()
+# Sentry (error tracking) — init o mais cedo possível p/ capturar erros de boot.
+# Só ativa com DSN configurado; send_default_pii=False é obrigatório (LGPD —
+# nunca enviar CNPJ/CPF/dado fiscal ao Sentry).
+if _settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_settings.SENTRY_DSN,
+        environment=_settings.ENVIRONMENT.value,
+        traces_sample_rate=_settings.SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+    )
 
 app = FastAPI(
     title="Analista Fiscal API",
@@ -220,6 +247,17 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
+# Correlation-ID por último → roda OUTERMOST: vincula request_id aos contextvars
+# do structlog antes de tudo (inclusive do rate-limit) e ecoa X-Request-ID na
+# resposta. Todo log do request passa a carregar o request_id.
+app.add_middleware(CorrelationIdMiddleware)
+
+# Prometheus /metrics — métricas agregadas (latência/contagem por rota/status),
+# sem PII. Gated por ENABLE_METRICS; fora do schema OpenAPI.
+if _settings.ENABLE_METRICS:
+    Instrumentator().instrument(app).expose(
+        app, endpoint="/metrics", include_in_schema=False
+    )
 
 app.include_router(auth_router)
 app.include_router(empresa_router)

@@ -3,11 +3,23 @@
 **Última atualização:** 2026-06-21
 **Agente:** claude-opus-4-8 (orquestrador) + implementadores backend-dev
 **Skill ativa:** `fiscalai-backend` / `auditor-fiscal-implacavel`
-**Branch:** `fix/fiscal-followups` (Ondas A+B+C já em `main` via fast-forward; não pushado)
-**Suite atual:** **2682 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
+**Branch:** `feat/producao-marco1` (auditoria fiscal A+B+C+followup já em `main`, pushada)
+**Suite atual:** **2684 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live)
 **mypy strict:** ✅ 0 erros
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧
+
+---
+
+## Production-Readiness — Marco 1 (Fundação) · branch `feat/producao-marco1`
+
+Após a auditoria fiscal, auditoria de production-readiness (`docs/PRODUCTION_READINESS_AUDIT-2026-06-21.md`, 8 dimensões via workflow). Marco 1 = fundação de produção, 100% código do orquestrador (os 2 subagentes despachados bateram em 529 Overloaded → feito solo). **Suite: 2684 passed, 3 skipped. mypy strict 0 (358 arq). ruff ✅.**
+
+- **Observabilidade:** Sentry (error tracking, `send_default_pii=False` p/ LGPD), Prometheus `/metrics` (Instrumentator, fora do schema), e **CorrelationIdMiddleware** (gera/ecoa `X-Request-ID`, binda nos contextvars do structlog → todo log do request carrega `request_id`). Deps `sentry-sdk[fastapi]` + `prometheus-fastapi-instrumentator` adicionadas. Campos novos: `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `ENABLE_METRICS`. Golden do middleware.
+- **Celery produção (BLOCKER fechado):** `Dockerfile.worker` e `Dockerfile.beat` REAIS (eram placeholders) — multi-stage espelhando o `Dockerfile.api`, `poetry install --with workers --with storage`, user não-root, CMD celery worker/beat. `docker-compose.prod.yml` overlay real (api+worker+beat, `!reset` limpa bind-mounts de dev, `depends_on` healthy, beat singleton). **Validado: `docker build` do worker OK + dentro da imagem a Celery REAL carrega com 21 tasks no beat_schedule** (não o stub).
+- **Hardening CI:** type-check do front (`tsc --noEmit`) como step (verificado verde) + cobertura reportada no backend (`--cov`, sem fail-under cego).
+
+Marco 1 restante (follow-up): promover QA-gates soft→bloqueante exige baseline Playwright commitado; Dockerfile do frontend exige `output:'standalone'` no next.config. Próximos marcos: M2 billing/assinatura · M3 LGPD/segurança · M4 deploy real. Ações PO×orquestrador no fim do `PRODUCTION_READINESS_AUDIT`.
 
 ---
 

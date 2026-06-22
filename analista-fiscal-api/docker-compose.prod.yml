@@ -1,7 +1,89 @@
-# Placeholder — overlay de produção entra na Sprint 11+.
-# Em produção real, infra é gerenciada por Helm/Terraform (ver infra/k8s e infra/terraform).
+# Overlay de produção/staging single-host. Use com:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Pré-requisitos:
+#   * Arquivo `.env` na raiz com os segredos: ENVIRONMENT=prod (ou staging),
+#     DATABASE_URL, REDIS_URL, JWT_SECRET (32+ chars), SENTRY_DSN (opcional),
+#     STORAGE_BACKEND, integrações (FOCUS/SERPRO/PLUGGY/META/GEMINI)...
+#   * Rodar as migrations ANTES de servir tráfego:
+#       docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#         run --rm api alembic upgrade head
+#
+# Em produção REAL, Postgres/Redis devem ser gerenciados (RDS/ElastiCache) e a
+# API atrás de nginx/ALB com TLS. Kubernetes/Helm é a fase seguinte (IaC).
+# Este overlay serve staging/VPS single-host e prova a orquestração worker+beat.
+#
+# Requer Docker Compose v2.24+ (tag `!reset` p/ limpar listas herdadas do base).
+
 services:
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fiscal}
+    ports: !reset []          # não expor o banco publicamente em prod
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []          # não expor o Redis publicamente em prod
+
   api:
     build:
       target: prod
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
     restart: unless-stopped
+    volumes: !reset []        # sem bind-mounts de dev; o código vem da imagem
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "4"
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+      target: prod
+    container_name: fiscal_worker
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.beat
+      target: prod
+    container_name: fiscal_beat
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    restart: unless-stopped
+    # Singleton — NÃO escalar o beat (duplicaria os disparos do schedule).
+    deploy:
+      replicas: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

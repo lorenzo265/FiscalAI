@@ -96,6 +96,20 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str = Field(default="", description="Public key do Langfuse.")
     LANGFUSE_SECRET_KEY: str = Field(default="", description="Secret key do Langfuse.")
 
+    # Observabilidade de produção — Marco 1 (2026-06-21)
+    SENTRY_DSN: str = Field(
+        default="",
+        description="DSN do Sentry (error tracking). Vazio = Sentry desativado.",
+    )
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(
+        default=0.0,
+        description="Fração de transações enviadas ao Sentry APM (0.0 a 1.0).",
+    )
+    ENABLE_METRICS: bool = Field(
+        default=True,
+        description="Expõe /metrics (Prometheus, métricas agregadas sem PII).",
+    )
+
     # JWT — Sprint 1
     JWT_SECRET: str = Field(
         default="TROCAR_EM_PRODUCAO_gere_com_openssl_rand_hex_32",  # nosec B105
