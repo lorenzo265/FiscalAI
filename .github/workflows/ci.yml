@@ -96,3 +96,17 @@ jobs:
         run: npm run build
       - name: Lint
         run: npm run lint
+
+  # Gate BLOQUEANTE de segredos (Marco 3 §6.5). Roda em TODO push/PR, repo
+  # inteiro — diferente do qa-gates.yml (soft + só em mudanças de frontend).
+  # Usa a imagem oficial do gitleaks (pinada) com o .gitleaks.toml do repo;
+  # exit != 0 em qualquer vazamento. Verificado limpo localmente (no leaks).
+  secret-scan:
+    name: Segurança — Gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks (working tree + config do repo)
+        run: >-
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1
+          detect --source=/repo --config=/repo/.gitleaks.toml --no-git --redact

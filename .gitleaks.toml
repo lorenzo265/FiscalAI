@@ -18,7 +18,14 @@ paths = [
   '''analista-fiscal-web/src/lib/mock/.*''',
   '''analista-fiscal-web/src/lib/fixtures/.*''',
   '''docs/.*''',
-  '''\.claude/.*'''
+  '''\.claude/.*''',
+  # Artefatos de build/deps (não versionados; excluídos p/ scans locais precisos)
+  '''\.venv/''',
+  '''node_modules/''',
+  '''\.next/''',
+  '''__pycache__/''',
+  '''\.storage/''',
+  '''htmlcov/'''
 ]
 
 # Regras específicas para suprimir por conteúdo
