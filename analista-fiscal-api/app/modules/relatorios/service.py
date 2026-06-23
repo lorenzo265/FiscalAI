@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.contabil.plano_referencial import (
     codigo as conta_codigo,
+)
+from app.modules.contabil.plano_referencial import (
     codigos_do_grupo,
 )
 from app.modules.empresa.repo import EmpresaRepo
@@ -538,7 +540,7 @@ def _date_anterior(d: date) -> date:
     return d - timedelta(days=1)
 
 
-def _stringify(o: Any) -> Any:  # noqa: ANN401 — helper recursivo dinâmico
+def _stringify(o: Any) -> Any:
     if isinstance(o, Decimal):
         return str(o)
     if isinstance(o, date):

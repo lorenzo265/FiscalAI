@@ -6,18 +6,12 @@ do ``Settings`` e que o listener loga apenas quando duração ≥ threshold.
 
 from __future__ import annotations
 
-import time
 from typing import Any
-from unittest.mock import patch
 
-import pytest
-import structlog
-from sqlalchemy import event
 from structlog.testing import capture_logs
 
 from app.config import Settings
 from app.shared.db.perf import build_async_engine, install_slow_query_listener
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # build_async_engine
@@ -152,7 +146,7 @@ def test_listener_threshold_zero_ou_negativo_e_no_op() -> None:
         # Como o listener nem foi registrado, nada acontece no dispatch.
         # Para confirmar, disparamos uma "query lenta" e checamos logs.
         with capture_logs() as logs:
-            try:
+            try:  # noqa: SIM105  # comentário interno justifica try/except explícito
                 _disparar_query(engine, "SELECT 1", duracao_ms=10_000.0)
             except Exception:
                 # Sem listener registrado, before/after ainda funcionam,

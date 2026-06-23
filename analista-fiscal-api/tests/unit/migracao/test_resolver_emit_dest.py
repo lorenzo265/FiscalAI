@@ -7,7 +7,6 @@ from app.modules.migracao.service import (
     tenant_cnpj_placeholder,
 )
 
-
 # ── Saída — empresa emite ──────────────────────────────────────────────────
 
 

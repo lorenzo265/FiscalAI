@@ -26,8 +26,10 @@ from app.modules.reforma.periodo_transicao import FaseReforma
 from app.modules.reforma.service import RecalculoResultado
 from app.modules.reforma.simulador import (
     ALGORITMO_VERSAO as SIMULADOR_VERSAO,
-    Cenario,
+)
+from app.modules.reforma.simulador import (
     CargaTributariaAnualizada,
+    Cenario,
     ImpactoFluxoCaixa,
     ResultadoSimulacao,
     SimulacaoCenario,

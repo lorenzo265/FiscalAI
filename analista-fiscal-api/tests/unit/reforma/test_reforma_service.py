@@ -103,9 +103,8 @@ async def test_simular_impacto_empresa_inexistente_levanta() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.reforma.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ReformaService(session).simular_impacto(uuid.uuid4())
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ReformaService(session).simular_impacto(uuid.uuid4())
 
 
 @pytest.mark.asyncio
@@ -122,9 +121,9 @@ async def test_simular_impacto_sem_apuracoes_levanta() -> None:
             "app.modules.reforma.service.ReformaRepo",
             return_value=reforma_repo,
         ),
+        pytest.raises(SemApuracoesDoPeriodo, match="12m"),
     ):
-        with pytest.raises(SemApuracoesDoPeriodo, match="12m"):
-            await ReformaService(session).simular_impacto(empresa.id)
+        await ReformaService(session).simular_impacto(empresa.id)
 
 
 @pytest.mark.asyncio
@@ -158,13 +157,6 @@ async def test_recalcular_historico_idempotente() -> None:
     """Chamar 2× recalcular_historico — 2ª vez não atualiza nada."""
     empresa = _empresa()
 
-    # Doc com valor_cbs já populado (do XML) — backfill não toca
-    doc_ja_populado = SimpleNamespace(
-        id=uuid.uuid4(),
-        valor_total=Decimal("1000.00"),
-        valor_cbs=Decimal("9.00"),
-        valor_ibs=Decimal("1.00"),
-    )
     # Doc sem valor_cbs — backfill calcula
     doc_para_backfill = SimpleNamespace(
         id=uuid.uuid4(),

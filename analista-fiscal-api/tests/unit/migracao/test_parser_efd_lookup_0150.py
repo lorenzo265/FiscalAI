@@ -32,7 +32,6 @@ from app.modules.sped.efd.gerador_icms_ipi import (
     gerar_efd_icms_ipi,
 )
 
-
 # ── _extrair_mapa_participantes ──────────────────────────────────────────
 
 

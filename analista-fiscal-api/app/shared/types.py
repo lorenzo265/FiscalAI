@@ -18,4 +18,4 @@ from __future__ import annotations
 from typing import Any
 
 JsonObject = dict[str, Any]
-JsonValue = Any  # noqa: UP007  — JSON union recursiva não vale a verbosidade
+JsonValue = Any

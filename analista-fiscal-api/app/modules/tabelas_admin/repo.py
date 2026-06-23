@@ -475,8 +475,8 @@ class SCDTabelasRepo:
             )
             .group_by(AliquotaIcmsUf.uf)
         )
-        rows = (await self._s.execute(stmt)).all()
-        return {uf: vf for uf, vf in rows}
+        rows = (await self._s.execute(stmt)).tuples().all()
+        return dict(rows)
 
     async def valid_from_ativa_cbs_ibs(self, em: date) -> date | None:
         stmt = (

@@ -18,8 +18,6 @@ from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
-
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -41,6 +39,7 @@ from app.shared.exceptions import (
     PluggyErro,
     PluggyTimeout,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 
@@ -158,8 +157,10 @@ class SyncService:
             page = 1
             while page <= _PLUGGY_MAX_PAGES:
                 def _fetch_page(p: int = page) -> Awaitable[JsonObject]:
+                    # B023 ok: o closure é invocado de imediato na mesma iteração
+                    # (logo abaixo), então conta_dto tem o valor correto.
                     return pluggy_client.list_transactions(
-                        account_id=conta_dto["pluggy_account_id"],
+                        account_id=conta_dto["pluggy_account_id"],  # noqa: B023
                         from_date=from_date.isoformat() if from_date else None,
                         to_date=to_date.isoformat() if to_date else None,
                         page_size=_PLUGGY_PAGE_SIZE,

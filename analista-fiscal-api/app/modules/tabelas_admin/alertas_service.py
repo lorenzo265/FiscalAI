@@ -81,7 +81,7 @@ class AlertaAdminService:
             tipo_tabela = str(resultado.contexto.get("tipo_tabela", "?"))
             ano_raw = resultado.contexto.get("ano_corrente", hoje.year)
             # ``contexto`` é dict[str, object] no dataclass — coerção defensiva.
-            ano = int(ano_raw) if isinstance(ano_raw, (int, str)) else hoje.year
+            ano = int(ano_raw) if isinstance(ano_raw, int | str) else hoje.year
             row = await self._alerta_repo.upsert_idempotente(
                 tipo=resultado.tipo,
                 tipo_tabela=tipo_tabela,
@@ -221,7 +221,7 @@ class AlertaAdminService:
     async def listar(
         self,
         *,
-        severidade: "Severidade | None" = None,
+        severidade: Severidade | None = None,
         resolvido: bool | None = None,
         limite: int = 100,
     ) -> list[AlertaAdmin]:

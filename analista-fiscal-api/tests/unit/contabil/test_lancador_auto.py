@@ -268,8 +268,8 @@ class TestProvisaoLancamento:
         )
         r = gerar_partidas_de_provisao(p, contas)
         assert r is not None
-        d = [x for x in r.partidas if x.tipo == "D"][0]
-        c = [x for x in r.partidas if x.tipo == "C"][0]
+        d = next(x for x in r.partidas if x.tipo == "D")
+        c = next(x for x in r.partidas if x.tipo == "C")
         assert d.conta_id == contas.despesa_pessoal
         assert c.conta_id == contas.provisao_ferias
         assert d.valor == Decimal("1111.11")
@@ -285,7 +285,7 @@ class TestProvisaoLancamento:
         )
         r = gerar_partidas_de_provisao(p, contas)
         assert r is not None
-        c = [x for x in r.partidas if x.tipo == "C"][0]
+        c = next(x for x in r.partidas if x.tipo == "C")
         assert c.conta_id == contas.provisao_13
 
     def test_inss_ferias_d_encargos_c_inss_recolher(self) -> None:
@@ -298,8 +298,8 @@ class TestProvisaoLancamento:
         )
         r = gerar_partidas_de_provisao(p, contas)
         assert r is not None
-        d = [x for x in r.partidas if x.tipo == "D"][0]
-        c = [x for x in r.partidas if x.tipo == "C"][0]
+        d = next(x for x in r.partidas if x.tipo == "D")
+        c = next(x for x in r.partidas if x.tipo == "C")
         assert d.conta_id == contas.encargos_sociais
         assert c.conta_id == contas.inss_recolher
 
@@ -313,7 +313,7 @@ class TestProvisaoLancamento:
         )
         r = gerar_partidas_de_provisao(p, contas)
         assert r is not None
-        c = [x for x in r.partidas if x.tipo == "C"][0]
+        c = next(x for x in r.partidas if x.tipo == "C")
         assert c.conta_id == contas.fgts_recolher
 
     def test_provisao_zero_retorna_none(self) -> None:

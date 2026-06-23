@@ -12,7 +12,6 @@ import pytest
 
 from app.modules.tabelas_admin.alertas_repo import _build_idempotency_key
 from app.modules.tabelas_admin.alertas_service import AlertaAdminService
-from app.shared.idempotency import NS_TABELA_ADMIN
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 

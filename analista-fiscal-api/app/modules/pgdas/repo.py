@@ -5,12 +5,11 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from app.shared.types import JsonObject
-
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.db.models import TransmissaoPgdas
+from app.shared.types import JsonObject
 
 
 class TransmissoesPgdasRepo:

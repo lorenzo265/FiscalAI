@@ -261,16 +261,15 @@ async def test_transmitir_empresa_inexistente_levanta() -> None:
     session = AsyncMock()
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=None)
-    with patch("app.modules.pgdas.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await PgdasService().transmitir(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                date(2026, 4, 1),
-                eh_retificadora=False,
-                serpro_client=AsyncMock(),
-            )
+    with patch("app.modules.pgdas.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(EmpresaNaoEncontrada):
+        await PgdasService().transmitir(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            date(2026, 4, 1),
+            eh_retificadora=False,
+            serpro_client=AsyncMock(),
+        )
 
 
 @pytest.mark.asyncio
@@ -302,16 +301,15 @@ async def test_transmitir_regime_lp_levanta() -> None:
     empresa.regime_tributario = "lucro_presumido"
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=empresa)
-    with patch("app.modules.pgdas.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(RegimeIncompativel):
-            await PgdasService().transmitir(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                date(2026, 4, 1),
-                eh_retificadora=False,
-                serpro_client=AsyncMock(),
-            )
+    with patch("app.modules.pgdas.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(RegimeIncompativel):
+        await PgdasService().transmitir(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            date(2026, 4, 1),
+            eh_retificadora=False,
+            serpro_client=AsyncMock(),
+        )
 
 
 @pytest.mark.asyncio
@@ -330,16 +328,16 @@ async def test_transmitir_sem_apuracao_levanta() -> None:
             "app.modules.pgdas.service.ApuracaoFiscalRepo",
             return_value=apuracao_repo,
         ),
+        pytest.raises(ApuracaoNaoEncontrada),
     ):
-        with pytest.raises(ApuracaoNaoEncontrada):
-            await PgdasService().transmitir(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                date(2026, 4, 1),
-                eh_retificadora=False,
-                serpro_client=AsyncMock(),
-            )
+        await PgdasService().transmitir(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            date(2026, 4, 1),
+            eh_retificadora=False,
+            serpro_client=AsyncMock(),
+        )
 
 
 @pytest.mark.asyncio

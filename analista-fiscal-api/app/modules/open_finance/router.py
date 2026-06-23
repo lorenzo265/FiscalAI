@@ -254,7 +254,9 @@ async def pluggy_webhook(
     try:
         payload = json.loads(body or b"{}")
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Body inválido (não é JSON)")
+        raise HTTPException(
+            status_code=400, detail="Body inválido (não é JSON)"
+        ) from None
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Body deve ser objeto JSON")

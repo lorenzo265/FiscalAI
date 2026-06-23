@@ -17,13 +17,12 @@ Quando ainda não houver Celery instalado, o stub no ``celery_app`` aceita
 from __future__ import annotations
 
 import structlog
-
-from app.shared.types import JsonObject
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.config import get_settings
 from app.shared.db.perf import build_async_engine
+from app.shared.types import JsonObject
 from app.workers.celery_app import celery_app
 
 log = structlog.get_logger(__name__)

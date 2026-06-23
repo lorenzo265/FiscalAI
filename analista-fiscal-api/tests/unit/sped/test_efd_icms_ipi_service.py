@@ -20,7 +20,6 @@ from app.shared.exceptions import (
     SpedJaGerado,
 )
 
-
 # ── Fixtures de stub ──────────────────────────────────────────────────────
 
 
@@ -198,12 +197,11 @@ async def test_empresa_sem_ie_rejeitada() -> None:
     p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, sped_repo, *_ = _patch_repos(
         empresa=empresa, apuracao=_apuracao_devedor(),
     )
-    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem:
-        with pytest.raises(EmpresaNaoElegivelEfd, match="inscrição estadual"):
-            await EfdIcmsIpiService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, pytest.raises(EmpresaNaoElegivelEfd, match="inscrição estadual"):
+        await EfdIcmsIpiService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -213,12 +211,11 @@ async def test_empresa_inexistente_levanta_404() -> None:
     p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, *_ = _patch_repos(
         empresa=None, apuracao=None,
     )
-    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem:
-        with pytest.raises(EmpresaNaoEncontrada):
-            await EfdIcmsIpiService().gerar(
-                session, uuid.uuid4(), uuid.uuid4(),
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, pytest.raises(EmpresaNaoEncontrada):
+        await EfdIcmsIpiService().gerar(
+            session, uuid.uuid4(), uuid.uuid4(),
+            competencia=date(2026, 3, 1),
+        )
 
 
 @pytest.mark.asyncio
@@ -228,12 +225,11 @@ async def test_sem_apuracao_levanta_sem_dados() -> None:
     p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, *_ = _patch_repos(
         empresa=empresa, apuracao=None,
     )
-    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem:
-        with pytest.raises(SemDadosParaSped, match="Apuração ICMS"):
-            await EfdIcmsIpiService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, pytest.raises(SemDadosParaSped, match="Apuração ICMS"):
+        await EfdIcmsIpiService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
 
 
 @pytest.mark.asyncio
@@ -244,12 +240,11 @@ async def test_idempotencia_sem_forcar_levanta_conflito() -> None:
     p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, sped_repo, *_ = _patch_repos(
         empresa=empresa, apuracao=_apuracao_devedor(), ativo=ativo,
     )
-    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem:
-        with pytest.raises(SpedJaGerado, match="já gerada"):
-            await EfdIcmsIpiService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, pytest.raises(SpedJaGerado, match="já gerada"):
+        await EfdIcmsIpiService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -306,9 +301,8 @@ async def test_sem_codigo_municipio_levanta_sem_dados() -> None:
         apuracao=_apuracao_devedor(),
         documentos=[],
     )
-    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem:
-        with pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
-            await EfdIcmsIpiService().gerar(
-                session, uuid.uuid4(), empresa.id,
-                competencia=date(2026, 3, 1),
-            )
+    with p_emp, p_apur, p_docs, p_sped, p_aliq, p_bem, pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
+        await EfdIcmsIpiService().gerar(
+            session, uuid.uuid4(), empresa.id,
+            competencia=date(2026, 3, 1),
+        )

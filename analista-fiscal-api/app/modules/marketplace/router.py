@@ -18,10 +18,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from app.config import Settings
+from app.modules.empresa.repo import EmpresaRepo
 from app.modules.marketplace.categorias import pricing_para
 from app.modules.marketplace.consulta_service import ConsultaService
 from app.modules.marketplace.matching import top_parceiros
@@ -44,7 +46,6 @@ from app.modules.marketplace.schemas import (
     WebhookPagamentoIn,
 )
 from app.modules.marketplace.service import ContadorParceiroService
-from app.modules.empresa.repo import EmpresaRepo
 from app.shared.db.deps import (
     AnonSessionDep,
     SessionDep,
@@ -55,10 +56,8 @@ from app.shared.exceptions import (
     ConsultaNaoEncontrada,
     ContadorParceiroNaoEncontrado,
     EmpresaNaoEncontrada,
-    SemParceirosDisponiveis,
     WebhookPagamentoAssinaturaInvalida,
 )
-from uuid import UUID
 
 router = APIRouter(prefix="/v1", tags=["marketplace"])
 

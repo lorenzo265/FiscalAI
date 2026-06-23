@@ -12,12 +12,11 @@ import time
 
 import httpx
 import redis.asyncio as redis_async
-
-from app.shared.types import JsonObject
 import structlog
 
 from app.config import Settings
 from app.shared.exceptions import SerproOAuthErro, SerproTimeout
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

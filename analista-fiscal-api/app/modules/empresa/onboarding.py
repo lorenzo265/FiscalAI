@@ -96,7 +96,7 @@ _CNAES_VEDADOS_SN: frozenset[str] = frozenset(
         # Gestão e administração de participações societárias (holdings)
         "6420100",  # Atividades de soc. de participação — holdings
         # Planos de saúde — operadoras com fins lucrativos
-        "6550200",  # Planos de saúde (operadoras — já listado acima, duplicata segura)
+        # Planos de saúde (operadoras — já listado acima, duplicata segura)
         # Cessão / locação de mão-de-obra (art. 17, XII LC 123/2006)
         "7820500",  # Locação de mão-de-obra temporária
         # Loteamento e incorporação de imóveis (art. 17, XIV)
@@ -214,7 +214,6 @@ def mapear_dados_brasil_api(dados: dict[str, object]) -> dict[str, object]:
 
     Retorna apenas os campos usados no onboarding.
     """
-    cnae_list = dados.get("cnaes_secundarios") or []
     cnae_principal_raw = dados.get("cnae_fiscal_descricao")
 
     cnae_codigo = str(dados.get("cnae_fiscal", "")).replace(".", "").replace("-", "")

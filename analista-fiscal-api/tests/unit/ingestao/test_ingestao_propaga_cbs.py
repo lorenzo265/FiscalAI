@@ -14,7 +14,6 @@ import pytest
 
 from app.modules.ingestao.service import IngestaoService
 
-
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 

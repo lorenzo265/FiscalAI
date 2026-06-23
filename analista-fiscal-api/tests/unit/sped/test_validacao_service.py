@@ -183,11 +183,10 @@ async def test_validar_id_inexistente_levanta_404() -> None:
     with patch(
         "app.modules.sped.validacao_service.ArquivoSpedRepo",
         return_value=repo,
-    ):
-        with pytest.raises(ArquivoSpedNaoEncontrado):
-            await SpedValidacaoService().validar(
-                session, empresa_id, uuid.uuid4(), tipo="ecd",
-            )
+    ), pytest.raises(ArquivoSpedNaoEncontrado):
+        await SpedValidacaoService().validar(
+            session, empresa_id, uuid.uuid4(), tipo="ecd",
+        )
 
 
 @pytest.mark.asyncio
@@ -203,11 +202,10 @@ async def test_validar_cross_empresa_levanta_404() -> None:
     with patch(
         "app.modules.sped.validacao_service.ArquivoSpedRepo",
         return_value=repo,
-    ):
-        with pytest.raises(ArquivoSpedNaoEncontrado):
-            await SpedValidacaoService().validar(
-                session, empresa_b, arquivo.id, tipo="ecd",
-            )
+    ), pytest.raises(ArquivoSpedNaoEncontrado):
+        await SpedValidacaoService().validar(
+            session, empresa_b, arquivo.id, tipo="ecd",
+        )
 
 
 @pytest.mark.asyncio
@@ -221,11 +219,10 @@ async def test_validar_tipo_divergente_levanta_404() -> None:
     with patch(
         "app.modules.sped.validacao_service.ArquivoSpedRepo",
         return_value=repo,
-    ):
-        with pytest.raises(ArquivoSpedNaoEncontrado):
-            await SpedValidacaoService().validar(
-                session, empresa_id, arquivo.id, tipo="ecf",
-            )
+    ), pytest.raises(ArquivoSpedNaoEncontrado):
+        await SpedValidacaoService().validar(
+            session, empresa_id, arquivo.id, tipo="ecf",
+        )
 
 
 @pytest.mark.asyncio

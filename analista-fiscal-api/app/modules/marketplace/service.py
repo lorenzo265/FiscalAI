@@ -25,8 +25,8 @@ from app.shared.auth.password import hash_senha, verificar_senha
 from app.shared.db.models import ConsultaMarketplace, ContadorParceiro
 from app.shared.exceptions import (
     ContadorParceiroNaoEncontrado,
-    CredenciaisParceiroInvalidas,
     CrcJaCadastrado,
+    CredenciaisParceiroInvalidas,
     EmailParceiroJaCadastrado,
     EspecialidadeInvalida,
     ParceiroSemSenhaDefinida,

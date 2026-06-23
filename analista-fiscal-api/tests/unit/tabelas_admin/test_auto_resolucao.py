@@ -17,7 +17,6 @@ from app.modules.tabelas_admin.repo import (
     VigenciaTabelaLogRepo,
 )
 from app.modules.tabelas_admin.service import TabelaAdminService
-
 from tests.unit.tabelas_admin._helpers import vigencia_inss_valida
 
 
@@ -28,7 +27,7 @@ def _service_com_alerta_repo(
 ) -> tuple[TabelaAdminService, AsyncMock, AsyncMock, AsyncMock]:
     log_repo = AsyncMock(spec=VigenciaTabelaLogRepo)
     log_repo.por_idempotency_key = AsyncMock(return_value=None)
-    log_repo.criar = AsyncMock(side_effect=lambda l: l)
+    log_repo.criar = AsyncMock(side_effect=lambda obj: obj)
 
     scd_repo = AsyncMock(spec=SCDTabelasRepo)
     scd_repo.max_valid_from_inss = AsyncMock(return_value=max_inss)
@@ -91,7 +90,7 @@ async def test_sem_alerta_repo_pr1_segue_funcionando() -> None:
     """Backward-compat: TabelaAdminService sem alerta_repo não chama resolver."""
     log_repo = AsyncMock(spec=VigenciaTabelaLogRepo)
     log_repo.por_idempotency_key = AsyncMock(return_value=None)
-    log_repo.criar = AsyncMock(side_effect=lambda l: l)
+    log_repo.criar = AsyncMock(side_effect=lambda obj: obj)
     scd_repo = AsyncMock(spec=SCDTabelasRepo)
     scd_repo.max_valid_from_inss = AsyncMock(return_value=date(2025, 1, 1))
     scd_repo.inserir_inss = AsyncMock(return_value=5)

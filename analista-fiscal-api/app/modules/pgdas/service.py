@@ -20,9 +20,6 @@ import uuid
 from datetime import date, datetime
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Protocol
-
-from app.shared.db.models import ApuracaoFiscal, Empresa
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -35,6 +32,7 @@ from app.modules.pgdas.schemas import (
     TransmissaoStatus,
     TransmitirPgdasOut,
 )
+from app.shared.db.models import ApuracaoFiscal, Empresa
 from app.shared.exceptions import (
     ApuracaoNaoEncontrada,
     EmpresaNaoEncontrada,
@@ -44,6 +42,7 @@ from app.shared.exceptions import (
     SerproErro,
     SerproTimeout,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

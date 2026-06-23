@@ -92,9 +92,8 @@ async def test_cadastrar_email_duplicado_levanta() -> None:
 
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo", return_value=repo
-    ):
-        with pytest.raises(EmailParceiroJaCadastrado):
-            await ContadorParceiroService().cadastrar(session, _payload_basico())
+    ), pytest.raises(EmailParceiroJaCadastrado):
+        await ContadorParceiroService().cadastrar(session, _payload_basico())
 
 
 @pytest.mark.asyncio
@@ -106,20 +105,18 @@ async def test_cadastrar_crc_duplicado_levanta() -> None:
 
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo", return_value=repo
-    ):
-        with pytest.raises(CrcJaCadastrado):
-            await ContadorParceiroService().cadastrar(session, _payload_basico())
+    ), pytest.raises(CrcJaCadastrado):
+        await ContadorParceiroService().cadastrar(session, _payload_basico())
 
 
 @pytest.mark.asyncio
 async def test_cadastrar_especialidade_invalida_levanta() -> None:
     session = AsyncMock()
-    with patch("app.modules.marketplace.service.ContadorParceiroRepo"):
-        with pytest.raises(EspecialidadeInvalida):
-            await ContadorParceiroService().cadastrar(
-                session,
-                _payload_basico(especialidades=["tributario", "futebol"]),
-            )
+    with patch("app.modules.marketplace.service.ContadorParceiroRepo"), pytest.raises(EspecialidadeInvalida):
+        await ContadorParceiroService().cadastrar(
+            session,
+            _payload_basico(especialidades=["tributario", "futebol"]),
+        )
 
 
 @pytest.mark.asyncio
@@ -202,8 +199,7 @@ async def test_aprovar_parceiro_inexistente_levanta() -> None:
 
     with patch(
         "app.modules.marketplace.service.ContadorParceiroRepo", return_value=repo
-    ):
-        with pytest.raises(ContadorParceiroNaoEncontrado):
-            await ContadorParceiroService().aprovar(
-                session, uuid.uuid4(), AprovarParceiroIn()
-            )
+    ), pytest.raises(ContadorParceiroNaoEncontrado):
+        await ContadorParceiroService().aprovar(
+            session, uuid.uuid4(), AprovarParceiroIn()
+        )

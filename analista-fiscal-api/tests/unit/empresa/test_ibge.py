@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from app.modules.empresa.ibge import resolver_ibge
 
-
 # Lista reduzida realista da BrasilAPI /ibge/municipios/v1/SP — usada em vários testes
 _MUNICIPIOS_SP = [
     {"nome": "SAO PAULO", "codigo_ibge": "3550308"},

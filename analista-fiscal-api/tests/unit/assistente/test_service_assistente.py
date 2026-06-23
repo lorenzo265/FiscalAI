@@ -9,7 +9,7 @@ import pytest
 
 from app.modules.assistente.schemas import PerguntaIn
 from app.modules.assistente.service import responder_pergunta
-from app.shared.llm.client import Citacao, FonteFato, LLMProvider, LLMResponse
+from app.shared.llm.client import Citacao, LLMProvider, LLMResponse
 
 
 def _llm_resp(
@@ -179,7 +179,6 @@ async def test_fallback_quando_afirmacao_fiscal_sem_citacao_e_fontes_presentes()
     settings = _mock_settings()
 
     # RAG retorna uma fonte (grafo não vazio)
-    from app.shared.llm.client import FonteFato
 
     fontes_rag = [{"id": "ap-001", "tipo": "apuracao_das", "payload": "DAS: R$ 1.234,56"}]
 

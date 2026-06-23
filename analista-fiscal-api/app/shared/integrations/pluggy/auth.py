@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from app.shared.types import JsonObject
 
 import httpx
 import redis.asyncio as redis_async
@@ -19,6 +18,7 @@ import structlog
 
 from app.config import Settings
 from app.shared.exceptions import PluggyOAuthErro, PluggyTimeout
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

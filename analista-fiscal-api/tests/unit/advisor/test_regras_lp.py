@@ -8,8 +8,6 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from app.modules.advisor.regras_lp import (
     ALGORITMO_VERSAO,
     DarfLpInfo,
@@ -18,7 +16,6 @@ from app.modules.advisor.regras_lp import (
     checar_irpj_adicional,
     checar_limite_receita_lp,
 )
-
 
 # ── Regra 1: DARF vencida ─────────────────────────────────────────────────────
 

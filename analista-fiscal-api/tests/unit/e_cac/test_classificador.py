@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
-
 from app.modules.e_cac.classificador import CLASSIFICADOR_VERSAO, classificar
 
 

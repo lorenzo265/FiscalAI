@@ -26,7 +26,6 @@ from app.shared.exceptions import (
 )
 from tests.unit.reforma.test_repo_aliquota import _row
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FakeRedis — reusa o pattern do test_cache, mas isolado por teste.
 # ─────────────────────────────────────────────────────────────────────────────

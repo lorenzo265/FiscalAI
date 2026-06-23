@@ -14,7 +14,6 @@ from app.modules.advisor.sugestoes_otimizacao import (
     sugerir_parcelamento_atrasado,
 )
 
-
 _COMP = date(2026, 5, 15)
 
 

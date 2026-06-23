@@ -16,7 +16,6 @@ from app.modules.certidoes.service import (
 )
 from app.shared.exceptions import EmpresaNaoEncontrada, SerproErro
 
-
 # ── helpers puros ────────────────────────────────────────────────────────────
 
 
@@ -192,11 +191,10 @@ async def test_emitir_empresa_inexistente_levanta() -> None:
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=None)
 
-    with patch("app.modules.certidoes.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await CertidoesService().emitir(
-                session, uuid.uuid4(), uuid.uuid4(), CertidaoTipo.CND, serpro_client=AsyncMock()
-            )
+    with patch("app.modules.certidoes.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(EmpresaNaoEncontrada):
+        await CertidoesService().emitir(
+            session, uuid.uuid4(), uuid.uuid4(), CertidaoTipo.CND, serpro_client=AsyncMock()
+        )
 
 
 # ── Sprint 19.6 PR1 (#3) — refactor CRF/CNDT scrapers ──────────────────────

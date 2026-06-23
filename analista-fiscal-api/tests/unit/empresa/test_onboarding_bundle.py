@@ -15,7 +15,7 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -26,7 +26,6 @@ from app.shared.exceptions import (
     EmpresaNaoEncontrada,
     OnboardingConflitoComImportacao,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers

@@ -128,7 +128,7 @@ def consolidar_balancete(
         )
         for m in movimentacoes
     ]
-    return sorted(linhas, key=lambda l: l.codigo)
+    return sorted(linhas, key=lambda lin: lin.codigo)
 
 
 # ── consolidar_razao ────────────────────────────────────────────────────────

@@ -51,7 +51,6 @@ from app.modules.sped.efd.gerador_icms_ipi import (
 )
 from app.modules.sped.efd.gerador_icms_ipi import (
     ApuracaoMensalIcms,
-    ApuracaoMensalIpi,
     DocumentoIcmsEfd,
     EntradaEfdIcmsIpi,
     IdentificacaoEmpresaEfdIcms,

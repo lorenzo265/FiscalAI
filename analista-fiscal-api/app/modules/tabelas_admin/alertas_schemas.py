@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.shared.types import JsonObject
 
-
 Severidade = Literal["info", "aviso", "critico"]
 
 

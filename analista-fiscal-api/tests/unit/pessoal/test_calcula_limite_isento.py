@@ -12,7 +12,6 @@ from app.modules.pessoal.calcula_limite_isento import (
     calcular_limite_isento_simples_nacional,
 )
 
-
 # ── Lucro Presumido ────────────────────────────────────────────────────────
 
 

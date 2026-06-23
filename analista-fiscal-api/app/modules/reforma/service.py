@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.empresa.repo import EmpresaRepo
 from app.modules.reforma.calcula_cbs_ibs import (
-    AliquotaCBSIBS,
     REGIMES_EXCLUIDOS_FASE_TESTE,
+    AliquotaCBSIBS,
 )
 from app.modules.reforma.integrar_documento import (
     popular_cbs_ibs_informacional,

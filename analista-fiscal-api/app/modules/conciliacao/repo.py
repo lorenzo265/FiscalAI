@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import desc, not_, select
@@ -150,7 +149,9 @@ class ConciliacaoRepo:
             stmt = stmt.where(ConciliacaoMatch.tipo == tipo)
         stmt = stmt.order_by(desc(ConciliacaoMatch.criado_em))
         result = await self._s.execute(stmt)
-        return [(m, t, d) for m, t, d in result.all()]
+        # C416 suprimido na linha: converte Row→tuple explicitamente (list()
+        # manteria Row e divergiria do tipo de retorno anotado).
+        return [(m, t, d) for m, t, d in result.all()]  # noqa: C416
 
     async def marcar_confirmado(
         self,

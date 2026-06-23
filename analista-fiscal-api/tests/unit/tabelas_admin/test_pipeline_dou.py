@@ -26,7 +26,6 @@ from app.modules.tabelas_admin.pipeline_dou import (
 from app.modules.tabelas_admin.recheck_llm import CitacaoLLM
 from app.shared.integrations.dou.client import MateriaDou
 
-
 # ── helpers de fixture ────────────────────────────────────────────────────
 
 

@@ -11,8 +11,8 @@ from app.modules.pessoal.calcula_holerite import (
 
 # Reaproveita os fixtures de faixas dos testes unitários adjacentes.
 from tests.unit.pessoal.test_calcula_inss import FAIXAS_2025 as INSS_FAIXAS
-from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_inss_2026 import FAIXAS_2026 as INSS_FAIXAS_2026
+from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_irrf_2026 import FAIXAS_2026 as IRRF_FAIXAS_2026
 
 ALIQ_FGTS_CLT = Decimal("0.0800")
@@ -104,13 +104,13 @@ class TestEstrutura:
         assert ALGORITMO_VERSAO == "holerite.clt.v2"
 
     def test_determinismo(self) -> None:
-        kwargs = dict(
-            salario_base=Decimal("4123.45"),
-            dependentes_irrf=1,
-            faixas_inss=INSS_FAIXAS,
-            faixas_irrf=IRRF_FAIXAS,
-            aliquota_fgts=ALIQ_FGTS_CLT,
-        )
+        kwargs = {
+            "salario_base": Decimal("4123.45"),
+            "dependentes_irrf": 1,
+            "faixas_inss": INSS_FAIXAS,
+            "faixas_irrf": IRRF_FAIXAS,
+            "aliquota_fgts": ALIQ_FGTS_CLT,
+        }
         r1 = calcular_holerite(**kwargs)  # type: ignore[arg-type]
         r2 = calcular_holerite(**kwargs)  # type: ignore[arg-type]
         assert r1 == r2
@@ -118,12 +118,12 @@ class TestEstrutura:
     def test_fgts_nao_entra_no_liquido(self) -> None:
         # FGTS é encargo do empregador — funcionário recebe líquido = bruto − INSS − IRRF.
         # Validação explícita: muda alíquota FGTS e líquido não muda.
-        kwargs = dict(
-            salario_base=Decimal("3000.00"),
-            dependentes_irrf=0,
-            faixas_inss=INSS_FAIXAS,
-            faixas_irrf=IRRF_FAIXAS,
-        )
+        kwargs = {
+            "salario_base": Decimal("3000.00"),
+            "dependentes_irrf": 0,
+            "faixas_inss": INSS_FAIXAS,
+            "faixas_irrf": IRRF_FAIXAS,
+        }
         r_clt = calcular_holerite(aliquota_fgts=Decimal("0.0800"), **kwargs)  # type: ignore[arg-type]
         r_ja = calcular_holerite(
             aliquota_fgts=Decimal("0.0200"), vinculo="jovem_aprendiz", **kwargs  # type: ignore[arg-type]

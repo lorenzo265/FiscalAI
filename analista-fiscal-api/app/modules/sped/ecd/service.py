@@ -36,13 +36,14 @@ from app.modules.relatorios.calcula_balanco import (
 )
 from app.modules.relatorios.calcula_dre import (
     ResultadoDre,
-    SaldoConta as SaldoDre,
     calcular_dre,
+)
+from app.modules.relatorios.calcula_dre import (
+    SaldoConta as SaldoDre,
 )
 from app.modules.relatorios.repo import SaldosPeriodoRepo
 from app.modules.sped.ecd.gerador import (
     ALGORITMO_VERSAO,
-    ArquivoEcdGerado,
     ContaPlano,
     EntradaEcd,
     IdentificacaoEmpresaEcd,
@@ -257,10 +258,8 @@ def _montar_entrada_ecd(
     sp_lista = _saldos_para_periodicos(saldos_mensais)
 
     # Lançamentos.
-    numero_seq = 0
     lanc_dtos: list[LancamentoEcd] = []
-    for cp in lancamentos:
-        numero_seq += 1
+    for numero_seq, cp in enumerate(lancamentos, start=1):
         partidas = tuple(
             PartidaLanc(
                 codigo_conta=conta.codigo,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -24,6 +24,7 @@ from app.shared.db.models import EventoESocial
 from app.shared.exceptions import (
     EsocialAssinaturaIndisponivel,
     EsocialEventoNaoEncontrado,
+    EsocialLoteInvalido,
     EsocialTransmissaoDesativada,
 )
 from app.shared.integrations.esocial.types import (
@@ -342,7 +343,7 @@ def monkeypatch_repo(mod: object, fake_repo: MagicMock) -> None:
         def __getattr__(self, name: str) -> object:
             return getattr(fake_repo, name)
 
-    setattr(mod, "EventoESocialRepo", _Factory)
+    mod.EventoESocialRepo = _Factory
 
 
 def test_extrair_id_evento_sem_id_levanta() -> None:
@@ -351,7 +352,7 @@ def test_extrair_id_evento_sem_id_levanta() -> None:
         assinador=NotImplementedXmldsigSigner(motivo="off"),
         cliente=_cliente_mock(),
     )
-    with pytest.raises(Exception):
+    with pytest.raises(EsocialLoteInvalido):
         service._extrair_id_evento("<eSocial><evtRemun/></eSocial>")
 
 

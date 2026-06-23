@@ -5,8 +5,6 @@ Cobre: salt aleatório, verificação correta/errada, custo rounds=12, Unicode.
 """
 from __future__ import annotations
 
-import pytest
-
 from app.shared.auth.password import hash_senha, verificar_senha
 
 

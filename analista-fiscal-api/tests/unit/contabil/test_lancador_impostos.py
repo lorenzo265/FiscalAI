@@ -24,7 +24,6 @@ from app.modules.contabil.lancador_auto import (
 )
 from app.modules.contabil.lancador_service import _valor_apuracao
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 _CONTAS_IMPOSTOS = ContasImpostos(
@@ -298,9 +297,9 @@ class TestRegressionResolverContasCore:
 
         from app.modules.contabil.lancador_service import LancadorService
         from app.modules.contabil.plano_referencial import (
-            CODIGOS_PADRAO_LANCAMENTO_AUTO,
             _CHAVES_CORE,
             _CHAVES_IMPOSTOS,
+            CODIGOS_PADRAO_LANCAMENTO_AUTO,
         )
 
         # Simula empresa antiga: contas core OK, contas de imposto ausentes.
@@ -335,7 +334,6 @@ class TestRegressionResolverContasCore:
     @pytest.mark.asyncio
     async def test_resolver_contas_impostos_levanta_quando_ausentes(self) -> None:
         """resolver_contas_impostos SIM falha quando conta de imposto está ausente."""
-        from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
 
         from app.modules.contabil.lancador_service import LancadorService
@@ -352,8 +350,7 @@ class TestRegressionResolverContasCore:
         with patch(
             "app.modules.contabil.lancador_service.ContaContabilRepo",
             return_value=repo,
-        ):
-            with pytest.raises(PlanoContasIncompleto):
-                await LancadorService().resolver_contas_impostos(
-                    session, uuid.uuid4(), date(2025, 1, 1)
-                )
+        ), pytest.raises(PlanoContasIncompleto):
+            await LancadorService().resolver_contas_impostos(
+                session, uuid.uuid4(), date(2025, 1, 1)
+            )

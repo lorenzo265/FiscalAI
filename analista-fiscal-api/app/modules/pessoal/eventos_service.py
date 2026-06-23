@@ -22,8 +22,6 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date, datetime, timedelta
-
-_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -39,12 +37,12 @@ from app.modules.pessoal.calcula_13o import (
     calcular_13o_primeira,
     calcular_13o_segunda,
 )
-from app.modules.pessoal.calcula_inss import FaixaInss
-from app.modules.pessoal.calcula_irrf import FaixaIrrf
 from app.modules.pessoal.calcula_ferias import (
     ResultadoFerias,
     calcular_ferias,
 )
+from app.modules.pessoal.calcula_inss import FaixaInss
+from app.modules.pessoal.calcula_irrf import FaixaIrrf
 from app.modules.pessoal.calcula_rescisao import (
     RescisaoTipo,
     ResultadoRescisao,
@@ -61,7 +59,6 @@ from app.modules.pessoal.schemas import (
     RescisaoIn,
 )
 from app.shared.db.models import Empresa, EventoFolha, Funcionario
-from app.shared.types import JsonObject
 from app.shared.exceptions import (
     EmpresaNaoEncontrada,
     EventoFolhaJaExiste,
@@ -70,11 +67,13 @@ from app.shared.exceptions import (
     ParametrosFolhaInvalidos,
     TabelaTributariaAusente,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 
 _ZERO = Decimal("0.00")
 _DOIS = Decimal("2")
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 
 
 class EventosFolhaService:
@@ -351,7 +350,7 @@ def _anos_completos(inicio: date, fim: date) -> int:
     return max(0, delta if aniversario_este_ano else delta - 1)
 
 
-def _detalhes_jsonb(obj: Any) -> JsonObject:  # noqa: ANN401 — dataclass arbitrário
+def _detalhes_jsonb(obj: Any) -> JsonObject:
     """Converte dataclasses aninhadas em dict JSON-safe (Decimal → str)."""
     raw = asdict(obj)
     serializado = _stringify(raw)
@@ -359,7 +358,7 @@ def _detalhes_jsonb(obj: Any) -> JsonObject:  # noqa: ANN401 — dataclass arbit
     return serializado
 
 
-def _stringify(o: Any) -> Any:  # noqa: ANN401 — helper recursivo dinâmico
+def _stringify(o: Any) -> Any:
     if isinstance(o, Decimal):
         return str(o)
     if isinstance(o, dict):

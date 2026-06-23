@@ -5,8 +5,6 @@ from __future__ import annotations
 import hashlib
 import hmac as hmac_module
 
-import pytest
-
 from app.shared.integrations.pluggy.webhook import (
     extrair_evento,
     verificar_assinatura_pluggy,

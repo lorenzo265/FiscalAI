@@ -8,9 +8,8 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.types import JsonObject
-
 from app.shared.db.models import Certidao
+from app.shared.types import JsonObject
 
 
 class CertidoesRepo:

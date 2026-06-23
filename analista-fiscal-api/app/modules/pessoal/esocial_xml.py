@@ -37,8 +37,9 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET  # nosec B405 — gera/serializa XML próprio; não parseia entrada externa
+from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Final, Mapping
+from typing import Final
 from zoneinfo import ZoneInfo
 
 from app.shared.types import JsonObject

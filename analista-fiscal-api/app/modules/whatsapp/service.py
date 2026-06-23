@@ -22,7 +22,7 @@ class WhatsAppService:
         *,
         tenant_id: UUID,
         empresa_id: UUID,
-        sender: Any | None = None,  # noqa: ANN401 — duck-typed MetaWhatsAppSender; ver Sprint 5
+        sender: Any | None = None,
     ) -> RespostaWhatsApp | None:
         """Processa uma mensagem recebida e envia resposta.
 
@@ -108,6 +108,7 @@ class WhatsAppService:
     ) -> UUID | None:
         """Tenta encontrar empresa associada ao número WhatsApp."""
         from sqlalchemy import select
+
         from app.shared.db.models import Empresa
 
         stmt = select(Empresa.id).where(

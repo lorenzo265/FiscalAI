@@ -8,11 +8,9 @@ from app.modules.tabelas_admin.recheck_llm import (
     CitacaoLLM,
     rechecar_extracao_llm,
 )
-
 from tests.unit.tabelas_admin._helpers import (
     faixas_inss_2026,
 )
-
 
 _PAYLOAD_INSS_VALIDO: dict[str, object] = {
     "valid_from": "2026-01-15",

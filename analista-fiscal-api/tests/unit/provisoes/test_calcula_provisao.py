@@ -17,13 +17,12 @@ from decimal import Decimal
 import pytest
 
 from app.modules.provisoes.calcula_provisao import (
-    ALIQ_CPP_BASE,
     ALGORITMO_VERSAO,
+    ALIQ_CPP_BASE,
     aliquota_patronal_regime,
     calcular_provisoes,
     inss_patronal_aplicavel,
 )
-
 
 # ── inss_patronal_aplicavel ─────────────────────────────────────────────────
 
@@ -386,7 +385,7 @@ class TestEstrutura:
         r = calcular_provisoes(Decimal("1000"), "lucro_presumido")
         linhas = r.as_lista()
         assert len(linhas) == 6
-        tipos = {l.tipo for l in linhas}
+        tipos = {lin.tipo for lin in linhas}
         assert tipos == {
             "ferias",
             "13_salario",

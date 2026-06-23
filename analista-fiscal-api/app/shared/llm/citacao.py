@@ -178,10 +178,7 @@ def validar_resposta(resp: LLMResponse, fontes: list[FonteFato]) -> bool:
     # Aplica-se apenas quando fontes existem (sem fontes o assistente já sinaliza ao usuário
     # que não há dados — não faz sentido exigir citação de grafo vazio).
     # Não-afirmações (saudações, "não sei", orientações genéricas) passam sem citação.
-    if fontes and _contem_afirmacao_fiscal(resp.texto) and len(resp.citacoes) == 0:
-        return False
-
-    return True
+    return not (fontes and _contem_afirmacao_fiscal(resp.texto) and len(resp.citacoes) == 0)
 
 
 def detectar_out_of_scope(pergunta: str) -> tuple[bool, str | None]:

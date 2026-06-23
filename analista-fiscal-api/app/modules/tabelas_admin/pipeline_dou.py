@@ -31,7 +31,6 @@ Princípios cravados:
 from __future__ import annotations
 
 import json
-from datetime import date
 from decimal import Decimal
 from typing import Protocol
 
@@ -245,7 +244,7 @@ def _parse_decimal_field(raw: object) -> Decimal:
     try:
         if isinstance(raw, str | int | float):
             return Decimal(str(raw))
-    except Exception:  # noqa: BLE001  # nosec B110 — coerção defensiva; inválido cai em default 0.5
+    except Exception:  # nosec B110 — coerção defensiva; inválido cai em default 0.5
         pass
     return Decimal("0.5")
 

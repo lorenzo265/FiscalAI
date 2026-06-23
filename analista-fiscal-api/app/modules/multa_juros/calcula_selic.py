@@ -96,7 +96,7 @@ def calcular_mora(
     pagamento_mes_atual = date(data_pagamento.year, data_pagamento.month, 1)
 
     # Converte taxas para dict para lookup rápido
-    selic_dict: dict[date, Decimal] = {comp: taxa for comp, taxa in taxas_selic}
+    selic_dict: dict[date, Decimal] = dict(taxas_selic)
 
     aliquota_selic_acumulada = Decimal("0")
     meses_selic = 0

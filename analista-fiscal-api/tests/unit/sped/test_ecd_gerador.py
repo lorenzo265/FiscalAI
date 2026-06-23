@@ -23,7 +23,6 @@ from app.modules.sped.ecd.gerador import (
     gerar_ecd,
 )
 
-
 # ── Fixtures de input mínimo ──────────────────────────────────────────────
 
 

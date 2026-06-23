@@ -6,8 +6,6 @@ campos omitidos não entram no ``exclude_unset``, e os validadores de formato.
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 from pydantic import ValidationError
 

@@ -66,11 +66,10 @@ async def test_run_empresa_inexistente() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.conciliacao.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ConciliacaoService().run(
-                session, uuid.uuid4(), uuid.uuid4(), RunConciliacaoIn()
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ConciliacaoService().run(
+            session, uuid.uuid4(), uuid.uuid4(), RunConciliacaoIn()
+        )
 
 
 @pytest.mark.asyncio
@@ -188,11 +187,10 @@ async def test_confirmar_nao_encontrado() -> None:
     repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.conciliacao.service.ConciliacaoRepo", return_value=repo
-    ):
-        with pytest.raises(MatchNaoEncontrado):
-            await ConciliacaoService().confirmar(
-                session, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-            )
+    ), pytest.raises(MatchNaoEncontrado):
+        await ConciliacaoService().confirmar(
+            session, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -206,11 +204,10 @@ async def test_confirmar_match_de_outra_empresa_nao_encontrado() -> None:
     )
     with patch(
         "app.modules.conciliacao.service.ConciliacaoRepo", return_value=repo
-    ):
-        with pytest.raises(MatchNaoEncontrado):
-            await ConciliacaoService().confirmar(
-                session, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-            )
+    ), pytest.raises(MatchNaoEncontrado):
+        await ConciliacaoService().confirmar(
+            session, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -234,11 +231,10 @@ async def test_confirmar_match_rejeitado_levanta() -> None:
     repo.por_id = AsyncMock(return_value=match)
     with patch(
         "app.modules.conciliacao.service.ConciliacaoRepo", return_value=repo
-    ):
-        with pytest.raises(MatchJaResolvido):
-            await ConciliacaoService().confirmar(
-                session, empresa_id, match.id, uuid.uuid4()
-            )
+    ), pytest.raises(MatchJaResolvido):
+        await ConciliacaoService().confirmar(
+            session, empresa_id, match.id, uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -331,11 +327,10 @@ async def test_rejeitar_manual_levanta() -> None:
     repo.por_id = AsyncMock(return_value=match)
     with patch(
         "app.modules.conciliacao.service.ConciliacaoRepo", return_value=repo
-    ):
-        with pytest.raises(MatchJaResolvido):
-            await ConciliacaoService().rejeitar(
-                session, empresa_id, match.id, uuid.uuid4()
-            )
+    ), pytest.raises(MatchJaResolvido):
+        await ConciliacaoService().rejeitar(
+            session, empresa_id, match.id, uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio

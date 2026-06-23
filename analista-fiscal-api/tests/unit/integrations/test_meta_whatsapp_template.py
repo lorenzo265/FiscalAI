@@ -57,7 +57,6 @@ async def test_enviar_template_sucesso_payload_correto() -> None:
 
     assert result == {"messages": [{"id": "wamid.123"}]}
     sender._http.post.assert_awaited_once()
-    url, _ = sender._http.post.call_args.args, sender._http.post.call_args.kwargs
     payload = sender._http.post.call_args.kwargs["json"]
     assert payload["messaging_product"] == "whatsapp"
     assert payload["to"] == "5511999990000"

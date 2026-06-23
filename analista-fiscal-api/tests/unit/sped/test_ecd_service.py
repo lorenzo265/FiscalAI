@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -28,7 +27,6 @@ from app.shared.exceptions import (
     SemDadosParaSped,
     SpedJaGerado,
 )
-
 
 # ── Fixtures de stub ──────────────────────────────────────────────────────
 
@@ -138,7 +136,6 @@ def _saldo_mes(
 
 def _balanco_resultado_vazio() -> ResultadoBalanco:
     zero = Decimal("0.00")
-    vazia = LinhaBalanco(rotulo="x", valor=zero, contas=())
     return ResultadoBalanco(
         ativo_circulante=LinhaBalanco("Ativo Circulante", zero, ()),
         ativo_nao_circulante=LinhaBalanco("Ativo Não Circulante", zero, ()),
@@ -305,11 +302,10 @@ async def test_mei_rejeitado() -> None:
     p_emp, p_cont, p_sld, p_sped, sped_repo, _ = _patch_repos(
         empresa=empresa, plano=[], lancamentos=[], saldos=[],
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(EmpresaNaoElegivelEcd, match="MEI"):
-            await EcdService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(EmpresaNaoElegivelEcd, match="MEI"):
+        await EcdService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -319,11 +315,10 @@ async def test_empresa_inexistente_levanta_404() -> None:
     p_emp, p_cont, p_sld, p_sped, _, _ = _patch_repos(
         empresa=None, plano=[], lancamentos=[], saldos=[],
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(EmpresaNaoEncontrada):
-            await EcdService().gerar(
-                session, uuid.uuid4(), uuid.uuid4(), ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(EmpresaNaoEncontrada):
+        await EcdService().gerar(
+            session, uuid.uuid4(), uuid.uuid4(), ano=2025
+        )
 
 
 @pytest.mark.asyncio
@@ -333,11 +328,10 @@ async def test_plano_vazio_levanta_sem_dados() -> None:
     p_emp, p_cont, p_sld, p_sped, _, _ = _patch_repos(
         empresa=empresa, plano=[], lancamentos=[], saldos=[],
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(SemDadosParaSped, match="Plano de contas vazio"):
-            await EcdService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(SemDadosParaSped, match="Plano de contas vazio"):
+        await EcdService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025
+        )
 
 
 @pytest.mark.asyncio
@@ -348,11 +342,10 @@ async def test_sem_lancamentos_levanta_sem_dados() -> None:
     p_emp, p_cont, p_sld, p_sped, _, _ = _patch_repos(
         empresa=empresa, plano=plano, lancamentos=[], saldos=[],
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(SemDadosParaSped, match="lançamento"):
-            await EcdService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(SemDadosParaSped, match="lançamento"):
+        await EcdService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025
+        )
 
 
 @pytest.mark.asyncio
@@ -364,11 +357,10 @@ async def test_idempotencia_409_quando_ja_existe_e_nao_forca() -> None:
         empresa=empresa, plano=_plano_minimo(), lancamentos=[],
         saldos=[], ativo=ativo,
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(SpedJaGerado):
-            await EcdService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(SpedJaGerado):
+        await EcdService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025
+        )
     sped_repo.criar.assert_not_awaited()
 
 
@@ -404,8 +396,7 @@ async def test_empresa_sem_ibge_levanta_sem_dados() -> None:
     p_emp, p_cont, p_sld, p_sped, _, _ = _patch_repos(
         empresa=empresa, plano=plano, lancamentos=lancs, saldos=[],
     )
-    with p_emp, p_cont, p_sld, p_sped:
-        with pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
-            await EcdService().gerar(
-                session, uuid.uuid4(), empresa.id, ano=2025
-            )
+    with p_emp, p_cont, p_sld, p_sped, pytest.raises(SemDadosParaSped, match="codigo_municipio_ibge"):
+        await EcdService().gerar(
+            session, uuid.uuid4(), empresa.id, ano=2025
+        )

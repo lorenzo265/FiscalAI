@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from app.modules.empresa.onboarding import (
     derivar_regime_por_porte,
     mapear_dados_brasil_api,

@@ -117,7 +117,7 @@ def receita_mensal_sintetica(tenant_idx: int, empresa_idx: int, mes: int) -> Dec
     Range típico R$ 15k – R$ 90k para Simples Nacional / Lucro Presumido
     pequeno. Sazonalidade simples: variação ±20% pelo mês.
     """
-    base = Decimal("30000") + Decimal(((tenant_idx * 7919 + empresa_idx * 31) % 60000))
+    base = Decimal("30000") + Decimal((tenant_idx * 7919 + empresa_idx * 31) % 60000)
     sazonalidade = Decimal("1") + Decimal((mes % 4) - 2) / Decimal("10")
     valor = (base * sazonalidade).quantize(Decimal("0.01"))
     if valor < Decimal("100"):
@@ -133,7 +133,7 @@ def rbt12_sintetico(tenant_idx: int, empresa_idx: int) -> Decimal:
     test não disparar exceções de regime.
     """
     base = Decimal("600000")
-    delta = Decimal(((tenant_idx * 1013 + empresa_idx * 41) % 100_000))
+    delta = Decimal((tenant_idx * 1013 + empresa_idx * 41) % 100_000)
     return (base + delta).quantize(Decimal("0.01"))
 
 

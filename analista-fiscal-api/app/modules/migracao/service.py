@@ -27,9 +27,8 @@ from typing import Literal, cast
 from zoneinfo import ZoneInfo
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-_TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 from app.modules.contabil.lancador_auto import (
     LancamentoCandidato,
@@ -38,8 +37,19 @@ from app.modules.contabil.lancador_auto import (
 from app.modules.contabil.lancador_service import LancadorService
 from app.modules.contabil.repo import ContaContabilRepo
 from app.modules.empresa.repo import EmpresaRepo
+from app.modules.migracao.parser_csv import (
+    ALGORITMO_VERSAO as ALGORITMO_CSV,
+)
+from app.modules.migracao.parser_csv import (
+    BalanceteParseado,
+    CsvInvalido,
+    parse_balancete_csv,
+    parse_razao_csv,
+)
 from app.modules.migracao.parser_ecd import (
     ALGORITMO_VERSAO as ALGORITMO_ECD,
+)
+from app.modules.migracao.parser_ecd import (
     EcdInvalido,
     EcdParseado,
     LancamentoEcdParseado,
@@ -47,29 +57,25 @@ from app.modules.migracao.parser_ecd import (
 )
 from app.modules.migracao.parser_ecf import (
     ALGORITMO_VERSAO as ALGORITMO_ECF,
+)
+from app.modules.migracao.parser_ecf import (
     EcfInvalido,
     EcfParseado,
     parse_ecf,
 )
-from app.modules.migracao.parser_csv import (
-    ALGORITMO_VERSAO as ALGORITMO_CSV,
-    BalanceteParseado,
-    CsvInvalido,
-    RazaoParseado,
-    parse_balancete_csv,
-    parse_razao_csv,
-)
 from app.modules.migracao.parser_efd_contribuicoes import (
     ALGORITMO_VERSAO as ALGORITMO_EFD_CONTRIB,
+)
+from app.modules.migracao.parser_efd_contribuicoes import (
     DocumentoFiscalImportado,
     EfdContribuicoesInvalida,
-    EfdContribuicoesParseado,
     parse_efd_contribuicoes,
 )
 from app.modules.migracao.parser_efd_icms_ipi import (
     ALGORITMO_VERSAO as ALGORITMO_EFD_ICMS_IPI,
+)
+from app.modules.migracao.parser_efd_icms_ipi import (
     EfdIcmsIpiInvalida,
-    EfdIcmsIpiParseado,
     parse_efd_icms_ipi,
 )
 from app.modules.migracao.repo import LoteImportacaoRepo
@@ -87,9 +93,10 @@ from app.shared.exceptions import (
     SpedInvalido,
 )
 from app.shared.types import JsonObject
-from sqlalchemy import select
 
 log = structlog.get_logger(__name__)
+
+_TZ_BR = ZoneInfo("America/Sao_Paulo")
 
 # Corte de período aceito pelo importador SPED histórico.
 # Anterior a 2024-01-01 → ``PeriodoForaCobertura`` (vigências SCD pré-2024

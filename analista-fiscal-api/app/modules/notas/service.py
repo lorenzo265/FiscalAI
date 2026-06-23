@@ -9,13 +9,6 @@ from zoneinfo import ZoneInfo
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_TZ_BR = ZoneInfo("America/Sao_Paulo")
-_AVISO_ISS = (
-    "A alíquota de ISS informada não foi validada junto à prefeitura do município "
-    "do prestador. Confirme a alíquota vigente antes de emitir em produção "
-    "(LC 116/2003 art. 8-A: mínimo 2%; art. 8º, II: máximo 5%)."
-)
-
 from app.modules.empresa.repo import EmpresaRepo
 from app.modules.notas.repo import NotasRepo
 from app.modules.notas.schemas import EmitirNfseIn, EmitirNfseOut, NfseStatusOut
@@ -23,9 +16,15 @@ from app.shared.db.models import Empresa
 from app.shared.exceptions import (
     EmpresaNaoEncontrada,
     MunicipioIbgeAusente,
-    NfseNaoEncontrada,
 )
 from app.shared.types import JsonObject
+
+_TZ_BR = ZoneInfo("America/Sao_Paulo")
+_AVISO_ISS = (
+    "A alíquota de ISS informada não foi validada junto à prefeitura do município "
+    "do prestador. Confirme a alíquota vigente antes de emitir em produção "
+    "(LC 116/2003 art. 8-A: mínimo 2%; art. 8º, II: máximo 5%)."
+)
 
 
 class _FocusClient(Protocol):

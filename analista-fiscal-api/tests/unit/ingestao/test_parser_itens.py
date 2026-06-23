@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from app.modules.ingestao.parser import parse_xml_nfe
 
-
 _NFE_TEMPLATE = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">'

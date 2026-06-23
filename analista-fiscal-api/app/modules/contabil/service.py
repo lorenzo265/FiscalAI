@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.contabil.partidas import (
     ContaView,
-    PartidaIn as PartidaInDomain,
     validar_partidas,
+)
+from app.modules.contabil.partidas import (
+    PartidaIn as PartidaInDomain,
 )
 from app.modules.contabil.plano_referencial import PLANO_REFERENCIAL
 from app.modules.contabil.repo import (

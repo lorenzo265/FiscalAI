@@ -27,13 +27,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from app.modules.migracao.parser_ecd import _campo, _decompor
 from app.modules.sped.compartilhado import (
     calcular_hash_sha256,
     parse_data,
     parse_decimal,
 )
-
-from app.modules.migracao.parser_ecd import _campo, _decompor
 
 ALGORITMO_VERSAO = "migracao.efd_contribuicoes.v2"
 # Sprint 19.7 PR3 #36 — emite ``cnpj_participante`` por documento via

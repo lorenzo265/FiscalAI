@@ -86,7 +86,7 @@ class _FakeProvider:
         self,
         *,
         consulta_id: UUID,
-        valor: Decimal,  # noqa: ARG002 — não usado pelo stub
+        valor: Decimal,
         idempotency_key: UUID,
     ) -> CobrancaCriada:
         return CobrancaCriada(

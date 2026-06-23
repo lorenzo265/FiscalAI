@@ -45,7 +45,9 @@ def test_beat_schedule_inclui_envio_segunda_06_30() -> None:
 def test_beat_schedule_envio_e_30min_apos_geracao() -> None:
     """envio deve rodar DEPOIS do gerar_digest (mesmo cron day, hora maior)."""
     try:
-        from celery.schedules import crontab  # type: ignore[import-not-found,unused-ignore]  # noqa: F401
+        from celery.schedules import (
+            crontab,  # type: ignore[import-not-found,unused-ignore]  # noqa: F401
+        )
     except ImportError:
         return  # stub
 

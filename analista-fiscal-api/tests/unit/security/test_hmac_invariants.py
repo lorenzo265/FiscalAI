@@ -9,8 +9,6 @@ from __future__ import annotations
 import hashlib
 import hmac as hmac_stdlib
 
-import pytest
-
 from app.shared.integrations.pluggy.webhook import verificar_assinatura_pluggy
 
 _SECRET = "webhook_secret_de_teste_32chars!!"
@@ -67,6 +65,7 @@ def test_signature_invalida_retorna_false():
 def test_usa_compare_digest_nao_igualdade_direta():
     """Confirma que a implementação usa hmac.compare_digest (timing-safe)."""
     import inspect
+
     from app.shared.integrations.pluggy import webhook
     src = inspect.getsource(webhook)
     assert "compare_digest" in src

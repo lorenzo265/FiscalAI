@@ -10,7 +10,6 @@ from app.modules.agenda.gerar_calendario import (
     gerar_calendario_anual,
 )
 
-
 # ── Simples Nacional ──────────────────────────────────────────────────────────
 
 

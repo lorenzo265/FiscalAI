@@ -1,10 +1,9 @@
 """Testes unitários do LLMClient — roteamento, cache e integração com Ollama/Gemini mockados."""
 from __future__ import annotations
 
-import json
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

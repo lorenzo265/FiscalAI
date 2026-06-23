@@ -22,7 +22,7 @@ log = structlog.get_logger(__name__)
 _RE_CITACAO = re.compile(r"\[([^\]]+)\]")
 
 
-def _extrair_citacoes(texto: str, fontes: list["FonteFato"]) -> list["Citacao"]:
+def _extrair_citacoes(texto: str, fontes: list[FonteFato]) -> list[Citacao]:
     """Parseia referências ``[ID]`` do texto e valida contra as fontes fornecidas.
 
     Princípio §8.5: só gera Citacao para IDs que o modelo *realmente* usou
@@ -38,7 +38,7 @@ def _extrair_citacoes(texto: str, fontes: list["FonteFato"]) -> list["Citacao"]:
     if not fontes:
         return []
 
-    ids_validos: dict[str, "FonteFato"] = {f.id: f for f in fontes}
+    ids_validos: dict[str, FonteFato] = {f.id: f for f in fontes}
     vistos: set[str] = set()
     citacoes: list[Citacao] = []
 
@@ -163,7 +163,7 @@ class LLMClient:
         self._http = http_client or httpx.AsyncClient(timeout=httpx.Timeout(60.0))
         # Lazy init — `genai.Client` é importado dentro de `_chamar_gemini` para
         # não exigir google-genai em ambientes que só usam Ollama.
-        self._gemini: Any = None  # noqa: ANN401
+        self._gemini: Any = None
 
     async def chamar(
         self,

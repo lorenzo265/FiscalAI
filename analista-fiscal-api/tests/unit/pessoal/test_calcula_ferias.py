@@ -11,8 +11,8 @@ from app.modules.pessoal.calcula_ferias import (
     calcular_ferias,
 )
 from tests.unit.pessoal.test_calcula_inss import FAIXAS_2025 as INSS_FAIXAS
-from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_inss_2026 import FAIXAS_2026 as INSS_FAIXAS_2026
+from tests.unit.pessoal.test_calcula_irrf import FAIXAS_VIGENTES as IRRF_FAIXAS
 from tests.unit.pessoal.test_calcula_irrf_2026 import FAIXAS_2026 as IRRF_FAIXAS_2026
 
 

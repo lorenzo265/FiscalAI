@@ -89,7 +89,6 @@ def calcular_inss_empregado(
     teto_aplicado = salario_base > teto
     base = teto if teto_aplicado else salario_base
 
-    acumulado = _ZERO
     limite_inferior = _ZERO
     inss_total = _ZERO
 
@@ -101,7 +100,6 @@ def calcular_inss_empregado(
         if fatia > _ZERO:
             inss_total += fatia * f.aliquota
         limite_inferior = f.valor_ate
-        acumulado = topo_faixa
 
     inss = inss_total.quantize(_CENTAVO, rounding=ROUND_HALF_EVEN)
 

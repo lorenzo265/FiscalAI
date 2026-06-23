@@ -28,7 +28,6 @@ from app.modules.tabelas_admin.schemas import (
     VigenciaSimplesNacionalIn,
 )
 
-
 FONTE_PADRAO = "Portaria MPS/MF 1/2026, DOU 2026-01-15 seção 1 página 42"
 
 

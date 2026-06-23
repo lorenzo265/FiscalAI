@@ -25,7 +25,6 @@ from app.modules.lucro_presumido.calcula_pis_cofins import (
     calcular_pis_cumulativo_mensal,
 )
 
-
 # ── Perfil 1: Consultoria de TI (serviços) ────────────────────────────────────
 # CNAE: 6201-5/01 | Presunção IRPJ 32% | CSLL 32%
 # Receita: R$ 500.000/trimestre = R$ 1.666.667/mês

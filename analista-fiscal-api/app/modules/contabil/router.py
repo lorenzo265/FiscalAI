@@ -276,21 +276,21 @@ async def balancete(
     linhas_dom = await RelatoriosService().balancete(session, empresa_id, comp_date)
     linhas = [
         LinhaBalanceteOut(
-            conta_id=l.conta_id,
-            codigo=l.codigo,
-            descricao=l.descricao,
-            natureza=NaturezaConta(l.natureza),
-            tipo=TipoConta(l.tipo),
-            nivel=l.nivel,
-            saldo_inicial=l.saldo_inicial,
-            total_debitos=l.total_debitos,
-            total_creditos=l.total_creditos,
-            saldo_final=l.saldo_final,
+            conta_id=lin.conta_id,
+            codigo=lin.codigo,
+            descricao=lin.descricao,
+            natureza=NaturezaConta(lin.natureza),
+            tipo=TipoConta(lin.tipo),
+            nivel=lin.nivel,
+            saldo_inicial=lin.saldo_inicial,
+            total_debitos=lin.total_debitos,
+            total_creditos=lin.total_creditos,
+            saldo_final=lin.saldo_final,
         )
-        for l in linhas_dom
+        for lin in linhas_dom
     ]
-    total_d = sum((l.total_debitos for l in linhas), start=Decimal("0"))
-    total_c = sum((l.total_creditos for l in linhas), start=Decimal("0"))
+    total_d = sum((lin.total_debitos for lin in linhas), start=Decimal("0"))
+    total_c = sum((lin.total_creditos for lin in linhas), start=Decimal("0"))
     return BalanceteOut(
         competencia=comp_date,
         linhas=linhas,
@@ -371,14 +371,14 @@ async def razao(
         saldo_final=saldo_final,
         linhas=[
             LinhaRazaoOut(
-                lancamento_id=l.lancamento_id,
-                data_lancamento=l.data_lancamento,
-                historico=l.historico,
-                debito=l.debito,
-                credito=l.credito,
-                saldo_corrente=l.saldo_corrente,
+                lancamento_id=lin.lancamento_id,
+                data_lancamento=lin.data_lancamento,
+                historico=lin.historico,
+                debito=lin.debito,
+                credito=lin.credito,
+                saldo_corrente=lin.saldo_corrente,
             )
-            for l in linhas_dom
+            for lin in linhas_dom
         ],
     )
 

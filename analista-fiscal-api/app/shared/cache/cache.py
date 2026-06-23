@@ -32,6 +32,7 @@ Princípios cravados:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import random
 from collections.abc import Awaitable, Callable
 
@@ -193,10 +194,8 @@ class Cache:
             finally:
                 # Libera lock — não usa Lua check-and-delete (overkill aqui;
                 # TTL curto protege contra lock órfão).
-                try:
+                with contextlib.suppress(redis_async.RedisError):
                     await self._r.delete(lock_key)
-                except redis_async.RedisError:
-                    pass
 
         # Perdedor — espera o vencedor terminar.
         log.debug("cache.miss.aguardando_lock", key=key)

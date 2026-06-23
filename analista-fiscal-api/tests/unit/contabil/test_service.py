@@ -67,21 +67,20 @@ async def test_criar_conta_empresa_inexistente() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.contabil.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await ContabilService().criar_conta(
-                session,
-                uuid.uuid4(),
-                uuid.uuid4(),
-                CriarContaIn(
-                    codigo="1.1",
-                    descricao="Conta",
-                    natureza=NaturezaConta.DEBITO,
-                    tipo=TipoConta.ATIVO,
-                    nivel=2,
-                    valid_from=date(2026, 1, 1),
-                ),
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await ContabilService().criar_conta(
+            session,
+            uuid.uuid4(),
+            uuid.uuid4(),
+            CriarContaIn(
+                codigo="1.1",
+                descricao="Conta",
+                natureza=NaturezaConta.DEBITO,
+                tipo=TipoConta.ATIVO,
+                nivel=2,
+                valid_from=date(2026, 1, 1),
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -97,22 +96,22 @@ async def test_criar_conta_codigo_duplicado_levanta() -> None:
     with (
         patch("app.modules.contabil.service.EmpresaRepo", return_value=empresa_repo),
         patch("app.modules.contabil.service.ContaContabilRepo", return_value=repo),
+        pytest.raises(ContaJaExiste),
     ):
-        with pytest.raises(ContaJaExiste):
-            await ContabilService().criar_conta(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                CriarContaIn(
-                    codigo="1.1.1.01",
-                    descricao="Caixa",
-                    natureza=NaturezaConta.DEBITO,
-                    tipo=TipoConta.ATIVO,
-                    nivel=4,
-                    aceita_lancamento=True,
-                    valid_from=date(2026, 1, 1),
-                ),
-            )
+        await ContabilService().criar_conta(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CriarContaIn(
+                codigo="1.1.1.01",
+                descricao="Caixa",
+                natureza=NaturezaConta.DEBITO,
+                tipo=TipoConta.ATIVO,
+                nivel=4,
+                aceita_lancamento=True,
+                valid_from=date(2026, 1, 1),
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -251,22 +250,22 @@ async def test_criar_lancamento_partidas_invalidas_levanta() -> None:
         patch(
             "app.modules.contabil.service.SaldoContaMesRepo", return_value=saldo_repo
         ),
+        pytest.raises(LancamentoInvalido, match="desbalanceadas"),
     ):
-        with pytest.raises(LancamentoInvalido, match="desbalanceadas"):
-            await ContabilService().criar_lancamento_manual(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                CriarLancamentoIn(
-                    data_lancamento=date(2026, 5, 15),
-                    competencia=date(2026, 5, 1),
-                    historico="Teste",
-                    partidas=[
-                        PartidaIn(conta_id=c1.id, tipo=NaturezaConta.DEBITO, valor=Decimal("100")),
-                        PartidaIn(conta_id=c2.id, tipo=NaturezaConta.CREDITO, valor=Decimal("90")),
-                    ],
-                ),
-            )
+        await ContabilService().criar_lancamento_manual(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CriarLancamentoIn(
+                data_lancamento=date(2026, 5, 15),
+                competencia=date(2026, 5, 1),
+                historico="Teste",
+                partidas=[
+                    PartidaIn(conta_id=c1.id, tipo=NaturezaConta.DEBITO, valor=Decimal("100")),
+                    PartidaIn(conta_id=c2.id, tipo=NaturezaConta.CREDITO, valor=Decimal("90")),
+                ],
+            ),
+        )
 
 
 @pytest.mark.asyncio
@@ -364,11 +363,10 @@ async def test_confirmar_nao_encontrado() -> None:
     session = AsyncMock()
     repo = AsyncMock()
     repo.por_id = AsyncMock(return_value=None)
-    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo):
-        with pytest.raises(LancamentoNaoEncontrado):
-            await ContabilService().confirmar_lancamento(
-                session, uuid.uuid4(), uuid.uuid4()
-            )
+    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo), pytest.raises(LancamentoNaoEncontrado):
+        await ContabilService().confirmar_lancamento(
+            session, uuid.uuid4(), uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -378,11 +376,10 @@ async def test_confirmar_outra_empresa_nao_encontrado() -> None:
     repo.por_id = AsyncMock(
         return_value=SimpleNamespace(empresa_id=uuid.uuid4(), status="rascunho")
     )
-    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo):
-        with pytest.raises(LancamentoNaoEncontrado):
-            await ContabilService().confirmar_lancamento(
-                session, uuid.uuid4(), uuid.uuid4()
-            )
+    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo), pytest.raises(LancamentoNaoEncontrado):
+        await ContabilService().confirmar_lancamento(
+            session, uuid.uuid4(), uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -393,11 +390,10 @@ async def test_confirmar_encerrado_levanta() -> None:
     repo.por_id = AsyncMock(
         return_value=SimpleNamespace(empresa_id=empresa_id, status="encerrado")
     )
-    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo):
-        with pytest.raises(LancamentoJaConfirmado):
-            await ContabilService().confirmar_lancamento(
-                session, empresa_id, uuid.uuid4()
-            )
+    with patch("app.modules.contabil.service.LancamentoRepo", return_value=repo), pytest.raises(LancamentoJaConfirmado):
+        await ContabilService().confirmar_lancamento(
+            session, empresa_id, uuid.uuid4()
+        )
 
 
 @pytest.mark.asyncio
@@ -459,8 +455,8 @@ async def test_confirmar_rascunho_vira_confirmado() -> None:
         criado_em=datetime.now(),
     )
 
-    async def confirmar(l):
-        l.status = "confirmado"
+    async def confirmar(lanc):
+        lanc.status = "confirmado"
 
     lanc_repo = AsyncMock()
     lanc_repo.por_id = AsyncMock(return_value=lanc)
@@ -503,30 +499,30 @@ async def test_criar_lancamento_em_mes_encerrado_bloqueia() -> None:
         patch(
             "app.modules.contabil.service.SaldoContaMesRepo", return_value=saldo_repo
         ),
+        pytest.raises(LancamentoEmMesEncerrado, match="encerrada"),
     ):
-        with pytest.raises(LancamentoEmMesEncerrado, match="encerrada"):
-            await ContabilService().criar_lancamento_manual(
-                session,
-                uuid.uuid4(),
-                empresa.id,
-                CriarLancamentoIn(
-                    data_lancamento=date(2026, 5, 15),
-                    competencia=date(2026, 5, 1),
-                    historico="Tentativa retroativa",
-                    partidas=[
-                        PartidaIn(
-                            conta_id=uuid.uuid4(),
-                            tipo=NaturezaConta.DEBITO,
-                            valor=Decimal("100"),
-                        ),
-                        PartidaIn(
-                            conta_id=uuid.uuid4(),
-                            tipo=NaturezaConta.CREDITO,
-                            valor=Decimal("100"),
-                        ),
-                    ],
-                ),
-            )
+        await ContabilService().criar_lancamento_manual(
+            session,
+            uuid.uuid4(),
+            empresa.id,
+            CriarLancamentoIn(
+                data_lancamento=date(2026, 5, 15),
+                competencia=date(2026, 5, 1),
+                historico="Tentativa retroativa",
+                partidas=[
+                    PartidaIn(
+                        conta_id=uuid.uuid4(),
+                        tipo=NaturezaConta.DEBITO,
+                        valor=Decimal("100"),
+                    ),
+                    PartidaIn(
+                        conta_id=uuid.uuid4(),
+                        tipo=NaturezaConta.CREDITO,
+                        valor=Decimal("100"),
+                    ),
+                ],
+            ),
+        )
 
     # Guard checa ANTES de validar partidas — não vai ao DB de contas.
     saldo_repo.competencia_encerrada.assert_awaited_once()
@@ -561,10 +557,10 @@ async def test_confirmar_rascunho_em_mes_encerrado_bloqueia() -> None:
         patch(
             "app.modules.contabil.service.SaldoContaMesRepo", return_value=saldo_repo
         ),
+        pytest.raises(LancamentoEmMesEncerrado, match="rascunho"),
     ):
-        with pytest.raises(LancamentoEmMesEncerrado, match="rascunho"):
-            await ContabilService().confirmar_lancamento(
-                session, empresa_id, lanc.id
-            )
+        await ContabilService().confirmar_lancamento(
+            session, empresa_id, lanc.id
+        )
 
     lanc_repo.confirmar.assert_not_called()

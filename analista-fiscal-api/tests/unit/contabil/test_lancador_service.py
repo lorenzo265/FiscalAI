@@ -20,8 +20,8 @@ from app.modules.contabil.lancador_auto import (
 )
 from app.modules.contabil.lancador_service import LancadorService
 from app.modules.contabil.plano_referencial import (
-    CODIGOS_PADRAO_LANCAMENTO_AUTO,
     _CHAVES_CORE,
+    CODIGOS_PADRAO_LANCAMENTO_AUTO,
 )
 from app.shared.exceptions import (
     EmpresaNaoEncontrada,
@@ -85,11 +85,10 @@ async def test_resolver_contas_faltando_levanta() -> None:
     with patch(
         "app.modules.contabil.lancador_service.ContaContabilRepo",
         return_value=repo,
-    ):
-        with pytest.raises(PlanoContasIncompleto, match="banco"):
-            await LancadorService().resolver_contas(
-                session, uuid.uuid4(), date(2026, 5, 1)
-            )
+    ), pytest.raises(PlanoContasIncompleto, match="banco"):
+        await LancadorService().resolver_contas(
+            session, uuid.uuid4(), date(2026, 5, 1)
+        )
 
 
 @pytest.mark.asyncio
@@ -108,11 +107,10 @@ async def test_resolver_contas_sintetica_levanta() -> None:
     with patch(
         "app.modules.contabil.lancador_service.ContaContabilRepo",
         return_value=repo,
-    ):
-        with pytest.raises(PlanoContasIncompleto, match="clientes"):
-            await LancadorService().resolver_contas(
-                session, uuid.uuid4(), date(2026, 5, 1)
-            )
+    ), pytest.raises(PlanoContasIncompleto, match="clientes"):
+        await LancadorService().resolver_contas(
+            session, uuid.uuid4(), date(2026, 5, 1)
+        )
 
 
 # ── Empresa inexistente ─────────────────────────────────────────────────────
@@ -126,11 +124,10 @@ async def test_lote_empresa_inexistente_levanta() -> None:
     with patch(
         "app.modules.contabil.lancador_service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await LancadorService().lote_depreciacao(
-                session, uuid.uuid4(), uuid.uuid4(), date(2026, 5, 1)
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await LancadorService().lote_depreciacao(
+            session, uuid.uuid4(), uuid.uuid4(), date(2026, 5, 1)
+        )
 
 
 # ── _persistir idempotência ─────────────────────────────────────────────────

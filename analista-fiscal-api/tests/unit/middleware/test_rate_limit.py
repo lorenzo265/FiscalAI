@@ -11,17 +11,16 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
 from app.shared.middleware.rate_limit import (
-    RateLimitResult,
+    _JANELA_SEG,
     _LIMITE_PADRAO,
     _LIMITE_SENSIVEL,
-    _JANELA_SEG,
-    SENSITIVE_PREFIXES,
+    RateLimitResult,
     calcular_janela_atual,
     checar_rate_limit,
     construir_chave_redis,
@@ -29,6 +28,7 @@ from app.shared.middleware.rate_limit import (
     limite_para_path,
     montar_headers_rate_limit,
 )
+
 _IP_TESTE = "192.168.1.1"
 
 
@@ -242,7 +242,6 @@ async def test_expire_chamado_somente_na_primeira_requisicao():
 @pytest.mark.asyncio
 async def test_ips_distintos_contadores_independentes():
     """Forja de tid não esgota bucket da vítima — IPs distintos → chaves distintas."""
-    import redis.asyncio as redis_async
 
     contador: dict[str, int] = {}
 

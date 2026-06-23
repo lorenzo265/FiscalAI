@@ -6,7 +6,6 @@ Threshold: 100% de acurácia (zero tolerância para citação inválida não det
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pytest

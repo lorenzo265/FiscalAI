@@ -15,11 +15,9 @@ from app.modules.conciliacao.algoritmo import (
     LIMIAR_AUTO,
     LIMIAR_SUGERIDA,
     DocumentoView,
-    ScoreMatch,
     TransacaoView,
     pontuar_match,
 )
-
 
 # ── factories ────────────────────────────────────────────────────────────────
 

@@ -36,7 +36,6 @@ from app.modules.reforma.integrar_documento import (
 from app.modules.reforma.periodo_transicao import FaseReforma
 from app.modules.reforma.service import ReformaService
 
-
 # ── fixtures ────────────────────────────────────────────────────────────────
 
 

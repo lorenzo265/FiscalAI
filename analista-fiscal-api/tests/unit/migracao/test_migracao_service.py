@@ -9,15 +9,15 @@ parsers).
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.modules.migracao.service import (
-    MigracaoService,
     PERIODO_INICIO_MINIMO,
+    MigracaoService,
 )
 from app.modules.sped.ecd.gerador import gerar_ecd
 from app.shared.exceptions import (
@@ -28,12 +28,9 @@ from app.shared.exceptions import (
 )
 
 # Reusa helpers já configurados.
-from tests.unit.migracao.test_parser_ecd import _entrada_minima as _entrada_ecd_2025
-from tests.unit.sped.test_ecd_gerador import (  # type: ignore[import-untyped]
-    _empresa as _empresa_ecd,
+from tests.unit.sped.test_ecd_gerador import (
     _entrada_minima as _entrada_sped16,
 )
-
 
 # ── Fixtures auxiliares ─────────────────────────────────────────────────────
 
@@ -50,15 +47,14 @@ async def test_empresa_inexistente_levanta() -> None:
     with patch(
         "app.modules.migracao.service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await MigracaoService().importar_sped_ecd(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                conteudo=b"conteudo qualquer",
-                nome_arquivo="sped.txt",
-            )
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await MigracaoService().importar_sped_ecd(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            conteudo=b"conteudo qualquer",
+            nome_arquivo="sped.txt",
+        )
 
 
 @pytest.mark.asyncio
@@ -69,15 +65,14 @@ async def test_arquivo_invalido_levanta_sped_invalido() -> None:
     with patch(
         "app.modules.migracao.service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(SpedInvalido, match="vazio"):
-            await MigracaoService().importar_sped_ecd(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                conteudo=b"",
-                nome_arquivo="sped.txt",
-            )
+    ), pytest.raises(SpedInvalido, match="vazio"):
+        await MigracaoService().importar_sped_ecd(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            conteudo=b"",
+            nome_arquivo="sped.txt",
+        )
 
 
 @pytest.mark.asyncio
@@ -94,15 +89,14 @@ async def test_cnpj_divergente_levanta_antes_de_qualquer_escrita() -> None:
     with patch(
         "app.modules.migracao.service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaCnpjDivergente, match="12345678000190"):
-            await MigracaoService().importar_sped_ecd(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                conteudo=arquivo.conteudo,
-                nome_arquivo="sped.txt",
-            )
+    ), pytest.raises(EmpresaCnpjDivergente, match="12345678000190"):
+        await MigracaoService().importar_sped_ecd(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            conteudo=arquivo.conteudo,
+            nome_arquivo="sped.txt",
+        )
 
     # Sessão NÃO foi tocada além do read da empresa.
     session.add.assert_not_called()
@@ -136,17 +130,16 @@ async def test_periodo_anterior_a_2024_levanta() -> None:
     with patch(
         "app.modules.migracao.service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(PeriodoForaCobertura, match="2023"):
-            await MigracaoService().importar_sped_ecd(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                conteudo=arquivo.conteudo,
-                nome_arquivo="sped.txt",
-            )
+    ), pytest.raises(PeriodoForaCobertura, match="2023"):
+        await MigracaoService().importar_sped_ecd(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            conteudo=arquivo.conteudo,
+            nome_arquivo="sped.txt",
+        )
     # Confirma corte explícito.
-    assert PERIODO_INICIO_MINIMO == date(2024, 1, 1)
+    assert date(2024, 1, 1) == PERIODO_INICIO_MINIMO
 
 
 @pytest.mark.asyncio
@@ -163,8 +156,8 @@ async def test_hash_ja_importado_retorna_lote_anterior() -> None:
         arquivo_sped_id=uuid.uuid4(),
         nome_arquivo="sped.txt",
         hash_arquivo="abc" * 21 + "a",
-        iniciado_em=datetime.now(timezone.utc),
-        concluido_em=datetime.now(timezone.utc),
+        iniciado_em=datetime.now(UTC),
+        concluido_em=datetime.now(UTC),
         status="concluido",
         resumo_jsonb={"cnpj_arquivo": "12345678000190"},
         erros_jsonb=None,
@@ -203,8 +196,8 @@ async def test_hash_ja_importado_retorna_lote_anterior() -> None:
 @pytest.mark.asyncio
 async def test_ecf_cnpj_divergente_levanta() -> None:
     """Idem para ECF — validação cruzada antes de tudo."""
-    from tests.unit.migracao.test_parser_ecf import _entrada as _entrada_ecf
     from app.modules.sped.ecf.gerador import gerar_ecf
+    from tests.unit.migracao.test_parser_ecf import _entrada as _entrada_ecf
 
     arquivo = gerar_ecf(_entrada_ecf())
     session = AsyncMock()
@@ -215,12 +208,11 @@ async def test_ecf_cnpj_divergente_levanta() -> None:
     with patch(
         "app.modules.migracao.service.EmpresaRepo",
         return_value=empresa_repo,
-    ):
-        with pytest.raises(EmpresaCnpjDivergente):
-            await MigracaoService().importar_sped_ecf(
-                session,
-                tenant_id=uuid.uuid4(),
-                empresa_id=uuid.uuid4(),
-                conteudo=arquivo.conteudo,
-                nome_arquivo="ecf.txt",
-            )
+    ), pytest.raises(EmpresaCnpjDivergente):
+        await MigracaoService().importar_sped_ecf(
+            session,
+            tenant_id=uuid.uuid4(),
+            empresa_id=uuid.uuid4(),
+            conteudo=arquivo.conteudo,
+            nome_arquivo="ecf.txt",
+        )

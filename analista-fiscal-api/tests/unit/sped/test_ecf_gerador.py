@@ -63,10 +63,7 @@ def _apuracao(numero: int) -> ApuracaoTrimestralLp:
     inicio = date(2025, 3 * (numero - 1) + 1, 1)
     mes_fim = 3 * (numero - 1) + 3
     from datetime import timedelta
-    if mes_fim == 12:
-        fim = date(2025, 12, 31)
-    else:
-        fim = date(2025, mes_fim + 1, 1) - timedelta(days=1)
+    fim = date(2025, 12, 31) if mes_fim == 12 else date(2025, mes_fim + 1, 1) - timedelta(days=1)
     receita = Decimal("100000.00")
     pres_irpj = Decimal("0.3200")
     pres_csll = Decimal("0.3200")

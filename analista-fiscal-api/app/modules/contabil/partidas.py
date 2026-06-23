@@ -125,6 +125,4 @@ def validar_partidas(
 def _vigente_em(conta: ContaView, em: date) -> bool:
     if conta.valid_from > em:
         return False
-    if conta.valid_to is not None and conta.valid_to < em:
-        return False
-    return True
+    return not (conta.valid_to is not None and conta.valid_to < em)

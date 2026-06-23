@@ -17,9 +17,6 @@ import base64
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Protocol
-
-from app.shared.db.models import Certidao
-from app.shared.types import JsonObject
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -37,12 +34,14 @@ from app.modules.certidoes.scrapers import (
     CrfScraper,
 )
 from app.modules.empresa.repo import EmpresaRepo
+from app.shared.db.models import Certidao
 from app.shared.exceptions import (
     CertidaoEmissaoFalhou,
     EmpresaNaoEncontrada,
     SerproErro,
     SerproTimeout,
 )
+from app.shared.types import JsonObject
 
 log = structlog.get_logger(__name__)
 

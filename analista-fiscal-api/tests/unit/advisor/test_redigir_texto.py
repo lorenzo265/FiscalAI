@@ -12,7 +12,6 @@ from app.modules.advisor.gera_digest_semanal import (
     AnomaliaResumo,
     ApuracaoResumo,
     DigestEstruturado,
-    FonteCitavel,
     SugestaoResumo,
     VencimentoResumo,
     gerar_digest_estruturado,

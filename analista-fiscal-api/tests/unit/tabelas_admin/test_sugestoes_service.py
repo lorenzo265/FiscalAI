@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -22,7 +21,6 @@ from app.shared.exceptions import (
     SugestaoVigenciaForaDeFluxo,
     SugestaoVigenciaNaoEncontrada,
 )
-
 from tests.unit.tabelas_admin._helpers import faixas_inss_2026
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")

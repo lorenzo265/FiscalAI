@@ -64,9 +64,8 @@ async def test_redetectar_empresa_nao_encontrada() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).redetectar_empresa(uuid.uuid4())
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).redetectar_empresa(uuid.uuid4())
 
 
 @pytest.mark.asyncio
@@ -183,9 +182,8 @@ async def test_listar_abertas_empresa_nao_encontrada() -> None:
     empresa_repo.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo
-    ):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).listar_abertas(uuid.uuid4())
+    ), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).listar_abertas(uuid.uuid4())
 
 
 # ── dispensar ───────────────────────────────────────────────────────────────
@@ -231,14 +229,13 @@ async def test_dispensar_anomalia_inexistente_levanta_404() -> None:
     with patch(
         "app.modules.advisor.service.AnomaliaFiscalRepo",
         return_value=anomalia_repo,
-    ):
-        with pytest.raises(AnomaliaNaoEncontrada):
-            await AdvisorService(session).dispensar(
-                uuid.uuid4(),
-                uuid.uuid4(),
-                dispensada_por=uuid.uuid4(),
-                motivo="x",
-            )
+    ), pytest.raises(AnomaliaNaoEncontrada):
+        await AdvisorService(session).dispensar(
+            uuid.uuid4(),
+            uuid.uuid4(),
+            dispensada_por=uuid.uuid4(),
+            motivo="x",
+        )
 
 
 @pytest.mark.asyncio
@@ -256,14 +253,13 @@ async def test_dispensar_anomalia_de_outra_empresa_404() -> None:
     with patch(
         "app.modules.advisor.service.AnomaliaFiscalRepo",
         return_value=anomalia_repo,
-    ):
-        with pytest.raises(AnomaliaNaoEncontrada):
-            await AdvisorService(session).dispensar(
-                uuid.uuid4(),  # empresa diferente
-                aberta.id,
-                dispensada_por=uuid.uuid4(),
-                motivo="x",
-            )
+    ), pytest.raises(AnomaliaNaoEncontrada):
+        await AdvisorService(session).dispensar(
+            uuid.uuid4(),  # empresa diferente
+            aberta.id,
+            dispensada_por=uuid.uuid4(),
+            motivo="x",
+        )
 
 
 @pytest.mark.asyncio
@@ -281,14 +277,13 @@ async def test_dispensar_anomalia_ja_superada_404() -> None:
     with patch(
         "app.modules.advisor.service.AnomaliaFiscalRepo",
         return_value=anomalia_repo,
-    ):
-        with pytest.raises(AnomaliaNaoEncontrada):
-            await AdvisorService(session).dispensar(
-                empresa_id,
-                superada.id,
-                dispensada_por=uuid.uuid4(),
-                motivo="x",
-            )
+    ), pytest.raises(AnomaliaNaoEncontrada):
+        await AdvisorService(session).dispensar(
+            empresa_id,
+            superada.id,
+            dispensada_por=uuid.uuid4(),
+            motivo="x",
+        )
 
 
 @pytest.mark.asyncio
@@ -307,11 +302,10 @@ async def test_dispensar_anomalia_ja_dispensada_409() -> None:
     with patch(
         "app.modules.advisor.service.AnomaliaFiscalRepo",
         return_value=anomalia_repo,
-    ):
-        with pytest.raises(AnomaliaJaDispensada):
-            await AdvisorService(session).dispensar(
-                empresa_id,
-                ja_disp.id,
-                dispensada_por=uuid.uuid4(),
-                motivo="x",
-            )
+    ), pytest.raises(AnomaliaJaDispensada):
+        await AdvisorService(session).dispensar(
+            empresa_id,
+            ja_disp.id,
+            dispensada_por=uuid.uuid4(),
+            motivo="x",
+        )

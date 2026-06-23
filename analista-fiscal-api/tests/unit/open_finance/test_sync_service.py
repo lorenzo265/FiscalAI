@@ -19,7 +19,6 @@ from app.modules.open_finance.sync_service import (
 )
 from app.shared.exceptions import ItemNaoEncontrado, PluggyErro
 
-
 # ── helpers puros ────────────────────────────────────────────────────────────
 
 
@@ -194,11 +193,10 @@ async def test_sync_item_inexistente_levanta() -> None:
     repo_item.por_id = AsyncMock(return_value=None)
     with patch(
         "app.modules.open_finance.sync_service.PluggyItemRepo", return_value=repo_item
-    ):
-        with pytest.raises(ItemNaoEncontrado):
-            await SyncService().sincronizar_item(
-                session, uuid.uuid4(), uuid.uuid4(), pluggy_client=AsyncMock()
-            )
+    ), pytest.raises(ItemNaoEncontrado):
+        await SyncService().sincronizar_item(
+            session, uuid.uuid4(), uuid.uuid4(), pluggy_client=AsyncMock()
+        )
 
 
 @pytest.mark.asyncio

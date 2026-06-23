@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from app.shared.types import JsonObject
 from uuid import UUID
 
 import httpx
@@ -10,6 +9,7 @@ from app.modules.memoria.embeddings import gerar_embedding
 from app.modules.memoria.repo import buscar_similares, criar_node
 from app.modules.memoria.schemas import ContextoRAG, MemoriaNodeCreate, MemoriaNodeOut
 from app.shared.db.models import MemoriaNode
+from app.shared.types import JsonObject
 
 
 async def adicionar_fato(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -12,7 +12,6 @@ import pytest
 
 from app.modules.advisor.service import AdvisorService
 from app.shared.exceptions import DigestJaGeradoNaSemana, EmpresaNaoEncontrada
-
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 _COMP = date(2026, 5, 20)  # quarta-feira → semana 2026-W21
@@ -90,11 +89,11 @@ async def test_gera_digest_existente_sem_forcar_levanta_409() -> None:
     with (
         patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo),
         patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo),
+        pytest.raises(DigestJaGeradoNaSemana),
     ):
-        with pytest.raises(DigestJaGeradoNaSemana):
-            await AdvisorService(session).gerar_digest_semanal(
-                empresa.id, competencia=_COMP, forcar=False
-            )
+        await AdvisorService(session).gerar_digest_semanal(
+            empresa.id, competencia=_COMP, forcar=False
+        )
 
 
 @pytest.mark.asyncio
@@ -131,11 +130,10 @@ async def test_empresa_nao_encontrada_levanta_404() -> None:
     session = AsyncMock()
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=None)
-    with patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).gerar_digest_semanal(
-                uuid.uuid4(), competencia=_COMP
-            )
+    with patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).gerar_digest_semanal(
+            uuid.uuid4(), competencia=_COMP
+        )
 
 
 @pytest.mark.asyncio
@@ -191,9 +189,8 @@ async def test_listar_digests_empresa_inexistente() -> None:
     session = AsyncMock()
     empresa_repo = AsyncMock()
     empresa_repo.por_id = AsyncMock(return_value=None)
-    with patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).listar_digests(uuid.uuid4())
+    with patch("app.modules.advisor.service.EmpresaRepo", return_value=empresa_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).listar_digests(uuid.uuid4())
 
 
 @pytest.mark.asyncio
@@ -215,6 +212,5 @@ async def test_obter_digest_de_outra_empresa_levanta_404() -> None:
     session = AsyncMock()
     digest_repo = AsyncMock()
     digest_repo.por_id = AsyncMock(return_value=digest)
-    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo):
-        with pytest.raises(EmpresaNaoEncontrada):
-            await AdvisorService(session).obter_digest(uuid.uuid4(), digest.id)
+    with patch("app.modules.advisor.service.DigestRepo", return_value=digest_repo), pytest.raises(EmpresaNaoEncontrada):
+        await AdvisorService(session).obter_digest(uuid.uuid4(), digest.id)

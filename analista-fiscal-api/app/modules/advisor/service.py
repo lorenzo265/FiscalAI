@@ -26,11 +26,13 @@ from zoneinfo import ZoneInfo
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import Settings
 from app.modules.advisor.calcula_anomalias import (
     TipoTributoAnomalia,
     detectar_anomalia,
 )
 from app.modules.advisor.gera_digest_semanal import (
+    DigestEstruturado,
     SugestaoResumo,
     gerar_digest_estruturado,
 )
@@ -66,7 +68,6 @@ from app.shared.exceptions import (
     EnvioWhatsappFalhou,
     SemDadosParaSugestao,
 )
-from app.config import Settings
 from app.shared.integrations.meta_whatsapp.sender import MetaWhatsAppSender
 from app.shared.llm.client import LLMClient
 from app.shared.types import JsonObject
@@ -560,20 +561,18 @@ class AdvisorService:
         return digest
 
 
-def _serializar_estruturado(digest: object) -> JsonObject:
+def _serializar_estruturado(digest: DigestEstruturado) -> JsonObject:
     """Serializa ``DigestEstruturado`` para JSONB — todos os Decimal viram str."""
-    # ``digest`` é DigestEstruturado; tipado como object para evitar import
-    # circular nos type checkers de runtime — atributos são acessados via getattr.
-    apuracoes = getattr(digest, "apuracoes")
-    anomalias = getattr(digest, "anomalias")
-    vencimentos = getattr(digest, "proximos_vencimentos")
-    sugestoes = getattr(digest, "sugestoes")
+    apuracoes = digest.apuracoes
+    anomalias = digest.anomalias
+    vencimentos = digest.proximos_vencimentos
+    sugestoes = digest.sugestoes
     return {
-        "empresa_nome": getattr(digest, "empresa_nome"),
-        "empresa_apelido_curto": getattr(digest, "empresa_apelido_curto"),
-        "semana_iso": getattr(digest, "semana_iso"),
-        "periodo_inicio": getattr(digest, "periodo_inicio").isoformat(),
-        "periodo_fim": getattr(digest, "periodo_fim").isoformat(),
+        "empresa_nome": digest.empresa_nome,
+        "empresa_apelido_curto": digest.empresa_apelido_curto,
+        "semana_iso": digest.semana_iso,
+        "periodo_inicio": digest.periodo_inicio.isoformat(),
+        "periodo_fim": digest.periodo_fim.isoformat(),
         "apuracoes": [
             {
                 "apuracao_id": a.apuracao_id,
@@ -620,7 +619,7 @@ def _serializar_estruturado(digest: object) -> JsonObject:
         ],
         "fontes": [
             {"id": f.id, "tipo": f.tipo, "payload": f.payload, "data": f.data}
-            for f in getattr(digest, "fontes")
+            for f in digest.fontes
         ],
-        "algoritmo_versao": getattr(digest, "algoritmo_versao"),
+        "algoritmo_versao": digest.algoritmo_versao,
     }

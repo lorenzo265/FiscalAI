@@ -22,8 +22,6 @@ from __future__ import annotations
 
 from datetime import date
 from datetime import datetime as _dt
-
-_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -57,6 +55,7 @@ log = structlog.get_logger(__name__)
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
 _ZERO = Decimal("0.00")
+_DATA_VIGENCIA_REDUTOR = date(2026, 1, 1)  # Lei 15.270/2025 — vigência 01/01/2026
 
 
 class PessoalService:
@@ -250,7 +249,7 @@ class PessoalService:
             await LancadorService().lote_folha(
                 session, tenant_id, empresa_id, folha
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Fail-soft real: a folha já foi comitada acima. Se o lançamento
             # automático falhar (ex.: plano de contas incompleto), a transação
             # do lançamento fica abortada — `rollback()` a limpa para que o
