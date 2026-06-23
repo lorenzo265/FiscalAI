@@ -1,11 +1,13 @@
-"""Primitivas criptográficas compartilhadas (Sprint 19.7 PR2 #13).
+"""Primitivas criptográficas compartilhadas.
 
-Hoje expõe apenas o assinador XMLDSig pra eventos eSocial. Em sprints
-futuras virão helpers de envelope AES-256-GCM (ampliar uso pgcrypto pra
-campos sensíveis adicionais — pendência da Sprint 21 hardening) e
-wrappers de KMS pra rotacionar `SERPRO_CERT_ENCRYPTION_KEY`.
+  * XMLDSig (Sprint 19.7) — assinador de eventos eSocial.
+  * Envelope AES-256-GCM (Marco 3) — cifra de PII em repouso (`envelope` +
+    `PiiCifrada` TypeDecorator). Chave via `settings.PII_ENCRYPTION_KEY` (KMS
+    em prod). Aplicado a `empresa.whatsapp_phone` como coluna de prova.
 """
 
+from app.shared.crypto.envelope import carregar_chave, cifrar, decifrar
+from app.shared.crypto.pii_type import PiiCifrada
 from app.shared.crypto.xmldsig import (
     ALGORITMO_VERSAO,
     NotImplementedXmldsigSigner,
@@ -18,8 +20,12 @@ from app.shared.crypto.xmldsig import (
 __all__ = [
     "ALGORITMO_VERSAO",
     "NotImplementedXmldsigSigner",
+    "PiiCifrada",
     "XmldsigSigner",
     "XmldsigSigningError",
+    "carregar_chave",
+    "cifrar",
     "construir_assinador",
+    "decifrar",
     "hash_xml_canonico",
 ]

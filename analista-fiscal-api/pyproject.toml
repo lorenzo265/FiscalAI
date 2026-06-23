@@ -29,6 +29,9 @@ pgvector = ">=0.3"
 tenacity = ">=8.2"
 sentry-sdk = {version = "^2.20", extras = ["fastapi"]}
 prometheus-fastapi-instrumentator = "^7.0"
+# AES-256-GCM para cifrar PII em repouso (Marco 3, LGPD §8.7). Dep CORE (sempre
+# instalada) -- nao confiar no extra crypto do pyjwt. O grupo esocial reusa esta.
+cryptography = "^43.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
@@ -98,7 +101,7 @@ optional = true
 [tool.poetry.group.esocial.dependencies]
 lxml = "^5.3"
 signxml = "^4.0"
-cryptography = "^43.0"
+# cryptography agora e dep CORE (ver [tool.poetry.dependencies]); esocial reusa.
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

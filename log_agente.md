@@ -4,8 +4,8 @@
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `feat/m3-lgpd-seguranca` (M1/M2 + auditoria já em `main`, pushados @ `0a076f2`)
-**Suite atual:** **2716 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **29 passed**
-**mypy strict:** ✅ 0 erros (372 arquivos)
+**Suite atual:** **2725 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **30 passed**
+**mypy strict:** ✅ 0 erros (374 arquivos)
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀 + **M3 LGPD/segurança (em andamento)** 🔐
 
@@ -23,7 +23,9 @@ Terceiro marco de produção (LGPD-first §8.7 + hardening de segurança). Tudo 
 
 - **PR 6.2b — Endpoints LGPD (parte 2: esquecimento por anonimização)** (✅): `POST /v1/lgpd/excluir` (`SessionDep`) — direito ao esquecimento (LGPD art. 18, VI) **respeitando a imutabilidade fiscal (§8.2) + guarda de 5 anos**: NÃO deleta fato fiscal; **anonimiza a PII de pessoas naturais** e agenda o expurgo físico. Módulo puro `app/modules/lgpd/anonimizacao.py` (golden): token hex determinístico/único por `id` da linha (deriva do id, não da PII → irreversível + respeita as UNIQUE constraints), `email_anonimo` (`anon-<hash>@anonimizado.invalid`, domínio reservado RFC 6761), `cpf_anonimo` (11 dígitos), `NOME_ANONIMO`. Service: anonimiza `usuario` (email/nome + **invalida senha_hash** com `hash_senha(token aleatório)` → login impossível + `ativo=False`), `socio`/`funcionario` (nome/cpf), `empresa.whatsapp_phone`→NULL (CNPJ/razão social FICAM — entidade jurídica exigida pela retenção), desativa o `tenant`, grava `lgpd_solicitacao` (tipo `exclusao`, status `agendada`, `expurgo_apos` = hoje+5 anos). Confirmação explícita obrigatória (`confirmar: Literal[True]` → sem ela 422). Golden `test_anonimizacao.py` (5) + integração (1: 422 sem confirmar → anonimiza → linha PERMANECE no export com email `.invalid`/nome `[ANONIMIZADO]` → PII original sumiu → login original bloqueado). **+5 unit (2711→2716) · +1 integração (28→29) · mypy 0 (372 arq) · ruff limpo · sem migration nova (reusa 0062).**
 
-**Restante do M3:** 6.3 AES-256 em repouso (PII), 6.4 refresh token/rotação JWT, 6.5 CI gates soft→bloqueante.
+- **PR 6.3 — AES-256 em repouso (PII)** (✅): envelope `app/shared/crypto/envelope.py` (AES-256-GCM, nonce aleatório por escrita, token versionado `v1:`, GCM autenticado → adulteração levanta) + `PiiCifrada` (`pii_type.py`, SQLAlchemy `TypeDecorator` que cifra/decifra transparente; impl `Text`). Chave de `settings.PII_ENCRYPTION_KEY` (base64 32 bytes; default DEV placeholder + **fail-fast em prod**; KMS em prod). **Coluna de prova: `empresa.whatsapp_phone`** (PII, SEM constraint/lookup — GCM não-determinístico quebraria UNIQUE; por isso NÃO foi o CPF, decisão validada com o PO). Migration **0063** amplia a coluna p/ `Text` + cifra os valores existentes (backfill app-level). `cryptography` PROMOVIDA a dep CORE (era só do grupo opt-in esocial — o import quebraria a CI que roda `--with dev`; vinha transitiva via `pyjwt[crypto]`, frágil p/ feature de segurança). Golden `tests/unit/crypto/test_envelope.py` (7: round-trip, ciphertext≠plaintext, nonce, adulteração GCM, chave/versão inválida, TypeDecorator) + integração `tests/integration/test_pii_crypto.py` (1: insere via ORM → coluna CRUA é ciphertext `v1:…`, NÃO o telefone → ORM decifra de volta). 2 testes de prod-guard atualizados (agora exigem PII key válida) + 2 novos (placeholder bloqueado em prod). **+9 unit (2716→2725) · +1 integração (29→30) · mypy 0 (374 arq) · ruff limpo nos meus arquivos.**
+
+**Restante do M3:** 6.4 refresh token/rotação JWT, 6.5 CI gates soft→bloqueante.
 
 ---
 

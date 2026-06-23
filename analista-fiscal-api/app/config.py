@@ -143,6 +143,16 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default="HS256", description="Algoritmo JWT (RS256 na Sprint 13+).")
     JWT_EXPIRE_MINUTES: int = Field(default=60, description="TTL do access token em minutos.")
 
+    # Cifra de PII em repouso (Marco 3, LGPD §8.7). Chave AES-256 (32 bytes) em
+    # base64. Default = placeholder DEV; em prod vem do KMS (fail-fast abaixo).
+    PII_ENCRYPTION_KEY: str = Field(
+        default="REVWX1BJSV9LRVlfVFJPQ0FSX0VNX1BST0RVQ0FPISE=",  # nosec B105
+        description=(
+            "Chave AES-256 (32 bytes em base64) para cifrar PII em repouso. "
+            "OBRIGATÓRIO trocar em prod (vem do KMS). Gere com: openssl rand -base64 32."
+        ),
+    )
+
     # Sprint 5 — Focus NFe (NFS-e)
     FOCUS_NFE_TOKEN: str = Field(
         default="",
@@ -387,6 +397,9 @@ class Settings(BaseSettings):
     # esta string é considerado não-seguro (commitado no repo, público).
     _JWT_PLACEHOLDER_PREFIX: str = "TROCAR_EM_PRODUCAO"
 
+    # Chave PII de DEV (commitada no repo, pública). Em prod tem de vir do KMS.
+    _PII_DEV_KEY_PLACEHOLDER: str = "REVWX1BJSV9LRVlfVFJPQ0FSX0VNX1BST0RVQ0FPISE="
+
     @model_validator(mode="after")
     def _fail_fast_em_prod(self) -> Self:
         if self.ENVIRONMENT is Environment.PROD:
@@ -411,6 +424,12 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "META_WHATSAPP_VERIFY_TOKEN usa o valor padrão em ENVIRONMENT=prod. "
                     "Configure um token aleatório no painel Meta e no env."
+                )
+            # PII_ENCRYPTION_KEY com placeholder DEV → PII cifrada com chave pública.
+            if self.PII_ENCRYPTION_KEY == self._PII_DEV_KEY_PLACEHOLDER:
+                raise ValueError(
+                    "PII_ENCRYPTION_KEY usa o placeholder DEV em ENVIRONMENT=prod. "
+                    "Configure a chave do KMS. Gere com: openssl rand -base64 32"
                 )
         return self
 

@@ -5,9 +5,14 @@ META_WHATSAPP_VERIFY_TOKEN padrão nunca cheguem a produção.
 """
 from __future__ import annotations
 
+import base64
+
 import pytest
 
 from app.config import Settings
+
+# Chave PII valida (base64 de 32 bytes) e DIFERENTE do placeholder DEV.
+_PII_PROD_KEY = base64.b64encode(b"P" * 32).decode()
 
 
 # ── JWT_SECRET guards ─────────────────────────────────────────────────────────
@@ -45,6 +50,7 @@ def test_jwt_secret_valido_aceito_em_prod() -> None:
         REDIS_URL="redis://redis.prod:6379/0",
         JWT_SECRET="a" * 32,  # 32 chars, sem placeholder
         META_WHATSAPP_VERIFY_TOKEN="token-customizado-valido",
+        PII_ENCRYPTION_KEY=_PII_PROD_KEY,
     )
     assert len(settings.JWT_SECRET) >= 32
 
@@ -90,8 +96,31 @@ def test_meta_verify_token_customizado_aceito_em_prod() -> None:
         REDIS_URL="redis://redis.prod:6379/0",
         JWT_SECRET="a" * 32,
         META_WHATSAPP_VERIFY_TOKEN="meu-token-webhook-secreto-unico",
+        PII_ENCRYPTION_KEY=_PII_PROD_KEY,
     )
     assert settings.META_WHATSAPP_VERIFY_TOKEN == "meu-token-webhook-secreto-unico"
+
+
+# ── PII_ENCRYPTION_KEY guard (Marco 3 — AES-256 em repouso) ───────────────────
+
+
+def test_pii_key_placeholder_bloqueado_em_prod() -> None:
+    """O placeholder DEV de PII_ENCRYPTION_KEY (público no repo) deve levantar em prod."""
+    with pytest.raises(ValueError, match="PII_ENCRYPTION_KEY"):
+        Settings(
+            ENVIRONMENT="prod",
+            DATABASE_URL="postgresql+asyncpg://user:pass@db.prod:5432/fiscal",
+            REDIS_URL="redis://redis.prod:6379/0",
+            JWT_SECRET="a" * 32,
+            META_WHATSAPP_VERIFY_TOKEN="token-customizado-valido",
+            PII_ENCRYPTION_KEY="REVWX1BJSV9LRVlfVFJPQ0FSX0VNX1BST0RVQ0FPISE=",
+        )
+
+
+def test_pii_key_placeholder_permitido_em_local() -> None:
+    """Em ENVIRONMENT=local o placeholder DEV de PII NÃO deve ser bloqueado."""
+    settings = Settings(ENVIRONMENT="local")
+    assert settings.PII_ENCRYPTION_KEY.startswith("REVW")
 
 
 # ── DATABASE_URL / REDIS_URL guards (pré-existentes — não regrediu) ───────────

@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
+from app.shared.crypto.pii_type import PiiCifrada
 from app.shared.db.base import Base
 from app.shared.types import JsonObject
 
@@ -99,7 +100,8 @@ class Empresa(Base):
     ie: Mapped[str | None] = mapped_column(String(20), nullable=True)
     im: Mapped[str | None] = mapped_column(String(20), nullable=True)
     faturamento_12m: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
-    whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # PII cifrada em repouso (Marco 3): AES-256-GCM via PiiCifrada (impl Text).
+    whatsapp_phone: Mapped[str | None] = mapped_column(PiiCifrada(), nullable=True)
     proximo_numero_rps: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="1"
     )
