@@ -75,7 +75,7 @@ def _redact_pii(
     """
     try:  # noqa: SIM105  # comentário interno justifica try/except explícito
         _redact_pii_inplace(event_dict)
-    except Exception:
+    except Exception:  # nosec B110
         # Redação não pode derrubar o log — silencia qualquer falha interna.
         pass
     return event_dict

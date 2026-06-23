@@ -424,7 +424,7 @@ class Settings(BaseSettings):
                 )
             # META_WHATSAPP_VERIFY_TOKEN com valor padrão (hardcoded no repo)
             # em produção compromete a segurança do webhook Meta.
-            if self.META_WHATSAPP_VERIFY_TOKEN == "fiscalai-webhook-verify":
+            if self.META_WHATSAPP_VERIFY_TOKEN == "fiscalai-webhook-verify":  # nosec B105
                 raise ValueError(
                     "META_WHATSAPP_VERIFY_TOKEN usa o valor padrão em ENVIRONMENT=prod. "
                     "Configure um token aleatório no painel Meta e no env."
