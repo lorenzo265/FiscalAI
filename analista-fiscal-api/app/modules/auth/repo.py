@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.db.models import Tenant, Usuario
+from app.shared.db.models import RefreshToken, Tenant, Usuario
 
 
 class TenantRepo:
@@ -59,3 +60,62 @@ class UsuarioRepo:
         self._s.add(usuario)
         await self._s.flush()
         return usuario
+
+
+class RefreshTokenRepo:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def criar(
+        self,
+        *,
+        tenant_id: UUID,
+        usuario_id: UUID,
+        family_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> RefreshToken:
+        token = RefreshToken(
+            tenant_id=tenant_id,
+            usuario_id=usuario_id,
+            family_id=family_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self._s.add(token)
+        await self._s.flush()
+        return token
+
+    async def por_hash(self, token_hash: str) -> RefreshToken | None:
+        stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
+    async def revogar_familia(self, family_id: UUID, *, momento: datetime) -> None:
+        """Revoga toda a linhagem (deteccao de reuso)."""
+        stmt = (
+            update(RefreshToken)
+            .where(
+                RefreshToken.family_id == family_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=momento)
+        )
+        await self._s.execute(stmt)
+
+    async def revogar_do_tenant(self, tenant_id: UUID, *, momento: datetime) -> int:
+        """Revoga todos os refresh tokens vivos do tenant (ex.: exclusao LGPD).
+
+        Retorna quantos foram revogados.
+        """
+        sel = select(RefreshToken.id).where(
+            RefreshToken.tenant_id == tenant_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        ids = (await self._s.execute(sel)).scalars().all()
+        if ids:
+            await self._s.execute(
+                update(RefreshToken)
+                .where(RefreshToken.id.in_(ids))
+                .values(revoked_at=momento)
+            )
+        return len(ids)

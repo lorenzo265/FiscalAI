@@ -32,6 +32,12 @@ class LoginIn(BaseModel):
     senha: str
 
 
+class RefreshIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=1, description="Refresh token a rotacionar.")
+
+
 class UsuarioOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,11 +59,13 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    refresh_token: str
 
 
 class RegisterOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    refresh_token: str
     usuario: UsuarioOut
     tenant: TenantOut

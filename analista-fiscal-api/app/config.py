@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="Algoritmo JWT (RS256 na Sprint 13+).")
     JWT_EXPIRE_MINUTES: int = Field(default=60, description="TTL do access token em minutos.")
+    JWT_REFRESH_EXPIRE_DAYS: int = Field(
+        default=30,
+        description="TTL do refresh token (dias). Rotacionado a cada uso (Marco 3).",
+    )
 
     # Cifra de PII em repouso (Marco 3, LGPD §8.7). Chave AES-256 (32 bytes) em
     # base64. Default = placeholder DEV; em prod vem do KMS (fail-fast abaixo).

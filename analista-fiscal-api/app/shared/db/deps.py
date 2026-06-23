@@ -110,6 +110,23 @@ async def get_webhook_session(request: Request) -> AsyncIterator[AsyncSession]:
 WebhookSessionDep = Annotated[AsyncSession, Depends(get_webhook_session)]
 
 
+async def get_system_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """Sessão de sistema PRE-autenticação (superuser, bypassa RLS).
+
+    Mesmo mecanismo do webhook (sem ``SET LOCAL ROLE``), mas com intenção
+    própria: fluxos que buscam por uma chave GLOBAL única antes de haver
+    contexto de tenant — ex.: ``POST /auth/refresh`` busca o refresh token pelo
+    hash (Marco 3). A credencial é o próprio hash unguessable; o tenant vem do
+    registro encontrado.
+    """
+    factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
+    async with factory() as session:
+        yield session
+
+
+SystemSessionDep = Annotated[AsyncSession, Depends(get_system_session)]
+
+
 # ── Painel admin de tabelas tributárias (Sprint 19.5 PR1) ────────────────────
 
 

@@ -25,6 +25,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.repo import RefreshTokenRepo
 from app.modules.lgpd.anonimizacao import NOME_ANONIMO, cpf_anonimo, email_anonimo
 from app.modules.lgpd.repo import LgpdSolicitacaoRepo
 from app.shared.auth.password import hash_senha
@@ -198,6 +199,14 @@ class LgpdService:
 
         agora = datetime.now(tz=_TZ_BR)
         expurgo_apos = _mais_n_anos(agora.date(), _RETENCAO_ANOS)
+
+        # Revoga os refresh tokens vivos: um titular "esquecido" nao pode mais
+        # renovar acesso (o access token morre em <=60min; o refresh duraria ate
+        # 30 dias sem isto).
+        resumo["refresh_tokens_revogados"] = await RefreshTokenRepo(
+            session
+        ).revogar_do_tenant(tenant_id, momento=agora)
+
         await LgpdSolicitacaoRepo(session).registrar(
             tenant_id=tenant_id,
             tipo="exclusao",

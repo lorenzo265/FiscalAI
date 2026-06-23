@@ -3352,3 +3352,36 @@ class LgpdSolicitacao(Base):
         ),
         Index("ix_lgpd_solicitacao_tenant", "tenant_id"),
     )
+
+
+class RefreshToken(Base):
+    """Refresh token DB-backed com rotacao + revogacao (Marco 3).
+
+    Guarda so o SHA-256 hex do token (nunca o valor cru). ``family_id`` encadeia
+    a linhagem de rotacao: cada renovacao revoga o token atual e emite um novo na
+    MESMA familia. Apresentar um token ja revogado (``revoked_at`` setado) =
+    reuso -> sinal de roubo -> toda a familia e revogada. Migration 0064.
+    """
+
+    __tablename__ = "refresh_token"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    usuario_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    family_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_refresh_token_hash"),
+        Index("ix_refresh_token_family", "family_id"),
+        Index("ix_refresh_token_tenant", "tenant_id"),
+    )

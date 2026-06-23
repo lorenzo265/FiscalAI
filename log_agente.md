@@ -4,8 +4,8 @@
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `feat/m3-lgpd-seguranca` (M1/M2 + auditoria já em `main`, pushados @ `0a076f2`)
-**Suite atual:** **2725 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **30 passed**
-**mypy strict:** ✅ 0 erros (374 arquivos)
+**Suite atual:** **2728 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **35 passed**
+**mypy strict:** ✅ 0 erros (375 arquivos)
 **bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀 + **M3 LGPD/segurança (em andamento)** 🔐
 
@@ -25,7 +25,9 @@ Terceiro marco de produção (LGPD-first §8.7 + hardening de segurança). Tudo 
 
 - **PR 6.3 — AES-256 em repouso (PII)** (✅): envelope `app/shared/crypto/envelope.py` (AES-256-GCM, nonce aleatório por escrita, token versionado `v1:`, GCM autenticado → adulteração levanta) + `PiiCifrada` (`pii_type.py`, SQLAlchemy `TypeDecorator` que cifra/decifra transparente; impl `Text`). Chave de `settings.PII_ENCRYPTION_KEY` (base64 32 bytes; default DEV placeholder + **fail-fast em prod**; KMS em prod). **Coluna de prova: `empresa.whatsapp_phone`** (PII, SEM constraint/lookup — GCM não-determinístico quebraria UNIQUE; por isso NÃO foi o CPF, decisão validada com o PO). Migration **0063** amplia a coluna p/ `Text` + cifra os valores existentes (backfill app-level). `cryptography` PROMOVIDA a dep CORE (era só do grupo opt-in esocial — o import quebraria a CI que roda `--with dev`; vinha transitiva via `pyjwt[crypto]`, frágil p/ feature de segurança). Golden `tests/unit/crypto/test_envelope.py` (7: round-trip, ciphertext≠plaintext, nonce, adulteração GCM, chave/versão inválida, TypeDecorator) + integração `tests/integration/test_pii_crypto.py` (1: insere via ORM → coluna CRUA é ciphertext `v1:…`, NÃO o telefone → ORM decifra de volta). 2 testes de prod-guard atualizados (agora exigem PII key válida) + 2 novos (placeholder bloqueado em prod). **+9 unit (2716→2725) · +1 integração (29→30) · mypy 0 (374 arq) · ruff limpo nos meus arquivos.**
 
-**Restante do M3:** 6.4 refresh token/rotação JWT, 6.5 CI gates soft→bloqueante.
+- **PR 6.4 — Refresh token DB-backed com rotação (produção)** (✅): `POST /auth/refresh` com rotação a cada uso + **detecção de reuso** (token já rotacionado apresentado de novo → revoga a família inteira = defesa contra roubo). Token **opaco aleatório** (384 bits, `secrets.token_urlsafe`) armazenado **só como SHA-256 hex** (`app/shared/auth/refresh_token.py`; nunca o valor cru). Tabela `refresh_token` (migration **0064**, RLS + GRANT; `family_id` encadeia a linhagem, `revoked_at`). Login/register agora emitem refresh token (resposta += `refresh_token`); a renovação usa **sessão de sistema** (`get_system_session`, superuser/bypass-RLS — busca por hash global é pré-autenticação) com a credencial sendo o próprio hash unguessable. Settings `JWT_REFRESH_EXPIRE_DAYS` (30). **Completude de produção:** a exclusão LGPD (6.2b) agora **revoga os refresh tokens** do titular esquecido (senão renovaria por 30 dias; o resumo inclui `refresh_tokens_revogados`). Golden `tests/unit/auth/test_refresh_token.py` (3) + integração `tests/integration/test_refresh.py` (5: rotação, reuso→família revogada, inválido→401, login emite, exclusão LGPD revoga). **+3 unit (2725→2728) · +5 integração (30→35) · mypy 0 (375 arq) · ruff limpo nos meus arquivos.**
+
+**Restante do M3:** 6.5 CI gates soft→bloqueante (promover Semgrep/Gitleaks estáveis; NÃO o visual Playwright sem baseline).
 
 ---
 
