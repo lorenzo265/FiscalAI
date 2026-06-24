@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -36,6 +37,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 from app.modules.sped.efd.service import EfdContribuicoesService, EfdIcmsIpiService
+from app.modules.sped.storage import mover_blob_sped_best_effort
 from app.shared.db.models import Empresa
 from app.shared.db.perf import build_async_engine
 from app.shared.exceptions import (
@@ -43,8 +45,15 @@ from app.shared.exceptions import (
     SemDadosParaSped,
     SpedJaGerado,
 )
+from app.shared.storage import ObjectStorage, build_storage_from_settings
 from app.shared.types import JsonObject
 from app.workers.celery_app import celery_app
+
+
+@lru_cache(maxsize=1)
+def _worker_storage() -> ObjectStorage:
+    """Object storage do worker (singleton por processo, lazy)."""
+    return build_storage_from_settings(get_settings())
 
 _GerarMensalFn = Callable[
     [AsyncSession, Empresa, date], Awaitable[None]
@@ -113,17 +122,19 @@ def _competencia_mes_anterior() -> date:
 async def _gerar_efd_contribuicoes_para_empresa(
     session: AsyncSession, empresa: Empresa, competencia: date
 ) -> None:
-    await EfdContribuicoesService().gerar(
+    gerada = await EfdContribuicoesService().gerar(
         session, empresa.tenant_id, empresa.id, competencia=competencia
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, _worker_storage())
 
 
 async def _gerar_efd_icms_ipi_para_empresa(
     session: AsyncSession, empresa: Empresa, competencia: date
 ) -> None:
-    await EfdIcmsIpiService().gerar(
+    gerada = await EfdIcmsIpiService().gerar(
         session, empresa.tenant_id, empresa.id, competencia=competencia
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, _worker_storage())
 
 
 async def _executar_geracao_async(

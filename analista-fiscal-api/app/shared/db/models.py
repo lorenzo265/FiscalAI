@@ -2715,9 +2715,12 @@ class ArquivoSped(Base):
     UNIQUE parcial (DB-level) garante 1 arquivo ativo por
     ``(empresa, tipo, periodo_inicio, periodo_fim)`` — idempotência §8.9.
 
-    Conteúdo do ``.txt`` em ``conteudo_bytea`` (BYTEA — limite prático
-    ~1GB; SPED de PME fica em 5-50MB, OK por enquanto). ``storage_key``
-    fica nullable para migração futura para S3/GCS.
+    Conteúdo do ``.txt`` em object storage (``storage_key`` + Marco 4 #10)
+    OU, para linhas legadas ainda não migradas, em ``conteudo_bytea``
+    (BYTEA). A geração nova escreve no storage e zera ``conteudo_bytea``;
+    a leitura é storage-first com fallback BYTEA
+    (``app.modules.sped.storage.ler_conteudo_sped``). Em prod
+    ``STORAGE_BACKEND=s3`` tira blobs de 5-50MB do Postgres.
 
     ``status`` começa em ``gerado`` (PR1). PR3 introduz ``validado``.
     Transições para ``transmitido``/``aceito``/``rejeitado`` exigem
@@ -2737,7 +2740,11 @@ class ArquivoSped(Base):
     tipo: Mapped[str] = mapped_column(String(30), nullable=False)
     periodo_inicio: Mapped[date] = mapped_column(DATE, nullable=False)
     periodo_fim: Mapped[date] = mapped_column(DATE, nullable=False)
-    conteudo_bytea: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    # Marco 4 #10: nullable porque o conteúdo agora vive no object storage
+    # (storage_key). Permanece preenchido em linhas legadas até o backfill.
+    conteudo_bytea: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )
     tamanho_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     hash_arquivo: Mapped[str] = mapped_column(String(64), nullable=False)
     storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)

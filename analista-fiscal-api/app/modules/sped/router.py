@@ -17,8 +17,10 @@ from pydantic import BaseModel, ConfigDict
 
 from app.modules.sped.ecd.repo import ArquivoSpedRepo
 from app.modules.sped.ecd.schemas import ArquivoSpedOut
+from app.modules.sped.storage import ler_conteudo_sped
 from app.modules.sped.validacao_service import SpedValidacaoService
 from app.shared.db.deps import SessionDep, TenantDep
+from app.shared.storage.deps import StorageDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["sped"])
 
@@ -102,6 +104,7 @@ async def download_sped_generico(
     empresa_id: UUID,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
     tipo: TipoSpedFiltro = Path(...),
     sped_id: UUID = Path(...),
 ) -> Response:
@@ -119,7 +122,7 @@ async def download_sped_generico(
         f"{arquivo.periodo_fim.strftime('%Y%m%d')}.txt"
     )
     return Response(
-        content=bytes(arquivo.conteudo_bytea),
+        content=await ler_conteudo_sped(arquivo, storage),
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": f'attachment; filename="{nome}"',
@@ -150,9 +153,10 @@ async def validar_sped(
     *,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> ValidacaoOut:
     executada = await SpedValidacaoService().validar(
-        session, empresa_id, sped_id, tipo=tipo.value,
+        session, empresa_id, sped_id, tipo=tipo.value, storage=storage,
     )
     return ValidacaoOut(
         arquivo=ArquivoSpedOut.model_validate(executada.arquivo),

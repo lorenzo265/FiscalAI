@@ -12,7 +12,12 @@ from app.modules.sped.ecf.schemas import (
     GerarEcfIn,
 )
 from app.modules.sped.ecf.service import EcfService
+from app.modules.sped.storage import (
+    ler_conteudo_sped,
+    mover_blob_sped_best_effort,
+)
 from app.shared.db.deps import SessionDep, TenantDep
+from app.shared.storage.deps import StorageDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["sped"])
 
@@ -41,6 +46,7 @@ async def gerar_ecf(
     payload: GerarEcfIn,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> ArquivoSpedOut:
     gerada = await EcfService().gerar(
         session,
@@ -49,6 +55,7 @@ async def gerar_ecf(
         ano=payload.ano,
         forcar=payload.forcar,
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, storage)
     return ArquivoSpedOut.model_validate(gerada.arquivo)
 
 
@@ -67,6 +74,7 @@ async def download_ecf(
     sped_id: UUID,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> Response:
     arquivo = await ArquivoSpedRepo(session).por_id(sped_id)
     if (
@@ -82,7 +90,7 @@ async def download_ecf(
         f"{arquivo.periodo_fim.strftime('%Y%m%d')}.txt"
     )
     return Response(
-        content=bytes(arquivo.conteudo_bytea),
+        content=await ler_conteudo_sped(arquivo, storage),
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": f'attachment; filename="{nome}"',

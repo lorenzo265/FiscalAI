@@ -48,6 +48,7 @@ async def test_download_genericu_serve_bytea_com_headers() -> None:
         empresa_id=arquivo.empresa_id,
         ctx=MagicMock(),
         session=session,
+        storage=MagicMock(),
         tipo=TipoSpedFiltro.EFD_CONTRIBUICOES,
         sped_id=arquivo.id,
     )
@@ -73,6 +74,7 @@ async def test_download_404_quando_arquivo_inexistente() -> None:
             empresa_id=uuid4(),
             ctx=MagicMock(),
             session=MagicMock(),
+            storage=MagicMock(),
             tipo=TipoSpedFiltro.ECF,
             sped_id=uuid4(),
         )
@@ -94,6 +96,7 @@ async def test_download_404_quando_tipo_url_nao_casa_com_arquivo() -> None:
             empresa_id=arquivo.empresa_id,
             ctx=MagicMock(),
             session=MagicMock(),
+            storage=MagicMock(),
             tipo=TipoSpedFiltro.ECF,  # arquivo é ECD
             sped_id=arquivo.id,
         )
@@ -115,6 +118,7 @@ async def test_download_404_quando_empresa_url_nao_casa() -> None:
             empresa_id=uuid4(),  # ≠ arquivo.empresa_id
             ctx=MagicMock(),
             session=MagicMock(),
+            storage=MagicMock(),
             tipo=TipoSpedFiltro.ECD,
             sped_id=arquivo.id,
         )
@@ -134,6 +138,7 @@ async def test_download_filename_inclui_periodo() -> None:
         empresa_id=arquivo.empresa_id,
         ctx=MagicMock(),
         session=MagicMock(),
+        storage=MagicMock(),
         tipo=TipoSpedFiltro.EFD_ICMS_IPI,
         sped_id=arquivo.id,
     )
@@ -167,6 +172,7 @@ async def test_download_ecd_legado_rejeita_tipo_errado() -> None:
             sped_id=arquivo.id,
             ctx=MagicMock(),
             session=MagicMock(),
+            storage=MagicMock(),
         )
     assert ei.value.status_code == 404
 
@@ -190,6 +196,7 @@ async def test_download_ecd_legado_serve_arquivo_correto() -> None:
         sped_id=arquivo.id,
         ctx=MagicMock(),
         session=MagicMock(),
+        storage=MagicMock(),
     )
     assert resp.status_code == 200
     assert resp.headers["X-Sped-Hash"] == "a" * 64

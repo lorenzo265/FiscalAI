@@ -1,13 +1,30 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-22
+**Última atualização:** 2026-06-23
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `main` @ `715e778` (Marco 3 + faxina de ruff integrados; **NÃO pushado** — `origin/main` em `0a076f2`)
-**Suite atual:** **2728 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **35 passed**
-**mypy strict:** ✅ 0 erros (375 arquivos) · **ruff `check .` ✅ VERDE** (faxina mergeada)
-**bandit:** ✅ 0 issues (8 nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing)** 🚀 + **M3 LGPD/segurança (em andamento)** 🔐
+**Branch:** `feat/m4-storage-s3` (base `main` @ `68f4d00`; M3 já pushado em `origin/main`) — M4 PR 1 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
+**Suite atual:** **2741 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
+**mypy strict:** ✅ 0 erros (377 arquivos) · **ruff `check .` ✅ VERDE**
+**bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (em andamento)** 📦
+
+---
+
+## Production-Readiness — Marco 4 (remover os últimos mocks) · branch `feat/m4-storage-s3`
+
+Quarto marco de produção: ligar cada integração stub/mock à produção real, atrás de env/flag (sem mock). Base em `docs/PROMPT-PROXIMO-AGENTE-M4.md` §6 e `docs/PLANO_GO_LIVE.md §B` (itens 10/11/14/15). Tudo código do orquestrador, solo, validado à mão + integração real.
+
+- **M4 · PR 1 — Storage S3 efetivo para SPED (item 10 / prompt §6.1)** (✅): o `.txt` SPED (ECD/ECF/EFD-Contribuições/EFD-ICMS-IPI) deixa de viver em `arquivo_sped.conteudo_bytea` (BYTEA, blobs de 5-50MB no Postgres) e passa ao **object storage** (`app.state.storage`: local/memory/s3 — a stack do `app/shared/storage/` da Sprint 19.6, que estava montada no lifespan mas **desconectada de todo handler**).
+  - **Wiring (o elo que faltava):** `StorageDep` (`app/shared/storage/deps.py` → `request.app.state.storage`) + `build_storage_from_settings(settings)` (DRY do mapa STORAGE_* p/ lifespan/workers).
+  - **Módulo de domínio** `app/modules/sped/storage.py`: `chave_storage_sped` (determinística, inclui o `id` → snapshots supersededos não colidem no storage), `mover_blob_sped_para_storage` (escreve no storage, seta `storage_key`, zera `conteudo_bytea`; **idempotente → serve de backfill**), `mover_blob_sped_best_effort` (uma falha de S3 não derruba uma geração já commitada: loga, rollback, segue; o BYTEA fica p/ fallback/backfill), `ler_conteudo_sped` (**storage-first com fallback BYTEA** p/ linhas legadas).
+  - **Plugado:** 4 routers de geração (`gerar_ecd/ecf/efd_contribuicoes/efd_icms_ipi`) movem o blob pós-geração (best-effort); 2 workers Celery (`sped_gerar_anual`, `sped_gerar_efd_mensal`) idem (storage do worker = singleton lazy `lru_cache`); 3 downloads (`download_ecd/ecf` + genérico) + `validacao_service` leem via `ler_conteudo_sped`.
+  - **Migration 0065:** `arquivo_sped.conteudo_bytea` → NULLABLE (widening backward-compat; **sem tabela/grant novos** — `arquivo_sped` é da Sprint 16, UPDATE sob RLS já provado pelo `validacao_service`). Model `Mapped[bytes | None]`.
+  - **Desenho deliberado (sem divergência test/prod):** o **service NÃO muda** (persiste BYTEA como antes) → zero churn nos ~37 testes de service; o move roda na borda (router/worker). A linha é commitada com BYTEA *antes* do move → se o storage falhar, **sem perda de dado** (download via fallback; backfill recupera). No dia em que `STORAGE_BACKEND=s3` + `STORAGE_BUCKET` entram no `.env`, o blob vai pro S3 sa-east-1 sozinho.
+  - **Validado à mão + integração real:** novo `tests/integration/test_sped_storage.py` insere `arquivo_sped` com BYTEA → move → confere a **coluna crua** (`conteudo_bytea` NULL, `storage_key` preenchida) → `ler_conteudo_sped` recupera os bytes do disco → idempotência (2º move = no-op). Golden `tests/unit/sped/test_storage_sped.py` (10: chave, mover/idempotência/no-op, ler storage-first/fallback/erro, best-effort). Migration 0065 aplicada no DB :5434 e conferida (`is_nullable=YES`).
+  - **Validação:** pytest **2741 passed, 3 skipped (+10)** · integração **36 passed (+1)** · mypy 0 (377 arq) · ruff limpo nos arquivos tocados.
+
+**Estado:** `feat/m4-storage-s3` = `main`(`68f4d00`) + M4 PR 1 (a commitar). DB :5434 em **0065**. **NÃO pushado** (freio do PO). Próximo M4: **PR 2 — EFD-Reinf→SERPRO** (item 11), depois e-mail transacional (14) e Dockerfile do front (15).
 
 ---
 

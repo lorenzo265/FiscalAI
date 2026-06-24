@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -35,6 +36,7 @@ from sqlalchemy.ext.asyncio import (
 from app.config import get_settings
 from app.modules.sped.ecd.service import EcdService
 from app.modules.sped.ecf.service import EcfService
+from app.modules.sped.storage import mover_blob_sped_best_effort
 from app.shared.db.models import Empresa
 from app.shared.db.perf import build_async_engine
 from app.shared.exceptions import (
@@ -42,6 +44,7 @@ from app.shared.exceptions import (
     SemDadosParaSped,
     SpedJaGerado,
 )
+from app.shared.storage import ObjectStorage, build_storage_from_settings
 from app.shared.types import JsonObject
 from app.workers.celery_app import celery_app
 
@@ -50,6 +53,16 @@ _GerarFn = Callable[[AsyncSession, Empresa, int], Awaitable[None]]
 log = structlog.get_logger(__name__)
 
 _TZ_BR = ZoneInfo("America/Sao_Paulo")
+
+
+@lru_cache(maxsize=1)
+def _worker_storage() -> ObjectStorage:
+    """Object storage do worker (singleton por processo).
+
+    Lazy: só constrói no primeiro blob a mover, nunca no import. Reusa o
+    mesmo adapter/cliente boto3 por toda a batelada noturna.
+    """
+    return build_storage_from_settings(get_settings())
 
 
 @celery_app.task(
@@ -97,13 +110,19 @@ def gerar_ecf_anual() -> JsonObject:
 async def _gerar_ecd_para_empresa(
     session: AsyncSession, empresa: Empresa, ano: int
 ) -> None:
-    await EcdService().gerar(session, empresa.tenant_id, empresa.id, ano=ano)
+    gerada = await EcdService().gerar(
+        session, empresa.tenant_id, empresa.id, ano=ano
+    )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, _worker_storage())
 
 
 async def _gerar_ecf_para_empresa(
     session: AsyncSession, empresa: Empresa, ano: int
 ) -> None:
-    await EcfService().gerar(session, empresa.tenant_id, empresa.id, ano=ano)
+    gerada = await EcfService().gerar(
+        session, empresa.tenant_id, empresa.id, ano=ano
+    )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, _worker_storage())
 
 
 async def _executar_geracao_async(

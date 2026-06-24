@@ -31,6 +31,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.sped.ecd.repo import ArquivoSpedRepo
+from app.modules.sped.storage import ler_conteudo_sped
 from app.modules.sped.validador import (
     ResultadoValidacao,
     resultado_para_jsonb,
@@ -38,6 +39,7 @@ from app.modules.sped.validador import (
 )
 from app.shared.db.models import ArquivoSped
 from app.shared.exceptions import ArquivoSpedNaoEncontrado
+from app.shared.storage.backend import ObjectStorage
 
 log = structlog.get_logger(__name__)
 
@@ -58,8 +60,12 @@ class SpedValidacaoService:
         sped_id: UUID,
         *,
         tipo: str,
+        storage: ObjectStorage,
     ) -> ValidacaoExecutada:
         """Executa validação local + persiste resultado em ``validacao_jsonb``.
+
+        Lê o conteúdo via ``ler_conteudo_sped`` (storage-first, fallback BYTEA)
+        - linhas geradas após o Marco 4 #10 têm o ``.txt`` no object storage.
 
         Raises:
             ArquivoSpedNaoEncontrado: ID inexistente, cross-tenant via RLS,
@@ -76,7 +82,7 @@ class SpedValidacaoService:
                 f"Arquivo SPED {sped_id} (tipo={tipo}) não encontrado."
             )
 
-        conteudo_str = bytes(arquivo.conteudo_bytea).decode(
+        conteudo_str = (await ler_conteudo_sped(arquivo, storage)).decode(
             "latin-1", errors="replace"
         )
         resultado = validar_por_tipo(arquivo.tipo, conteudo_str)

@@ -12,7 +12,12 @@ from app.modules.sped.ecd.schemas import (
     GerarEcdIn,
 )
 from app.modules.sped.ecd.service import EcdService
+from app.modules.sped.storage import (
+    ler_conteudo_sped,
+    mover_blob_sped_best_effort,
+)
 from app.shared.db.deps import SessionDep, TenantDep
+from app.shared.storage.deps import StorageDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["sped"])
 
@@ -40,6 +45,7 @@ async def gerar_ecd(
     payload: GerarEcdIn,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> ArquivoSpedOut:
     gerada = await EcdService().gerar(
         session,
@@ -48,6 +54,7 @@ async def gerar_ecd(
         ano=payload.ano,
         forcar=payload.forcar,
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, storage)
     return ArquivoSpedOut.model_validate(gerada.arquivo)
 
 
@@ -66,6 +73,7 @@ async def download_ecd(
     sped_id: UUID,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> Response:
     arquivo = await ArquivoSpedRepo(session).por_id(sped_id)
     if arquivo is None or arquivo.empresa_id != empresa_id or arquivo.tipo != "ecd":
@@ -77,7 +85,7 @@ async def download_ecd(
         f"{arquivo.periodo_fim.strftime('%Y%m%d')}.txt"
     )
     return Response(
-        content=bytes(arquivo.conteudo_bytea),
+        content=await ler_conteudo_sped(arquivo, storage),
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": f'attachment; filename="{nome}"',

@@ -13,6 +13,9 @@ EFD usam `bytea` ou `storage_key=NULL` (placeholder). Stack pronta:
 
 Factory ``build_storage(settings)`` lê ``STORAGE_BACKEND`` e devolve o
 adapter apropriado. Plugado no lifespan de `app/main.py` → `app.state.storage`.
+``build_storage_from_settings`` é o atalho que recebe o objeto de settings
+inteiro (usado no lifespan e nos workers Celery, evitando duplicar o mapa
+de campos STORAGE_*).
 
 **Princípios cravados:**
 
@@ -27,18 +30,43 @@ adapter apropriado. Plugado no lifespan de `app/main.py` → `app.state.storage`
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.shared.storage.backend import (
     LocalDiskStorage,
     MemoryStorage,
     ObjectStorage,
+    S3Storage,
     StorageError,
     build_storage,
 )
+
+if TYPE_CHECKING:
+    from app.config import Settings
+
+
+def build_storage_from_settings(settings: Settings) -> ObjectStorage:
+    """Constrói o adapter de storage a partir do objeto de settings.
+
+    Atalho usado pelo lifespan de ``app/main.py`` e pelos workers Celery —
+    centraliza o mapeamento dos campos ``STORAGE_*`` num único lugar para
+    não duplicar a chamada a ``build_storage`` por call-site.
+    """
+    return build_storage(
+        backend=settings.STORAGE_BACKEND,
+        base_path=settings.STORAGE_BASE_PATH,
+        bucket=settings.STORAGE_BUCKET or None,
+        endpoint_url=settings.STORAGE_S3_ENDPOINT_URL or None,
+        region=settings.STORAGE_S3_REGION,
+    )
+
 
 __all__ = [
     "LocalDiskStorage",
     "MemoryStorage",
     "ObjectStorage",
+    "S3Storage",
     "StorageError",
     "build_storage",
+    "build_storage_from_settings",
 ]

@@ -24,6 +24,7 @@ from app.modules.sped.ecd.gerador import (
 )
 from app.modules.sped.validacao_service import SpedValidacaoService
 from app.shared.exceptions import ArquivoSpedNaoEncontrado
+from app.shared.storage import MemoryStorage
 
 
 def _ecd_perfeita_bytes() -> bytes:
@@ -143,7 +144,7 @@ async def test_validar_arquivo_ok_transita_status_para_validado() -> None:
         return_value=repo,
     ):
         executada = await SpedValidacaoService().validar(
-            session, empresa_id, arquivo.id, tipo="ecd",
+            session, empresa_id, arquivo.id, tipo="ecd", storage=MemoryStorage(),
         )
     assert executada.resultado.ok
     assert arquivo.status == "validado"
@@ -165,7 +166,7 @@ async def test_validar_arquivo_com_erros_mantem_status_gerado() -> None:
         return_value=repo,
     ):
         executada = await SpedValidacaoService().validar(
-            session, empresa_id, arquivo.id, tipo="ecd",
+            session, empresa_id, arquivo.id, tipo="ecd", storage=MemoryStorage(),
         )
     assert not executada.resultado.ok
     assert arquivo.status == "gerado"  # não promovido
@@ -185,7 +186,7 @@ async def test_validar_id_inexistente_levanta_404() -> None:
         return_value=repo,
     ), pytest.raises(ArquivoSpedNaoEncontrado):
         await SpedValidacaoService().validar(
-            session, empresa_id, uuid.uuid4(), tipo="ecd",
+            session, empresa_id, uuid.uuid4(), tipo="ecd", storage=MemoryStorage(),
         )
 
 
@@ -204,7 +205,7 @@ async def test_validar_cross_empresa_levanta_404() -> None:
         return_value=repo,
     ), pytest.raises(ArquivoSpedNaoEncontrado):
         await SpedValidacaoService().validar(
-            session, empresa_b, arquivo.id, tipo="ecd",
+            session, empresa_b, arquivo.id, tipo="ecd", storage=MemoryStorage(),
         )
 
 
@@ -221,7 +222,7 @@ async def test_validar_tipo_divergente_levanta_404() -> None:
         return_value=repo,
     ), pytest.raises(ArquivoSpedNaoEncontrado):
         await SpedValidacaoService().validar(
-            session, empresa_id, arquivo.id, tipo="ecf",
+            session, empresa_id, arquivo.id, tipo="ecf", storage=MemoryStorage(),
         )
 
 
@@ -238,11 +239,11 @@ async def test_validar_idempotente_sobrescreve_jsonb() -> None:
         return_value=repo,
     ):
         await SpedValidacaoService().validar(
-            session, empresa_id, arquivo.id, tipo="ecd",
+            session, empresa_id, arquivo.id, tipo="ecd", storage=MemoryStorage(),
         )
         primeiro_jsonb = arquivo.validacao_jsonb
         await SpedValidacaoService().validar(
-            session, empresa_id, arquivo.id, tipo="ecd",
+            session, empresa_id, arquivo.id, tipo="ecd", storage=MemoryStorage(),
         )
         segundo_jsonb = arquivo.validacao_jsonb
     # Conteúdo é determinístico para o mesmo arquivo.

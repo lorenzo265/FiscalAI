@@ -20,7 +20,9 @@ from app.modules.sped.efd.service import (
     EfdContribuicoesService,
     EfdIcmsIpiService,
 )
+from app.modules.sped.storage import mover_blob_sped_best_effort
 from app.shared.db.deps import SessionDep, TenantDep
+from app.shared.storage.deps import StorageDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["sped"])
 
@@ -50,6 +52,7 @@ async def gerar_efd_contribuicoes(
     payload: GerarEfdContribuicoesIn,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> ArquivoSpedOut:
     gerada = await EfdContribuicoesService().gerar(
         session,
@@ -58,6 +61,7 @@ async def gerar_efd_contribuicoes(
         competencia=payload.competencia,
         forcar=payload.forcar,
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, storage)
     return ArquivoSpedOut.model_validate(gerada.arquivo)
 
 
@@ -85,6 +89,7 @@ async def gerar_efd_icms_ipi(
     payload: GerarEfdIcmsIpiIn,
     ctx: TenantDep,
     session: SessionDep,
+    storage: StorageDep,
 ) -> ArquivoSpedOut:
     gerada = await EfdIcmsIpiService().gerar(
         session,
@@ -93,4 +98,5 @@ async def gerar_efd_icms_ipi(
         competencia=payload.competencia,
         forcar=payload.forcar,
     )
+    await mover_blob_sped_best_effort(session, gerada.arquivo, storage)
     return ArquivoSpedOut.model_validate(gerada.arquivo)
