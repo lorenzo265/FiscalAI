@@ -231,6 +231,32 @@ def _beat_schedule() -> dict[str, Any]:
     }
 
 
+def _descobrir_modulos_tasks() -> list[str]:
+    """Lista os módulos de ``app.workers.tasks`` para o ``include`` do Celery.
+
+    Sem isto, um worker ``-A app.workers.celery_app`` importa só ESTE módulo e
+    NÃO registra as tasks (que vivem em submódulos `tasks/*.py`) → o broker
+    entrega e o worker responde ``Received unregistered task``. A descoberta é
+    dinâmica (``pkgutil``) e portanto auto-mantida: toda task nova em
+    ``app/workers/tasks/`` passa a ser registrada sem editar lista nenhuma.
+
+    ``iter_modules`` apenas LISTA os nomes (não importa os submódulos), então
+    rodar isto durante o ``_build`` não cria ciclo com ``celery_app`` — o Celery
+    importa os módulos só na finalização (worker start / 1º envio), quando este
+    módulo já está totalmente carregado.
+    """
+    import pkgutil
+
+    from app.workers import tasks as _tasks_pkg
+
+    return [
+        name
+        for _finder, name, _ispkg in pkgutil.iter_modules(
+            _tasks_pkg.__path__, prefix=f"{_tasks_pkg.__name__}."
+        )
+    ]
+
+
 def _build() -> _CeleryStub:
     """Constrói a Celery app real se o pacote estiver disponível, senão o stub."""
     try:
@@ -244,6 +270,8 @@ def _build() -> _CeleryStub:
         "analista-fiscal",
         broker=settings.REDIS_URL,
         backend=settings.REDIS_URL,
+        # Registra as tasks dos submódulos no worker (senão: unregistered task).
+        include=_descobrir_modulos_tasks(),
     )
     real.conf.update(
         task_acks_late=True,
