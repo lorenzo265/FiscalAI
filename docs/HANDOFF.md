@@ -592,3 +592,9 @@ O `reviewer` registra o veredito assim:
 - **🟡 `empresa.criar`** mandava `faturamento12m` (toSnake não põe `_` antes de dígito) → 422 `extra_forbidden`. Corrigido p/ `faturamento_12m` à mão (mesmo do atualizar).
 - **🟢 logout** agora faz `resetar()` + `queryClient.clear()` (não vaza cache do tenant); **🟢 painel e-CAC** trata `isError`.
 - **Estado:** 4 commits em `feat/front-pontas-soltas` (`50ee0bb`, `42286b8`, `addd281` + base `c734529`). Gate verde (tsc + build). **NÃO pushado.** Pronto p/ consolidar na main (fast-forward local) sob decisão do PO. Não re-rodei o reviewer completo (fix endereça a causa-raiz confirmada por ele); um re-check rápido do PUT parcial é opcional.
+
+### 2026-06-29 · orquestrador · fechamento da sessão (e-mail nos fluxos + fix Celery + push) · HANDOFF p/ próximo agente
+- **Pushado** (`origin/main` @ `3c7d65d`): e-mail plugado nos 3 fluxos (onboarding/fatura/alerta), fix do gap de registro Celery (`include` dinâmico) e os write-backs. Antes disso, na mesma sessão: M4 PR2/PR3/PR4 + pontas soltas do front (logout, robustez, fiação §3.3) também foram consolidados e pushados.
+- **Gate consolidado:** pytest 2782 unit+eval (3 skip) · mypy 0/388 · ruff verde · front tsc/build verde · integração 36 (DB :5434 **subiu nesta sessão**, agora disponível).
+- **Onde continuar:** o pacote de contexto p/ o próximo agente está em **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — freios, ambiente, estado, pendências priorizadas (§3.2 módulos órfãos, §3.4 manifesto NF-e/convite, Reinf cert A1, e-mail at-least-once) e onde achar tudo. Fonte canônica das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
+- **Próximo agente / próximo passo:** confirmar com o PO a frente (ops vs código). Recomendação de código: Reinf cert A1 (pequeno) → robustez e-mail (Idempotency-Key) → 1ª tela de módulo órfão de alto valor (**advisor**). Mapear com `backend-scout`/`explorer` antes.

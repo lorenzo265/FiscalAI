@@ -7,7 +7,9 @@
 **Suite atual:** **2782 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
 **mypy strict:** ✅ 0 erros (388 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅ (código do M4 COMPLETO)** 📦
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦
+
+> **▶ PRÓXIMO AGENTE:** leia **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — contexto completo, freios, ambiente (DB :5434 agora UP), e pendências priorizadas (Reinf cert A1, e-mail at-least-once, módulos órfãos §3.2, manifesto NF-e §3.4). Mapa das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
 
 ---
 
