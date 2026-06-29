@@ -1192,3 +1192,67 @@ class WebhookStripeAssinaturaInvalida(DomainError):
     """
 
     http_status = 401
+
+
+# ── Manifestação do Destinatário NF-e (MD-e) — PR1 ──────────────────────────
+
+
+class ManifestacaoError(DomainError):
+    """Base para erros do módulo de Manifestação do Destinatário (MD-e).
+
+    Subtypes mapeiam diretamente para HTTP 4xx. Não levante a base
+    diretamente — use um dos subtipos abaixo.
+    """
+
+    http_status = 422
+
+
+class ChaveNFeInvalida(ManifestacaoError):
+    """Chave de acesso NF-e inválida — deve ter exatamente 44 dígitos numéricos.
+
+    NT 2014.002 §4.1.1.2: ``chNFe`` é a chave de acesso NF-e de 44 algarismos
+    (cUF + AAAAMM + CNPJ + mod + serie + nNF + tpEmis + cNF + cDV). Qualquer
+    desvio — 43 dígitos, caracteres alfa, pontilhação — é rejeitado aqui antes
+    de qualquer I/O, zerando o risco de persistir dado corrompido.
+    """
+
+    http_status = 422
+
+
+class ManifestacaoJustificativaObrigatoria(ManifestacaoError):
+    """Evento 210240 (Operação não Realizada) exige o campo ``justificativa``.
+
+    NT 2014.002 §4.1.1.3: ``<xJust>`` é obrigatório para o evento 210240 e
+    deve ter entre 15 e 255 caracteres. Os outros 3 tipos (210200/10/20)
+    não têm justificativa — passá-la é erro de input (schema rejeita antes).
+    """
+
+    http_status = 422
+
+
+class ManifestacaoJaRegistrada(ManifestacaoError):
+    """Manifestação (empresa, chave_nfe, tipo_evento, sequencial) já registrada.
+
+    Idempotência §8.9: o UNIQUE ``uq_manifestacao_empresa_chave_tipo_seq``
+    detecta duplicata. Se o caller usa ``idempotency_key``, o service devolve
+    o registro existente (200) em vez de 409 — apenas sem idempotency_key
+    é levantado este 409.
+    """
+
+    http_status = 409
+
+
+class ManifestacaoNaoEncontrada(ManifestacaoError):
+    """Manifestação não encontrada para o (empresa, ID) informado."""
+
+    http_status = 404
+
+
+class ManifestacaoAssinaturaIndisponivel(ManifestacaoError):
+    """Cert A1 ausente ou grupo opt-in 'esocial' não instalado.
+
+    §8.12 — assinatura XMLDSig é ato consciente. Service persiste o XML
+    não-assinado em status 'preparado' e retorna 412 ao caller.
+    """
+
+    http_status = 412

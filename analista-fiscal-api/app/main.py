@@ -37,6 +37,7 @@ from app.modules.imobilizado.router import router as imobilizado_router
 from app.modules.ingestao.router import router as ingestao_router
 from app.modules.lgpd.router import router as lgpd_router
 from app.modules.lucro_presumido.router import router as lucro_presumido_router
+from app.modules.manifestacao.router import router as manifestacao_router
 from app.modules.marketplace.parceiros_router import router as marketplace_parceiros_router
 from app.modules.marketplace.router import (
     router as marketplace_router,
@@ -236,6 +237,7 @@ app = FastAPI(
         {"name": "tabelas_admin", "description": "Administração de tabelas tributárias SCD (admin)."},
         {"name": "lgpd", "description": "Direito do titular (LGPD): exportação/portabilidade dos dados."},
         {"name": "health", "description": "Probes de saúde (liveness/readiness)."},
+        {"name": "manifestacao_nfe", "description": "Manifestação do Destinatário NF-e (MD-e) — NT 2014.002."},
     ],
     lifespan=lifespan,
 )
@@ -316,6 +318,7 @@ app.include_router(tabelas_admin_router)
 app.include_router(tabelas_admin_alertas_router)
 app.include_router(tabelas_admin_sugestoes_router)
 app.include_router(tabelas_admin_stats_router)
+app.include_router(manifestacao_router)
 
 
 @app.exception_handler(DomainError)

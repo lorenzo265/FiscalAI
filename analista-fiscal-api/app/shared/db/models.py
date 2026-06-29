@@ -3376,6 +3376,88 @@ class LgpdSolicitacao(Base):
     )
 
 
+class ManifestacaoNFe(Base):
+    """Manifestação do Destinatário de NF-e (MD-e) — PR1 fundação.
+
+    4 eventos NT 2014.002 / NT 2020.001:
+      210200 — Confirmação da Operação
+      210210 — Ciência da Operação
+      210220 — Desconhecimento da Operação
+      210240 — Operação não Realizada (exige justificativa 15–255 chars)
+
+    Status machine: preparado → assinado → transmitido → aceito/rejeitado
+    (§8.2: append-only; cancelamento = novo evento no SEFAZ, não UPDATE aqui).
+
+    Migration 0067.
+    """
+
+    __tablename__ = "manifestacao_nfe"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("empresa.id", ondelete="CASCADE"), nullable=False
+    )
+    chave_nfe: Mapped[str] = mapped_column(String(44), nullable=False)
+    cnpj_destinatario: Mapped[str] = mapped_column(String(14), nullable=False)
+    tipo_evento: Mapped[str] = mapped_column(String(6), nullable=False)
+    sequencial: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    justificativa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="preparado")
+    protocolo: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    codigo_status_sefaz: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    motivo_sefaz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    xml_evento_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    xml_recibo_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    algoritmo_versao: Mapped[str] = mapped_column(String(50), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    assinado_em: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    transmitido_em: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    respondido_em: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_evento IN ('210200','210210','210220','210240')",
+            name="ck_manifestacao_tipo_evento",
+        ),
+        CheckConstraint(
+            "status IN ('preparado','assinado','transmitido','aceito','rejeitado')",
+            name="ck_manifestacao_status",
+        ),
+        CheckConstraint(
+            "(tipo_evento = '210240') = (justificativa IS NOT NULL)",
+            name="ck_manifestacao_just_obrigatoria",
+        ),
+        CheckConstraint(
+            "justificativa IS NULL OR "
+            "(char_length(justificativa) >= 15 AND char_length(justificativa) <= 255)",
+            name="ck_manifestacao_just_tamanho",
+        ),
+        CheckConstraint(
+            r"chave_nfe ~ '^\d{44}$'",
+            name="ck_manifestacao_chave_formato",
+        ),
+        CheckConstraint(
+            r"cnpj_destinatario ~ '^\d{14}$'",
+            name="ck_manifestacao_cnpj_formato",
+        ),
+        CheckConstraint(
+            "sequencial >= 1",
+            name="ck_manifestacao_sequencial_positivo",
+        ),
+        Index("ix_manifestacao_tenant", "tenant_id"),
+        Index("ix_manifestacao_empresa_chave", "empresa_id", "chave_nfe"),
+        Index("ix_manifestacao_status", "status"),
+        UniqueConstraint(
+            "empresa_id", "chave_nfe", "tipo_evento", "sequencial",
+            name="uq_manifestacao_empresa_chave_tipo_seq",
+        ),
+    )
+
+
 class RefreshToken(Base):
     """Refresh token DB-backed com rotacao + revogacao (Marco 3).
 

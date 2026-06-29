@@ -3,11 +3,11 @@
 **Última atualização:** 2026-06-29
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/email-fluxos` (sobre `main`@`d6ee258`) — M4 PR2/PR3/PR4 + pontas soltas do front **CONSOLIDADOS E PUSHADOS** (`origin/main`@`d6ee258`); este PR (e-mail nos fluxos) a consolidar por ff, **NÃO pushado** (freio do PO)
-**Suite atual:** **2782 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
-**mypy strict:** ✅ 0 erros (388 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação)** consolidado por commit local, gate verde; **NÃO pushado** (freio do PO). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
+**Suite atual:** **2827 testes** em `tests/unit + tests/eval` (gate canônico, +45 golden MD-e); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
+**mypy strict:** ✅ 0 erros (394 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação ✅ (branch, não pushado)** 🧾
 
 > **▶ PRÓXIMO AGENTE:** leia **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — contexto completo, freios, ambiente (DB :5434 agora UP), e pendências priorizadas (Reinf cert A1, e-mail at-least-once, módulos órfãos §3.2, manifesto NF-e §3.4). Mapa das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
 
@@ -88,6 +88,44 @@ O M4 PR3 deixou provider+templates+task prontos mas **sem disparo**. Este PR lig
 3. **Domínio Resend verificado + `EMAIL_API_KEY` + Celery instalado/deployado** — atos do PO p/ os e-mails de fato saírem.
 
 **Estado:** `main` local = `d6ee258` + `716e2b6` (e-mail) + `7754270` (log) + `5a722ed` (fix Celery). Suite **2782**. **NÃO pushado** (freio do PO).
+
+---
+
+## Manifestação do Destinatário NF-e (MD-e) — PR1 Fundação · branch `feat/manifestacao-mde` · 2026-06-29
+
+Novo módulo `app/modules/manifestacao/` — obrigação legal do destinatário de NF-e (NT 2014.002 / NT 2020.001). 4 tipos de evento: 210200 (Confirmação), 210210 (Ciência), 210220 (Desconhecimento), 210240 (Não Realizada, exige justificativa 15–255 chars). `cOrgao = 91` (Ambiente Nacional, fixo para MD-e).
+
+**O que entrou:**
+- **Migration `0067`** (`alembic/versions/0067_manifestacao_nfe.py`): tabela `manifestacao_nfe` com RLS multi-tenant (§8.1), CHECKs (tipo_evento IN 4 valores, status machine 5 estados, bi-condicional justificativa/210240, formato chave 44 dígitos, CNPJ 14 dígitos, sequencial ≥ 1), UNIQUE composto `uq_manifestacao_empresa_chave_tipo_seq` (idempotência §8.9), índice parcial por `idempotency_key`.
+- **Model `ManifestacaoNFe`** em `app/shared/db/models.py`: SQLAlchemy 2.0 `Mapped[]`, todos os campos do scopo, `__table_args__` espelha migration.
+- **Exceções** em `app/shared/exceptions.py`: `ManifestacaoError` (base) + `ChaveNFeInvalida`, `ManifestacaoJustificativaObrigatoria`, `ManifestacaoJaRegistrada`, `ManifestacaoNaoEncontrada`, `ManifestacaoAssinaturaIndisponivel`.
+- **`app/modules/manifestacao/manifestacao_xml.py`**: função pura `gerar_xml_evento()` → tupla `(xml_str, id_infevento)`. `ALGORITMO_VERSAO = "mde.xml.v1"`. Gera XML `envEvento` versão 1.00, namespace `http://www.portalfiscal.inf.br/nfe`, atributo `Id = "ID" + tpEvento(6) + chNFe(44) + nSeqEvento(02d)` (54 chars). `idLote` determinístico via SHA-256[:12] do conjunto. `cOrgao = 91` fixo. `xJust` gerado apenas em 210240.
+- **`schemas.py`**: `RegistrarManifestacaoIn` (extra=forbid, patterns/min/max), `ManifestacaoNFeOut`, `TipoEventoManifestacaoIn` (StrEnum 4 valores).
+- **`repo.py`**: `ManifestacaoRepo` async — `por_id`, `por_idempotency_key`, `por_chave_tipo_seq`, `listar_empresa`, `criar`, `atualizar_status`.
+- **`service.py`**: `ManifestacaoService.registrar()` — valida chave/justificativa → idempotência → gera XML → assina via `construir_assinador()` (fail-soft: sem cert/flag → status='preparado') → persiste. Storage key determinística já calculada; write I/O ao object storage é PR3.
+- **`router.py`**: `POST /v1/empresas/{empresa_id}/manifestacao` (registrar, 201) + `GET /v1/empresas/{empresa_id}/manifestacao` (listar). Tag `manifestacao_nfe`.
+- **Plugado** em `app/main.py` (import + `app.include_router` + tag OpenAPI).
+- **Golden tests** `tests/unit/manifestacao/test_manifestacao_xml.py`: 45 testes cobrindo os 4 tipos × validações × estrutura XML × determinismo × Id correto × cOrgao=91 × edge cases (chave curta, tipo inválido, 210240 sem/com justificativa, sequencial fora de range, datetime naive, CNPJ inválido, versão `verEvento=1.00`, `idLote` numérico ≤15 dígitos).
+
+**Contagem:** 2782 (base) → **2827 confirmados** (45 golden novos). Gate (orquestrador): `pytest tests/unit tests/eval` = **2827 passed / 3 skip** · `mypy app/` = **0 / 394** · `ruff` limpo · migration `0067` validada **up/down/up no DB :5434** (GRANT a `fiscal_app` e WITH CHECK aplicaram limpos).
+
+**Decisões de domínio (com fonte):**
+- `cOrgao = 91` (Ambiente Nacional): conforme NT 2014.002 §4.1.1 — manifestação do destinatário é sempre roteada para o AN, não para o cOrgao do emitente. Fonte: [MOC SEFAZ §5.4](http://moc.sped.fazenda.pr.gov.br/RecepcaoEventoManifestacao.html).
+- `Id` do `<infEvento>`: formato `"ID" + tpEvento(6) + chNFe(44) + nSeqEvento(02d)` = 54 chars. Fonte: NT 2014.002 §4.1.1.2.
+- `descEvento` sem acentuação ("Confirmacao da Operacao", etc.): valor exato do XSD da SEFAZ — não usar versão com acento.
+- `idLote`: numérico determinístico (SHA-256[:12] hex → int % 10^15) — leiaute exige numérico ≤ 15 dígitos.
+- Namespace `http://www.portalfiscal.inf.br/nfe` (NF-e padrão, distinto do EFD-Reinf).
+
+**Pendências conscientes (PR2/PR3):**
+1. **Client SEFAZ/Focus real** — transmissão efetiva ao webservice `NFeRecepcaoEvento` é PR2 (análogo ao eSocial/Reinf). Ponto de extensão: `ManifestacaoService.registrar()` retorna o objeto com status 'preparado'/'assinado'; PR2 adicionará `transmitir()`.
+2. **Cert A1 não cabeado** — `router` passa `cert_p12_bytes=None` → `NotImplementedXmldsigSigner` → status sempre 'preparado' em dev/CI. Wire do cert do storage cifrado é pendência #20 (mesma do eSocial/Reinf).
+3. **Write I/O ao object storage** — storage_key calculada mas XML não é gravado (PR3, junto com a transmissão).
+4. **retProEvento / polling de recibo** — schema da SEFAZ para o XML de retorno é PR3.
+
+**Revisão (orquestrador, contexto fresco — os subagentes `backend-reviewer`/`fiscal-validator` travaram no watchdog 600s):** rodei os 10 princípios + invariantes sobre o diff manualmente.
+- **🔴 corrigido:** a migration `0067` tinha só `CREATE POLICY … USING` (seguindo o gabarito antigo `0013`). Adicionado **`WITH CHECK ({_RLS_USING})` + `GRANT SELECT,INSERT,UPDATE,DELETE … TO fiscal_app`** para alinhar ao **padrão vigente** (billing `0061` / lgpd `0062` / refresh `0064`) — sem `WITH CHECK` um INSERT podia gravar linha com `tenant_id` de outro tenant (§8.1).
+- **🟡 corrigidos:** docstring do `service` dizia "aceita repo por DI" (sempre cria internamente); descrição do `schema` prometia retorno `200` no caso idempotente (o router retorna `201`).
+- **Estado:** PR1 consolidado por **commit local** na branch `feat/manifestacao-mde` — **NÃO pushado, sem merge na main** (freio do PO).
 
 ---
 
