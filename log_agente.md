@@ -4,7 +4,7 @@
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
 **Branch:** `feat/email-fluxos` (sobre `main`@`d6ee258`) — M4 PR2/PR3/PR4 + pontas soltas do front **CONSOLIDADOS E PUSHADOS** (`origin/main`@`d6ee258`); este PR (e-mail nos fluxos) a consolidar por ff, **NÃO pushado** (freio do PO)
-**Suite atual:** **2779 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
+**Suite atual:** **2782 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
 **mypy strict:** ✅ 0 erros (388 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅ (código do M4 COMPLETO)** 📦
@@ -81,11 +81,11 @@ O M4 PR3 deixou provider+templates+task prontos mas **sem disparo**. Este PR lig
 - **Gate de contexto fresco** (`backend-reviewer`): **LIBERA COM RESSALVAS**, zero violação de princípio. Corrigido na sequência: comentários que diziam "idempotente/única vez" → honestos sobre a semântica **at-least-once** (enqueue antes do commit; trade-off consciente p/ notificação — não perder > não duplicar).
 
 **Pendências conscientes (`[follow-up]`):**
-1. 🔴 **Gap de registro Celery (PRÉ-EXISTENTE, não regressão)** — `app/workers/celery_app.py` não tem `autodiscover_tasks()`/`include=[...]` e `app/workers/tasks/__init__.py` está vazio. Um worker `-A app.workers.celery_app` importa só o `celery_app` → as tasks só-agendadas (as 21, inclusive `agenda.alertar_vencimentos`, e até `email.enviar`) ficam **unregistered** (`Received unregistered task`). **Enquanto não fechar isso, o alerta agendado e o envio via Celery NÃO funcionam em prod** — pré-requisito de infra junto com a ativação do Celery (pendência consciente #1 do roadmap). Fix: `include`/`autodiscover` no `_build`.
+1. ~~🔴 **Gap de registro Celery**~~ ✅ **RESOLVIDO** em `fix/celery-task-discovery` (`5a722ed`, 2026-06-29): `_descobrir_modulos_tasks()` (pkgutil) gera o `include=` da Celery real → as 21 tasks (beat + on-demand: `agenda.alertar_vencimentos`, `email.enviar`, digests do advisor, syncs) passam a registrar no worker. Auto-mantido. Stub mode inalterado. O `include` real roda em CI/deploy (grupo `--with workers`). Testes em `tests/unit/workers/`.
 2. **at-least-once** (recibo de fatura / alerta) — enqueue antes do commit; falha de commit + retry pode duplicar. Aceito p/ notificação. `Idempotency-Key` do Resend fecharia (pendência #2 do PR3).
-3. **Domínio Resend verificado + `EMAIL_API_KEY`** — ato do PO.
+3. **Domínio Resend verificado + `EMAIL_API_KEY` + Celery instalado/deployado** — atos do PO p/ os e-mails de fato saírem.
 
-**Estado:** `feat/email-fluxos` = `main`(`d6ee258`) + `716e2b6`. **NÃO pushado** (freio do PO).
+**Estado:** `main` local = `d6ee258` + `716e2b6` (e-mail) + `7754270` (log) + `5a722ed` (fix Celery). Suite **2782**. **NÃO pushado** (freio do PO).
 
 ---
 
