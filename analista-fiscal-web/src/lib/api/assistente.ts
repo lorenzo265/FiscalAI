@@ -142,7 +142,10 @@ export const assistente = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pergunta: textoPergunta }),
-      }
+      },
+      // LLM é lento; 60s evita o chat ficar "digitando" para sempre se o
+      // backend não tiver modelo configurado. POST → sem retry (não re-pergunta).
+      { timeoutMs: 60_000 }
     );
 
     const msgResposta = mapearResposta(raw, new Date().toISOString());

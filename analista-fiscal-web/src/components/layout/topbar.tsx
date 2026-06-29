@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ChevronsUpDown, Menu, Search, Sparkles, User2 } from "lucide-react";
 import { Logo } from "./logo";
 import { useEmpresaAtual } from "./empresa-provider";
+import { sair } from "@/lib/auth";
 import { useUIStore } from "@/lib/stores/ui-store";
 import {
   DropdownMenu,
@@ -16,10 +18,17 @@ import {
 import { formatarCNPJ } from "@/lib/format/cnpj";
 
 export function Topbar() {
+  const router = useRouter();
   const { empresa, resetar } = useEmpresaAtual();
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen);
   const setAssistOpen = useUIStore((s) => s.setAssistenteSidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarMobileOpen);
+
+  function sairDaConta() {
+    sair();
+    // replace (não push) para não permitir voltar ao painel autenticado.
+    router.replace("/login");
+  }
 
   return (
     <header
@@ -155,10 +164,16 @@ export function Topbar() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[200px]">
           <DropdownMenuLabel>Sua conta</DropdownMenuLabel>
-          <DropdownMenuItem>Perfil</DropdownMenuItem>
-          <DropdownMenuItem>Preferências</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/configuracoes")}>
+            Configurações
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-[var(--color-danger)]">Sair</DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-[var(--color-danger)]"
+            onClick={sairDaConta}
+          >
+            Sair
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
