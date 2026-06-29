@@ -3,11 +3,11 @@
 **Última atualização:** 2026-06-28
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/m4-reinf-serpro` (base `main` @ `9f8c834`, que já inclui M4 PR 1 storage) — M4 PR 2 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
-**Suite atual:** **2761 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
-**mypy strict:** ✅ 0 erros (382 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/m4-email` (base `feat/m4-reinf-serpro` @ `114e729`, que já inclui M4 PR 2; cadeia linear sobre `main`@`9f8c834` com M4 PR 1) — M4 PR 3 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
+**Suite atual:** **2774 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
+**mypy strict:** ✅ 0 erros (387 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (PR 1 storage + PR 2 Reinf→SERPRO ✅, em andamento)** 📦
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail transacional ✅, em andamento)** 📦
 
 ---
 
@@ -38,7 +38,21 @@ Quarto marco de produção: ligar cada integração stub/mock à produção real
 2. **Endpoints/tags do leiaute EFD-Reinf** (`recepcao/lotes`, `consulta/lotes/{protocolo}`, `protocoloEnvio`, `cdStatus`, `nrRecibo`) são best-effort com parser tolerante → **confirmar contra o Manual EFD-Reinf v2.1.2** antes de ligar em produção.
 3. **Leak httpx por request** (mirror do eSocial) — corrigir nos dois num cleanup futuro (cliente via lifespan ou `try/finally aclose`).
 
-**Estado:** `feat/m4-reinf-serpro` = `main`(`9f8c834`) + M4 PR 2 (a commitar). **NÃO pushado** (freio do PO). Próximo M4: **PR 3 — e-mail transacional** (item 14: cliente Resend/Postmark/SES atrás de Protocol + fake, templates onboarding/fatura/alerta) e **Dockerfile do front** (item 15: `output:'standalone'`).
+**Estado (PR 2):** `feat/m4-reinf-serpro` = `main`(`9f8c834`) + M4 PR 2 (`114e729`). **NÃO pushado** (freio do PO).
+
+- **M4 · PR 3 — E-mail transacional (item 14 / prompt §6.3)** (✅): não havia cliente de e-mail. Criado `app/shared/integrations/email/` espelhando o padrão do billing (Protocol + provider real + `_Fake` + factory). **Sem `EMAIL_API_KEY` → `_FakeEmailProvider` (não envia)**; a credencial liga o real — zero mock em prod.
+  - **Provider** `provider.py`: `EmailProvider` Protocol + `ResendProvider` (httpx puro, **sem SDK novo** → sem grupo opt-in; retry tenacity só em 5xx/transporte, 4xx → `EmailEnvioFalhou` sem retry, espelha `MetaWhatsAppSender`) + `_FakeEmailProvider` + `build_email_provider(settings)`. E-mail **redigido no log** (LGPD: `a***@dominio`).
+  - **Templates puros** `templates.py` (golden): `renderizar_onboarding/fatura/alerta_fiscal` — funções tipadas (zero `Any`), HTML + fallback texto, moeda pt-BR (`_brl`, Decimal), **escape XSS**, **linguagem do dono de PME** (sem jargão fiscal cru). `types.py`: `EmailMessage`/`EmailEnviado`/`TipoEmail`.
+  - **Task Celery** `app/workers/tasks/email_enviar.py` (`email.enviar`, on-demand, espelha `advisor_enviar_digests`: asyncio.run + aclose). Corpo já chega renderizado; a task só monta `EmailMessage` e delega ao provider.
+  - **Config** `EMAIL_PROVIDER`/`EMAIL_API_KEY`/`EMAIL_FROM` + exceção `EmailEnvioFalhou` (502). **Sem migration/model** — e-mail não persiste (envia + structlog).
+  - **Validação:** pytest **2774 passed, 3 skipped (+13)** · mypy strict 0 (387 arq) · `ruff check .` VERDE. Testes: templates (render/moeda/XSS) + provider (factory fake/resend, fake não envia, Resend via `httpx.MockTransport` sucesso/4xx-sem-retry).
+
+**Pendências conscientes desta onda (`[follow-up]`):**
+1. **Não wirado nos fluxos** — a capacidade (provider+templates+task) está pronta, mas o disparo real em onboarding (pós-cadastro), billing (fatura/dunning) e alerta fiscal fica para um PR de wiring (chamar `enqueue(enviar_email, ...)` nesses pontos).
+2. **Idempotência de envio** — `email.enviar` é at-least-once (acks_late + retry → risco de e-mail duplicado se o worker morrer pós-envio). Resend aceita header `Idempotency-Key`; ligar quando houver chave estável do caller.
+3. **Domínio verificado** — `EMAIL_FROM` exige domínio verificado no Resend (ato do PO, igual cert A1 / Stripe Price).
+
+**Estado:** `feat/m4-email` = cadeia `main`(`9f8c834`) + PR 2 (`114e729`) + PR 3 (a commitar). **NÃO pushado** (freio do PO). Próximo M4: **PR 4 — Dockerfile do front** (item 15: `output:'standalone'` no `next.config` + multi-stage). Depois M4 fecha; restam ativações de credencial do PO (cert A1, SERPRO, Resend, Stripe).
 
 ---
 

@@ -135,6 +135,20 @@ class Settings(BaseSettings):
         description="URL de retorno do checkout Stripe (cancelado).",
     )
 
+    # E-mail transacional (Marco 4 PR3). Vazio = _FakeEmailProvider (não envia).
+    EMAIL_PROVIDER: str = Field(
+        default="resend",
+        description="Provedor de e-mail ('resend'). Outro valor + key = fake.",
+    )
+    EMAIL_API_KEY: str = Field(
+        default="",
+        description="API key do provedor (Resend re_...). Vazio = fake provider.",
+    )
+    EMAIL_FROM: str = Field(
+        default="Arkan <nao-responda@arkan.com.br>",
+        description="Remetente padrão (precisa de domínio verificado no provedor).",
+    )
+
     # JWT — Sprint 1
     JWT_SECRET: str = Field(
         default="TROCAR_EM_PRODUCAO_gere_com_openssl_rand_hex_32",  # nosec B105

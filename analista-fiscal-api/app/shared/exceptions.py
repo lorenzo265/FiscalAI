@@ -911,6 +911,13 @@ class EnvioWhatsappFalhou(DomainError):
     http_status = 502
 
 
+class EmailEnvioFalhou(DomainError):
+    """Provedor de e-mail rejeitou o envio (4xx) ou ficou indisponível (5xx
+    após retries). Marco 4 PR3 (#14)."""
+
+    http_status = 502
+
+
 # ── SPED (Sprint 16 PR1) ─────────────────────────────────────────────────────
 
 
