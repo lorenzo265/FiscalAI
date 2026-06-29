@@ -1980,6 +1980,16 @@ class EfdReinfEvento(Base):
     transmitido_em: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    processado_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    # Marco 4 PR2 (#11) -- transmissao real (XMLDSig + envio API + recibo).
+    xml_assinado: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )
+    lote_protocolo: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    recibo_numero: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    hash_xml: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -1988,6 +1998,11 @@ class EfdReinfEvento(Base):
         ),
         Index("ix_reinf_tenant", "tenant_id"),
         Index("ix_reinf_empresa_periodo", "empresa_id", "periodo_apuracao"),
+        Index(
+            "ix_reinf_lote_protocolo",
+            "lote_protocolo",
+            postgresql_where="lote_protocolo IS NOT NULL",
+        ),
     )
 
 

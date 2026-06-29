@@ -1073,6 +1073,43 @@ class EsocialLoteInvalido(DomainError):
     http_status = 422
 
 
+# ── EFD-Reinf transmissão real (Marco 4 PR2 #11) ─────────────────────────────
+
+
+class ReinfEventoNaoEncontrado(DomainError):
+    """ID do evento EFD-Reinf inexistente para o tenant atual."""
+
+    http_status = 404
+
+
+class ReinfTransmissaoDesativada(DomainError):
+    """Tentativa de transmitir com flag REINF_TRANSMISSAO_ATIVA=false.
+
+    §8.12 — transmissão é ato consciente. Service para com 412 quando
+    admin tenta forçar o envio sem flip explícito da flag.
+    """
+
+    http_status = 412
+
+
+class ReinfAssinaturaIndisponivel(DomainError):
+    """Cert A1 ausente ou grupo opt-in 'esocial' não instalado."""
+
+    http_status = 412
+
+
+class ReinfErroAPI(DomainError):
+    """EFD-Reinf respondeu com 4xx/5xx ou XML inválido após retries."""
+
+    http_status = 502
+
+
+class ReinfLoteInvalido(DomainError):
+    """Lote vazio, com tipo inválido ou excedendo limite oficial."""
+
+    http_status = 422
+
+
 # ── DARF LP — guias de pagamento (Sprint 20 PR1) ──────────────────────────────
 
 

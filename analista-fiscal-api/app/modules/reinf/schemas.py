@@ -58,6 +58,10 @@ class EventoReinfOut(BaseModel):
     csll_retido: Decimal
     payload: dict[str, object]
     status: str
+    protocolo: str | None = None
+    lote_protocolo: str | None = None
+    recibo_numero: str | None = None
     algoritmo_versao: str
     criado_em: datetime
     transmitido_em: datetime | None
+    processado_em: datetime | None = None

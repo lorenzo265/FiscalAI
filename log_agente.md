@@ -1,13 +1,13 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-23
+**Última atualização:** 2026-06-28
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/m4-storage-s3` (base `main` @ `68f4d00`; M3 já pushado em `origin/main`) — M4 PR 1 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
-**Suite atual:** **2741 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
-**mypy strict:** ✅ 0 erros (377 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/m4-reinf-serpro` (base `main` @ `9f8c834`, que já inclui M4 PR 1 storage) — M4 PR 2 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
+**Suite atual:** **2761 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
+**mypy strict:** ✅ 0 erros (382 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (em andamento)** 📦
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (PR 1 storage + PR 2 Reinf→SERPRO ✅, em andamento)** 📦
 
 ---
 
@@ -24,7 +24,21 @@ Quarto marco de produção: ligar cada integração stub/mock à produção real
   - **Validado à mão + integração real:** novo `tests/integration/test_sped_storage.py` insere `arquivo_sped` com BYTEA → move → confere a **coluna crua** (`conteudo_bytea` NULL, `storage_key` preenchida) → `ler_conteudo_sped` recupera os bytes do disco → idempotência (2º move = no-op). Golden `tests/unit/sped/test_storage_sped.py` (10: chave, mover/idempotência/no-op, ler storage-first/fallback/erro, best-effort). Migration 0065 aplicada no DB :5434 e conferida (`is_nullable=YES`).
   - **Validação:** pytest **2741 passed, 3 skipped (+10)** · integração **36 passed (+1)** · mypy 0 (377 arq) · ruff limpo nos arquivos tocados.
 
-**Estado:** `feat/m4-storage-s3` = `main`(`68f4d00`) + M4 PR 1 (a commitar). DB :5434 em **0065**. **NÃO pushado** (freio do PO). Próximo M4: **PR 2 — EFD-Reinf→SERPRO** (item 11), depois e-mail transacional (14) e Dockerfile do front (15).
+- **M4 · PR 2 — Transmissão EFD-Reinf → SERPRO/RFB (item 11 / prompt §6.2)** (✅): o Reinf saía da Sprint 11 PR2 com `status='preparado'` **permanente** (só payload JSONB R-4020). Agora tem o **pipeline de transmissão completo** (assinar XMLDSig → empacotar lote → enviar → recibo → status final), espelhando 1:1 o gabarito eSocial (`pessoal/transmissao_esocial_service.py` + `shared/integrations/esocial/`). Tudo atrás de flag opt-in **`REINF_TRANSMISSAO_ATIVA`** (default False, §8.12).
+  - **Cliente dedicado** `app/shared/integrations/reinf/{types,client}.py` (espelha o do eSocial): `ReinfClient.enviar_lote`/`consultar_recibo`, envelope `<Reinf><envioLoteEventos>` da recepção assíncrona, idempotência `X-Idempotency-Key`, retry tenacity só em `TransportError`, parser tolerante a aliases do leiaute. `ReinfError`.
+  - **Serializador puro** `app/modules/reinf/reinf_xml.py` (golden): payload R-4020 → XML canônico `<Reinf xmlns=…evt4020…/v2_01_02><evtPgtoBenefPJ Id="ID…">`, com conversão determinística snake_case→camelCase (`ide_contri`→`ideContri`) e skip de chaves meta/internas (`_retencao_snapshot`). `gerar_id_evento` (ID+CNPJ+timestamp+seq).
+  - **Serviço** `app/modules/reinf/transmissao_reinf_service.py`: `assinar_evento` (fail-soft: sem cert/flag → `ReinfAssinaturaIndisponivel` 412, evento fica em `preparado` mas **grava hash_xml**), `transmitir_lote` (fail-closed 412 se flag off; idempotency UUID5 sobre conjunto **ordenado** de id_evento, namespace **distinto** do eSocial), `aplicar_recibo` (**aceito = presença de `nrRecibo`**, não código mágico "201" — decisão deliberada pro leiaute Reinf). Reusa `construir_assinador` (sem crypto nova). Exceções `Reinf*` em `shared/exceptions.py`.
+  - **Migration 0065→0066:** add `processado_em/xml_assinado/lote_protocolo/recibo_numero/hash_xml` + índice parcial `ix_reinf_lote_protocolo` em `efd_reinf_evento` (nullable, backward-compat; tabela é da Sprint 11 PR2 — **sem RLS/grant novos**). Model atualizado. `EfdReinfEvento` **não tinha CHECK de status** (≠ eSocial) → nada a alterar em constraint.
+  - **Router:** +3 endpoints (`/reinf/eventos/{id}/assinar`, `/reinf/transmissao/lotes`, `/.../{protocolo}/consultar`) espelhando o eSocial; `EventoReinfOut` passou a expor `protocolo/lote_protocolo/recibo_numero/processado_em`.
+  - **Validação:** pytest **2761 passed, 3 skipped (+20)** · mypy strict 0 (382 arq) · `ruff check .` VERDE · migration validada **offline** (`alembic upgrade 0065:0066 --sql` → DDL limpo; grafo resolve head 0066). **DB vivo indisponível neste shell** (sem container Postgres) → `alembic upgrade head` real + integração ficam p/ quem tem o DB de pé (o gabarito eSocial também é só unit/mock).
+  - **Gate de contexto fresco** (`backend-reviewer`): **LIBERA COM RESSALVAS**, zero violação de princípio. Avisos = espelho do eSocial (não regressão): cliente httpx criado por request sem `aclose` (dívida pré-existente nos dois); `empresa_id` do path não validado cross-empresa dentro do tenant (RLS cobre cross-tenant). Pendências registradas abaixo.
+
+**Pendências conscientes desta onda (`[follow-up]`):**
+1. **Cert A1 não cabeado** — `router._construir_servico_transmissao` passa `cert_p12_bytes=None` fixo → mesmo com `REINF_TRANSMISSAO_ATIVA=True` o assinador é `NotImplemented` (cert None) e o pipeline **não transmite de fato** (inerte, pré-piloto). Wire do cert do storage cifrado é a mesma pendência #20 do eSocial.
+2. **Endpoints/tags do leiaute EFD-Reinf** (`recepcao/lotes`, `consulta/lotes/{protocolo}`, `protocoloEnvio`, `cdStatus`, `nrRecibo`) são best-effort com parser tolerante → **confirmar contra o Manual EFD-Reinf v2.1.2** antes de ligar em produção.
+3. **Leak httpx por request** (mirror do eSocial) — corrigir nos dois num cleanup futuro (cliente via lifespan ou `try/finally aclose`).
+
+**Estado:** `feat/m4-reinf-serpro` = `main`(`9f8c834`) + M4 PR 2 (a commitar). **NÃO pushado** (freio do PO). Próximo M4: **PR 3 — e-mail transacional** (item 14: cliente Resend/Postmark/SES atrás de Protocol + fake, templates onboarding/fatura/alerta) e **Dockerfile do front** (item 15: `output:'standalone'`).
 
 ---
 

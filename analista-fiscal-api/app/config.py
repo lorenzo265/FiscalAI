@@ -386,6 +386,53 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Marco 4 PR2 (#11) — EFD-Reinf transmissão real (SERPRO/RFB).
+    # Mesmo padrão do eSocial: Sandbox=True por default, opt-in explícito
+    # pra produção. Endpoints oficiais confirmar no Manual EFD-Reinf antes
+    # de ligar em prod (leiaute v2.1.2, recepção assíncrona de lote).
+    REINF_BASE_URL_SANDBOX: str = Field(
+        default="https://pre-reinf.receita.economia.gov.br",
+        description="Endpoint sandbox/produção restrita do EFD-Reinf.",
+    )
+    REINF_BASE_URL_PROD: str = Field(
+        default="https://reinf.receita.economia.gov.br",
+        description="Endpoint produção real do EFD-Reinf.",
+    )
+    REINF_SANDBOX: bool = Field(
+        default=True,
+        description=(
+            "True = produção restrita (tpAmb=2); False = produção real "
+            "(tpAmb=1). Default True em dev pra nunca emitir evento real."
+        ),
+    )
+    REINF_TRANSMISSAO_ATIVA: bool = Field(
+        default=False,
+        description=(
+            "§8.12 — Transmissão é ato consciente. Flag opt-in: False = "
+            "evento fica em status='assinado' sem enviar (pronto pra admin "
+            "baixar e transmitir manualmente). True = pipeline envia "
+            "automaticamente após assinatura."
+        ),
+    )
+    REINF_LOTE_MAX_EVENTOS: int = Field(
+        default=50,
+        description=(
+            "Máximo de eventos por lote EFD-Reinf. Service quebra "
+            "automaticamente lotes maiores."
+        ),
+    )
+    REINF_TIMEOUT_SEC: int = Field(
+        default=30,
+        description="Timeout HTTP por chamada à API EFD-Reinf.",
+    )
+    REINF_RECIBO_POLL_INTERVAL_SEC: int = Field(
+        default=15,
+        description=(
+            "Intervalo entre polls de consulta de recibo enquanto o "
+            "processamento do lote não finaliza."
+        ),
+    )
+
     # Sprint 19.5 PR2 — Painel admin de tabelas tributárias
     ADMIN_WHATSAPP_PHONE: str | None = Field(
         default=None,
