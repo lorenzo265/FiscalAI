@@ -1,11 +1,11 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-28
+**Última atualização:** 2026-06-29
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/m4-front-dockerfile` (cadeia linear sobre `main`@`9f8c834`: PR2 `114e729` + PR3 `2a0a18c` + PR4) — M4 PR 4 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
-**Suite atual:** **2774 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `docker build --check` ✅
-**mypy strict:** ✅ 0 erros (387 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/email-fluxos` (sobre `main`@`d6ee258`) — M4 PR2/PR3/PR4 + pontas soltas do front **CONSOLIDADOS E PUSHADOS** (`origin/main`@`d6ee258`); este PR (e-mail nos fluxos) a consolidar por ff, **NÃO pushado** (freio do PO)
+**Suite atual:** **2779 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
+**mypy strict:** ✅ 0 erros (388 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅ (código do M4 COMPLETO)** 📦
 
@@ -48,7 +48,7 @@ Quarto marco de produção: ligar cada integração stub/mock à produção real
   - **Validação:** pytest **2774 passed, 3 skipped (+13)** · mypy strict 0 (387 arq) · `ruff check .` VERDE. Testes: templates (render/moeda/XSS) + provider (factory fake/resend, fake não envia, Resend via `httpx.MockTransport` sucesso/4xx-sem-retry).
 
 **Pendências conscientes desta onda (`[follow-up]`):**
-1. **Não wirado nos fluxos** — a capacidade (provider+templates+task) está pronta, mas o disparo real em onboarding (pós-cadastro), billing (fatura/dunning) e alerta fiscal fica para um PR de wiring (chamar `enqueue(enviar_email, ...)` nesses pontos).
+1. ~~**Não wirado nos fluxos**~~ ✅ **RESOLVIDO** em `feat/email-fluxos` (2026-06-29) — ver entrada "M4 pós-PR4" abaixo.
 2. **Idempotência de envio** — `email.enviar` é at-least-once (acks_late + retry → risco de e-mail duplicado se o worker morrer pós-envio). Resend aceita header `Idempotency-Key`; ligar quando houver chave estável do caller.
 3. **Domínio verificado** — `EMAIL_FROM` exige domínio verificado no Resend (ato do PO, igual cert A1 / Stripe Price).
 
@@ -64,7 +64,28 @@ Quarto marco de produção: ligar cada integração stub/mock à produção real
 **Estado:** `feat/m4-front-dockerfile` = cadeia `main`(`9f8c834`) + PR 2 (`114e729`) + PR 3 (`2a0a18c`) + PR 4 (a commitar). **NÃO pushado** (freio do PO).
 
 ### 🚀 Marco 4 — código COMPLETO (PRs 1–4)
-Todos os "últimos mocks" do go-live foram religados atrás de env/flag, sem mock: storage S3 (SPED), EFD-Reinf→SERPRO, e-mail transacional e o Dockerfile do front. **No dia em que a credencial entra no `.env` de produção, a capacidade liga sozinha.** Restam só **ativações do PO** (não-código): cert A1 (eSocial/Reinf), credenciais SERPRO, `EMAIL_API_KEY` + domínio Resend, `STRIPE_*` + Prices, bucket S3. Consolidar `main` por ff (PR2→PR3→PR4) + push = decisão do PO.
+Todos os "últimos mocks" do go-live foram religados atrás de env/flag, sem mock: storage S3 (SPED), EFD-Reinf→SERPRO, e-mail transacional e o Dockerfile do front. **No dia em que a credencial entra no `.env` de produção, a capacidade liga sozinha.** Restam só **ativações do PO** (não-código): cert A1 (eSocial/Reinf), credenciais SERPRO, `EMAIL_API_KEY` + domínio Resend, `STRIPE_*` + Prices, bucket S3. **PR2→PR3→PR4 + pontas soltas do front foram consolidados na `main` e PUSHADOS (`origin/main`@`d6ee258`, 2026-06-29, PO liberou).**
+
+---
+
+## M4 pós-PR4 — E-mail plugado nos fluxos (resolve a pendência #1 do PR3) · branch `feat/email-fluxos` · 2026-06-29
+
+O M4 PR3 deixou provider+templates+task prontos mas **sem disparo**. Este PR liga os 3 fluxos (commit `716e2b6`):
+
+- **Helper único** `enfileirar_email(msg, *, to, tags)` em `app/workers/tasks/email_enviar.py` — preenche o `to` real (templates renderizam com `to=""`) e despacha via `enqueue` (no-op sem Celery, **nunca levanta**).
+- **Onboarding** — `auth/service.registrar()` dispara boas-vindas **pós-commit** + try/except (fail-soft, nunca quebra o cadastro).
+- **Fatura** — `billing/service._registrar_fatura()` manda recibo em `invoice.paid` (status="paga"), via novo `UsuarioRepo.primeira_do_tenant(tenant_id)` (filtra por `tenant_id` explícito → seguro no webhook superuser e sob RLS). Fail-soft.
+- **Alerta fiscal** — novo worker agendado `app/workers/tasks/alerta_fiscal.py` (beat `agenda.alertar_vencimentos`, diário 06:45 BR) varre `AgendaItem` pendentes a vencer na janela `ALERTA_AGENDA_DIAS` (default 7) com `alertado_em IS NULL`, dispara e-mail e marca `alertado_em`. Superuser cross-tenant, fail-soft por item (espelha `advisor_enviar_digests`). `AgendaItem.alertado_em` já existia (migration 0003) → **sem migration nova**.
+- Config nova: `APP_BASE_URL` (links nos e-mails) + `ALERTA_AGENDA_DIAS`. Testes: `tests/unit/email/test_enfileirar.py` (dispatch+moeda+sem-jargão) + `tests/unit/agenda/test_worker_alerta.py` (callable+beat).
+- **Gate:** pytest **2779 passed, 3 skipped (+5)** · mypy 0 (388) · ruff `check .` VERDE.
+- **Gate de contexto fresco** (`backend-reviewer`): **LIBERA COM RESSALVAS**, zero violação de princípio. Corrigido na sequência: comentários que diziam "idempotente/única vez" → honestos sobre a semântica **at-least-once** (enqueue antes do commit; trade-off consciente p/ notificação — não perder > não duplicar).
+
+**Pendências conscientes (`[follow-up]`):**
+1. 🔴 **Gap de registro Celery (PRÉ-EXISTENTE, não regressão)** — `app/workers/celery_app.py` não tem `autodiscover_tasks()`/`include=[...]` e `app/workers/tasks/__init__.py` está vazio. Um worker `-A app.workers.celery_app` importa só o `celery_app` → as tasks só-agendadas (as 21, inclusive `agenda.alertar_vencimentos`, e até `email.enviar`) ficam **unregistered** (`Received unregistered task`). **Enquanto não fechar isso, o alerta agendado e o envio via Celery NÃO funcionam em prod** — pré-requisito de infra junto com a ativação do Celery (pendência consciente #1 do roadmap). Fix: `include`/`autodiscover` no `_build`.
+2. **at-least-once** (recibo de fatura / alerta) — enqueue antes do commit; falha de commit + retry pode duplicar. Aceito p/ notificação. `Idempotency-Key` do Resend fecharia (pendência #2 do PR3).
+3. **Domínio Resend verificado + `EMAIL_API_KEY`** — ato do PO.
+
+**Estado:** `feat/email-fluxos` = `main`(`d6ee258`) + `716e2b6`. **NÃO pushado** (freio do PO).
 
 ---
 
