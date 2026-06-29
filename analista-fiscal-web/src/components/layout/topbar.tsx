@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronsUpDown, Menu, Search, Sparkles, User2 } from "lucide-react";
 import { Logo } from "./logo";
 import { useEmpresaAtual } from "./empresa-provider";
@@ -19,6 +20,7 @@ import { formatarCNPJ } from "@/lib/format/cnpj";
 
 export function Topbar() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { empresa, resetar } = useEmpresaAtual();
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen);
   const setAssistOpen = useUIStore((s) => s.setAssistenteSidebarOpen);
@@ -26,6 +28,10 @@ export function Topbar() {
 
   function sairDaConta() {
     sair();
+    // Limpa o contexto de empresa e o cache do React Query — não vazar dados do
+    // tenant anterior para o próximo login (o app não recarrega a página).
+    resetar();
+    queryClient.clear();
     // replace (não push) para não permitir voltar ao painel autenticado.
     router.replace("/login");
   }

@@ -94,17 +94,21 @@ export function FormEmpresa({ empresa }: { empresa: Empresa }) {
   }, [regime, form]);
 
   async function aoSalvar(input: FormInput) {
-    const ie = input.inscricaoEstadual?.trim() || undefined;
-    const im = input.inscricaoMunicipal?.trim() || undefined;
+    // `null` = limpar (campo em branco que o form edita); o adapter o envia.
+    const ie = input.inscricaoEstadual?.trim() || null;
+    const im = input.inscricaoMunicipal?.trim() || null;
     try {
       // Persiste no backend (PUT /v1/empresas/{id}) — antes só gravava no
-      // contexto e perdia no reload.
+      // contexto e perdia no reload. Só mando os campos que ESTE form edita;
+      // `cnaePrincipal`/`codigoMunicipioIbge` são deliberadamente omitidos para
+      // o backend preservá-los (mandá-los como null zerava o CNAE — bug do PUT).
       const persistida = await empresa_api.atualizar(empresa.id, {
         razaoSocial: input.razaoSocial.trim(),
-        nomeFantasia: input.nomeFantasia?.trim() || undefined,
+        nomeFantasia: input.nomeFantasia?.trim() || null,
         regime: input.regime,
+        // Fora do Simples, limpa o anexo (null); no Simples, define o escolhido.
         anexoSimples:
-          input.regime === "SIMPLES_NACIONAL" ? input.anexoSimples : undefined,
+          input.regime === "SIMPLES_NACIONAL" ? input.anexoSimples : null,
         uf: input.uf,
         municipio: input.municipio.trim(),
         inscricaoEstadual: ie,
@@ -114,8 +118,8 @@ export function FormEmpresa({ empresa }: { empresa: Empresa }) {
       // O EmpresaOut não ecoa IE/IM — preserva o que o usuário digitou.
       const atualizada: Empresa = {
         ...persistida,
-        inscricaoEstadual: ie,
-        inscricaoMunicipal: im,
+        inscricaoEstadual: ie ?? undefined,
+        inscricaoMunicipal: im ?? undefined,
       };
       await salvarEmpresa(atualizada);
       toast.success("Cadastro atualizado", {

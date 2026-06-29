@@ -159,7 +159,7 @@ const ECAC_PRIORIDADE_TOM: Record<string, "error" | "warn" | "neutral"> = {
 };
 
 function PainelEcac() {
-  const { data, isLoading } = useMensagensEcac();
+  const { data, isLoading, isError } = useMensagensEcac();
   const sincronizar = useSincronizarEcac();
   const mensagens = data ?? [];
 
@@ -208,6 +208,11 @@ function PainelEcac() {
       {isLoading ? (
         <div className="px-5 py-6 text-sm text-[var(--color-ink-3)]">
           Carregando mensagens do e-CAC...
+        </div>
+      ) : isError ? (
+        <div className="px-5 py-6 text-sm text-[var(--color-ink-2)]">
+          Não foi possível carregar as mensagens do e-CAC agora. Tente{" "}
+          <span className="font-semibold">Sincronizar</span> de novo.
         </div>
       ) : mensagens.length === 0 ? (
         <div className="px-5 py-6 text-sm text-[var(--color-ink-2)]">

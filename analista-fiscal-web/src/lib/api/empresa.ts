@@ -207,18 +207,23 @@ export interface CriarEmpresaInput {
   faturamento12m?: number;
 }
 
-/** Campos editáveis de `PUT /v1/empresas/{id}` (todos opcionais — só envia o que veio). */
+/**
+ * Campos editáveis de `PUT /v1/empresas/{id}`. Semântica de PUT parcial:
+ * `undefined` = "não gerencio este campo" → NÃO é enviado (o backend
+ * `exclude_unset` preserva o valor atual); `null` = "limpar"; valor = "definir".
+ * Isso evita zerar dado-mestre (ex.: `cnaePrincipal`) que o form não edita.
+ */
 export interface AtualizarEmpresaInput {
   razaoSocial?: string;
-  nomeFantasia?: string;
+  nomeFantasia?: string | null;
   regime?: RegimeTributario;
-  anexoSimples?: string;
-  cnaePrincipal?: string;
+  anexoSimples?: string | null;
+  cnaePrincipal?: string | null;
   municipio?: string;
-  codigoMunicipioIbge?: string;
+  codigoMunicipioIbge?: string | null;
   uf?: string;
-  inscricaoEstadual?: string;
-  inscricaoMunicipal?: string;
+  inscricaoEstadual?: string | null;
+  inscricaoMunicipal?: string | null;
   faturamento12m?: number;
 }
 
@@ -237,20 +242,26 @@ export const empresa = {
 
   /** `POST /v1/empresas` → cria empresa (EmpresaIn). */
   criar: async (input: CriarEmpresaInput): Promise<Empresa> => {
-    const body = toSnake({
-      cnpj: input.cnpj,
-      razaoSocial: input.razaoSocial,
-      nomeFantasia: input.nomeFantasia ?? null,
-      regimeTributario: REGIME_FRONT_TO_BACK[input.regime],
-      anexoSimples: input.anexoSimples ?? null,
-      cnaePrincipal: input.cnaePrincipal ?? null,
-      municipio: input.municipio ?? null,
-      codigoMunicipioIbge: input.codigoMunicipioIbge ?? null,
-      uf: input.uf ?? null,
+    const body = {
+      // `toSnake` converte camel→snake, MAS só insere `_` antes de LETRAS
+      // maiúsculas — não antes de dígitos. `faturamento12m` ficaria igual e o
+      // EmpresaIn (extra="forbid") devolveria 422; por isso a chave de dinheiro
+      // é montada à mão como `faturamento_12m`.
+      ...(toSnake({
+        cnpj: input.cnpj,
+        razaoSocial: input.razaoSocial,
+        nomeFantasia: input.nomeFantasia ?? null,
+        regimeTributario: REGIME_FRONT_TO_BACK[input.regime],
+        anexoSimples: input.anexoSimples ?? null,
+        cnaePrincipal: input.cnaePrincipal ?? null,
+        municipio: input.municipio ?? null,
+        codigoMunicipioIbge: input.codigoMunicipioIbge ?? null,
+        uf: input.uf ?? null,
+      }) as Record<string, unknown>),
       // Dinheiro como string decimal (nunca float no body).
-      faturamento12m:
+      faturamento_12m:
         input.faturamento12m != null ? String(input.faturamento12m) : null,
-    });
+    };
     const out = await fetchJson("/empresas", empresaOutSchema, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -262,26 +273,37 @@ export const empresa = {
   /**
    * `PUT /v1/empresas/{id}` → atualiza o cadastro (EmpresaUpdateIn → EmpresaOut).
    *
-   * Body montado em snake_case explícito porque IE/IM viram `ie`/`im` (não é
-   * conversão camel→snake direta). O `EmpresaOut` não ecoa IE/IM — o caller
-   * preserva esses dois a partir do form.
+   * PUT PARCIAL: só envia as chaves que o caller forneceu (≠ `undefined`).
+   * Chaves omitidas são preservadas pelo backend (`model_dump(exclude_unset)`).
+   * Isto é CRÍTICO: mandar `cnae_principal: null` por engano (campo que o form
+   * não edita) zerava o CNAE da empresa a cada save — não enviar a chave evita.
+   * Body em snake_case explícito porque IE/IM viram `ie`/`im` (não é conversão
+   * camel→snake direta). O `EmpresaOut` não ecoa IE/IM — o caller os preserva.
    */
   atualizar: async (id: string, input: AtualizarEmpresaInput): Promise<Empresa> => {
-    const body = {
-      razao_social: input.razaoSocial ?? null,
-      nome_fantasia: input.nomeFantasia ?? null,
-      regime_tributario: input.regime ? REGIME_FRONT_TO_BACK[input.regime] : null,
-      anexo_simples: input.anexoSimples ?? null,
-      cnae_principal: input.cnaePrincipal ?? null,
-      municipio: input.municipio ?? null,
-      codigo_municipio_ibge: input.codigoMunicipioIbge ?? null,
-      uf: input.uf ?? null,
-      ie: input.inscricaoEstadual ?? null,
-      im: input.inscricaoMunicipal ?? null,
-      // Dinheiro como string decimal (nunca float no body).
-      faturamento_12m:
-        input.faturamento12m != null ? String(input.faturamento12m) : null,
+    const body: Record<string, string | null> = {};
+    // `undefined` → omite (preserva no backend); `null` → limpa; valor → define.
+    const definir = (chave: string, valor: string | null | undefined): void => {
+      if (valor !== undefined) body[chave] = valor;
     };
+    definir("razao_social", input.razaoSocial);
+    definir("nome_fantasia", input.nomeFantasia);
+    definir(
+      "regime_tributario",
+      input.regime ? REGIME_FRONT_TO_BACK[input.regime] : undefined
+    );
+    definir("anexo_simples", input.anexoSimples);
+    definir("cnae_principal", input.cnaePrincipal);
+    definir("municipio", input.municipio);
+    definir("codigo_municipio_ibge", input.codigoMunicipioIbge);
+    definir("uf", input.uf);
+    definir("ie", input.inscricaoEstadual);
+    definir("im", input.inscricaoMunicipal);
+    // Dinheiro como string decimal (nunca float no body).
+    definir(
+      "faturamento_12m",
+      input.faturamento12m != null ? String(input.faturamento12m) : undefined
+    );
     const out = await fetchJson(`/empresas/${id}`, empresaOutSchema, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
