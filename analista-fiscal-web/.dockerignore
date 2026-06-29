@@ -1,0 +1,27 @@
+# Marco 4 PR4 (#15) -- contexto de build minimo + sem segredos.
+# .env* fora do contexto: NEXT_PUBLIC_API_BASE_URL entra por --build-arg.
+node_modules
+.next
+out
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Segredos / ambiente local (NUNCA no contexto de build)
+.env
+.env.*
+!.env.local.example
+
+# VCS / IDE / OS
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# Artefatos de analise / teste / docs
+coverage
+.turbo
+*.md
+Dockerfile
+.dockerignore

@@ -3,11 +3,11 @@
 **Última atualização:** 2026-06-28
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/m4-email` (base `feat/m4-reinf-serpro` @ `114e729`, que já inclui M4 PR 2; cadeia linear sobre `main`@`9f8c834` com M4 PR 1) — M4 PR 3 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
-**Suite atual:** **2774 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed**
+**Branch:** `feat/m4-front-dockerfile` (cadeia linear sobre `main`@`9f8c834`: PR2 `114e729` + PR3 `2a0a18c` + PR4) — M4 PR 4 a consolidar na `main` por ff; **NÃO pushado** (freio do PO)
+**Suite atual:** **2774 testes** em `tests/unit + tests/eval` (gate canônico); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `docker build --check` ✅
 **mypy strict:** ✅ 0 erros (387 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks (PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail transacional ✅, em andamento)** 📦
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅ (código do M4 COMPLETO)** 📦
 
 ---
 
@@ -52,7 +52,19 @@ Quarto marco de produção: ligar cada integração stub/mock à produção real
 2. **Idempotência de envio** — `email.enviar` é at-least-once (acks_late + retry → risco de e-mail duplicado se o worker morrer pós-envio). Resend aceita header `Idempotency-Key`; ligar quando houver chave estável do caller.
 3. **Domínio verificado** — `EMAIL_FROM` exige domínio verificado no Resend (ato do PO, igual cert A1 / Stripe Price).
 
-**Estado:** `feat/m4-email` = cadeia `main`(`9f8c834`) + PR 2 (`114e729`) + PR 3 (a commitar). **NÃO pushado** (freio do PO). Próximo M4: **PR 4 — Dockerfile do front** (item 15: `output:'standalone'` no `next.config` + multi-stage). Depois M4 fecha; restam ativações de credencial do PO (cert A1, SERPRO, Resend, Stripe).
+**Estado (PR 3):** `feat/m4-email` = cadeia `main`(`9f8c834`) + PR 2 (`114e729`) + PR 3 (`2a0a18c`). **NÃO pushado** (freio do PO).
+
+- **M4 · PR 4 — Dockerfile do frontend (item 15 / prompt §6.4)** (✅): `analista-fiscal-web` não tinha imagem de produção. Adicionado **`output: 'standalone'`** no `next.config.mjs` (build self-contained → `.next/standalone/server.js`) + **`Dockerfile` multi-stage** (deps `npm ci` → builder `next build` → runner mínimo) espelhando as convenções do `Dockerfile.api` (syntax 1.7, imagem slim, **user não-root uid 1000**, EXPOSE + CMD explícito, HEALTHCHECK).
+  - **`NEXT_PUBLIC_API_BASE_URL` por build-arg** (é `NEXT_PUBLIC_*` → inlinado em build-time; default = mesmo fallback do `src/lib/http.ts`, o deploy do PO sobrescreve com `--build-arg`). `PORT`/`HOSTNAME` no runner (o `server.js` standalone os lê).
+  - **`.dockerignore`** exclui `node_modules`/`.next` e **`.env*`** (não vaza segredo pro contexto de build; só `NEXT_PUBLIC_API_BASE_URL` entra, via build-arg).
+  - **Validação:** `npm run build` ✅ (gera `.next/standalone/server.js` + `.next/static` + `public` — as 3 fontes que o Dockerfile copia, conferidas) · **`docker build --check` ✅** ("no warnings found": syntax, base image `node:20-bookworm-slim`, .dockerignore, best-practices). Docker build completo (npm ci + next build no container) fica p/ a CI/deploy do PO. Revisor de design (gates anti-AI-slop) **N/A** — sem superfície de UI.
+
+**Pendência consciente (`[follow-up]`):** o §6.4 também sugeria `error.tsx` + retry/timeout no fetch (robustez da auditoria UX) — é **código de frontend que pede verificação visual** (skill/verifier de front); fica para um PR de frontend dedicado, fora do escopo deste artefato de deploy.
+
+**Estado:** `feat/m4-front-dockerfile` = cadeia `main`(`9f8c834`) + PR 2 (`114e729`) + PR 3 (`2a0a18c`) + PR 4 (a commitar). **NÃO pushado** (freio do PO).
+
+### 🚀 Marco 4 — código COMPLETO (PRs 1–4)
+Todos os "últimos mocks" do go-live foram religados atrás de env/flag, sem mock: storage S3 (SPED), EFD-Reinf→SERPRO, e-mail transacional e o Dockerfile do front. **No dia em que a credencial entra no `.env` de produção, a capacidade liga sozinha.** Restam só **ativações do PO** (não-código): cert A1 (eSocial/Reinf), credenciais SERPRO, `EMAIL_API_KEY` + domínio Resend, `STRIPE_*` + Prices, bucket S3. Consolidar `main` por ff (PR2→PR3→PR4) + push = decisão do PO.
 
 ---
 
