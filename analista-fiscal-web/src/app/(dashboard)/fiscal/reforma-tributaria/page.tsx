@@ -13,6 +13,7 @@ import { Pill } from "@/components/shared/pill";
 import { Framed } from "@/components/blueprint/framed";
 import { FiscalSubnav } from "@/components/fiscal/fiscal-subnav";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import { useSimulacaoReforma } from "@/hooks/use-reforma";
 import {
   formatarMoeda,
   formatarMoedaCompacta,
@@ -101,12 +102,19 @@ const COMPARATIVO: ComparativoLinha[] = [
 
 export default function FiscalReformaTributariaPage() {
   const { empresa } = useEmpresaAtual();
+  const { data: sim } = useSimulacaoReforma();
   const reduced = useReducedMotion();
   const fat = empresa?.faturamento12m ?? 850_000;
 
-  const impostoAtualAprox = fat * 0.082;
-  const impostoNovoAprox = fat * 0.094;
-  const diferenca = impostoNovoAprox - impostoAtualAprox;
+  // Cenário "realista" no regime pleno (2033) é o comparativo pós-reforma.
+  const realista = sim?.cenarios.find((c) => c.cenario === "realista");
+  // Números reais do backend quando disponíveis; fallback aproximado mantém a
+  // tela viva quando a API ainda não respondeu (ou está fora).
+  const impostoAtualAprox = sim ? sim.cargaAtualTotal : fat * 0.082;
+  const impostoNovoAprox = realista ? realista.totalProjetado : fat * 0.094;
+  const diferenca = realista
+    ? realista.deltaAbsoluto
+    : impostoNovoAprox - impostoAtualAprox;
   const tendencia: "sobe" | "desce" | "neutro" =
     Math.abs(diferenca) < impostoAtualAprox * 0.02
       ? "neutro"
@@ -294,14 +302,21 @@ export default function FiscalReformaTributariaPage() {
 
           <p className="flex items-start gap-2 text-[11px] text-[var(--color-ink-3)] leading-snug">
             <Info className="size-3.5 mt-0.5 shrink-0" aria-hidden />
-            Estimativa simplificada baseada em alíquotas cheias e faturamento de{" "}
-            <span
-              className="mono text-[var(--color-ink-2)] mx-1"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {formatarMoeda(fat)}
-            </span>
-            . O valor final depende do split de receita por estado/atividade.
+            {sim ? (
+              sim.observacaoEstimativa
+            ) : (
+              <>
+                Estimativa simplificada baseada em alíquotas cheias e faturamento
+                de{" "}
+                <span
+                  className="mono text-[var(--color-ink-2)] mx-1"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {formatarMoeda(fat)}
+                </span>
+                . O valor final depende do split de receita por estado/atividade.
+              </>
+            )}
           </p>
         </Framed>
 

@@ -21,6 +21,7 @@ import { contabil } from "@/lib/api/contabil";
 import { assistente } from "@/lib/api/assistente";
 import { compliance } from "@/lib/api/compliance";
 import { relatorios } from "@/lib/api/relatorios";
+import { reforma } from "@/lib/api/reforma";
 
 export const api = {
   auth,
@@ -34,4 +35,5 @@ export const api = {
   assistente,
   compliance,
   relatorios,
+  reforma,
 };

@@ -75,6 +75,27 @@ export function useEnviarIntimacaoAoContador() {
   });
 }
 
+/** Mensagens reais do e-CAC (`GET /empresas/{id}/e-cac/mensagens`). */
+export function useMensagensEcac() {
+  const { empresa } = useEmpresaAtual();
+  return useQuery({
+    queryKey: ["compliance", "ecac-mensagens", empresa?.cnpj],
+    queryFn: () => api.compliance.listarMensagensEcac(),
+    enabled: !!empresa,
+  });
+}
+
+/** Dispara o sync com a Receita (`POST /empresas/{id}/e-cac/sync`). */
+export function useSincronizarEcac() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.compliance.sincronizarEcac(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+
 export function useParcelamentos() {
   const { empresa } = useEmpresaAtual();
   return useQuery({

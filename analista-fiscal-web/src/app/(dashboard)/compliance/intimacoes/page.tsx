@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Mail, Send, X } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, RefreshCw, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,10 @@ import {
   useEnviarIntimacaoAoContador,
   useIntimacoes,
   useMarcarIntimacaoLida,
+  useMensagensEcac,
+  useSincronizarEcac,
 } from "@/hooks/use-compliance";
+import type { MensagemEcac } from "@/lib/api/compliance";
 import {
   ORGAO_LABEL,
   type Intimacao,
@@ -96,6 +99,8 @@ export default function IntimacoesPage() {
 
       <ComplianceSubnav />
 
+      <PainelEcac />
+
       {isLoading ? (
         <LoadingState titulo="Buscando intimações..." />
       ) : isError ? (
@@ -130,6 +135,130 @@ export default function IntimacoesPage() {
         onClose={() => setSelecionada(null)}
       />
     </motion.div>
+  );
+}
+
+// ── Caixa postal do e-CAC (mensagens reais da Receita) ───────────────────────
+
+const ECAC_TIPO_LABEL: Record<string, string> = {
+  intimacao: "intimação",
+  aviso: "aviso",
+  informativa: "informativa",
+  outro: "outro",
+};
+const ECAC_TIPO_TOM: Record<string, "warn" | "info" | "neutral"> = {
+  intimacao: "warn",
+  aviso: "info",
+  informativa: "neutral",
+  outro: "neutral",
+};
+const ECAC_PRIORIDADE_TOM: Record<string, "error" | "warn" | "neutral"> = {
+  alta: "error",
+  media: "warn",
+  baixa: "neutral",
+};
+
+function PainelEcac() {
+  const { data, isLoading } = useMensagensEcac();
+  const sincronizar = useSincronizarEcac();
+  const mensagens = data ?? [];
+
+  async function aoSincronizar() {
+    try {
+      const r = await sincronizar.mutateAsync();
+      if (r.novas > 0) {
+        toast.success(
+          `${r.novas} mensagem${r.novas > 1 ? "ns" : ""} nova${r.novas > 1 ? "s" : ""} no e-CAC`,
+          { description: r.aviso ?? "Sincronização com a Receita concluída." }
+        );
+      } else {
+        toast.success("Nenhuma mensagem nova", {
+          description: r.aviso ?? "Sua caixa do e-CAC já estava em dia.",
+        });
+      }
+    } catch {
+      toast.error("Não foi possível sincronizar com o e-CAC agora.");
+    }
+  }
+
+  return (
+    <Framed marks={false} tone="rule" surface="card" padded={false}>
+      <div
+        className="px-5 pt-4 pb-2 border-b flex items-center justify-between gap-2"
+        style={{ borderColor: "var(--color-rule)" }}
+      >
+        <div className="flex flex-col">
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-2)]">
+            Caixa postal do e-CAC · Receita Federal
+          </h2>
+          <span className="text-[11px] text-[var(--color-ink-3)]">
+            Mensagens oficiais da sua conta no portal e-CAC.
+          </span>
+        </div>
+        <Button variant="outline" disabled={sincronizar.isPending} onClick={aoSincronizar}>
+          {sincronizar.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="size-4" />
+          )}
+          Sincronizar
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="px-5 py-6 text-sm text-[var(--color-ink-3)]">
+          Carregando mensagens do e-CAC...
+        </div>
+      ) : mensagens.length === 0 ? (
+        <div className="px-5 py-6 text-sm text-[var(--color-ink-2)]">
+          Nenhuma mensagem no e-CAC. Clique em{" "}
+          <span className="font-semibold">Sincronizar</span> para buscar na Receita.
+        </div>
+      ) : (
+        <ul className="divide-y" style={{ borderColor: "var(--color-rule)" }}>
+          {mensagens.map((m) => (
+            <LinhaEcac key={m.id} mensagem={m} />
+          ))}
+        </ul>
+      )}
+    </Framed>
+  );
+}
+
+function LinhaEcac({ mensagem }: { mensagem: MensagemEcac }) {
+  const tipo = mensagem.tipo ?? "outro";
+  const naoLida = !mensagem.lidaEm;
+  return (
+    <li className="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3">
+      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span className="text-sm font-semibold text-[var(--color-ink)] truncate">
+          {mensagem.assunto}
+        </span>
+        <div
+          className="flex items-center gap-2 text-[11px] text-[var(--color-ink-2)] mono flex-wrap"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          <span>Recebida {formatarDataHoraBR(mensagem.recebidaEm)}</span>
+          {mensagem.prazoResposta ? (
+            <>
+              <span className="size-1 rounded-full bg-[var(--color-rule-2)]" aria-hidden />
+              <span>Prazo até {formatarDataBR(mensagem.prazoResposta)}</span>
+            </>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        {naoLida ? <Pill tom="warn">não lida</Pill> : null}
+        <Pill tom={ECAC_TIPO_TOM[tipo] ?? "neutral"}>
+          {ECAC_TIPO_LABEL[tipo] ?? tipo}
+        </Pill>
+        {mensagem.prioridade ? (
+          <Pill tom={ECAC_PRIORIDADE_TOM[mensagem.prioridade] ?? "neutral"}>
+            prioridade {mensagem.prioridade}
+          </Pill>
+        ) : null}
+      </div>
+    </li>
   );
 }
 

@@ -19,6 +19,7 @@ import {
 import { Ruler } from "@/components/blueprint/ruler";
 import { Fig } from "@/components/blueprint/fig";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import { empresa as empresa_api } from "@/lib/api/empresa";
 import {
   anexoSimplesSchema,
   regimeTributarioSchema,
@@ -93,20 +94,29 @@ export function FormEmpresa({ empresa }: { empresa: Empresa }) {
   }, [regime, form]);
 
   async function aoSalvar(input: FormInput) {
-    const atualizada: Empresa = {
-      ...empresa,
-      razaoSocial: input.razaoSocial.trim(),
-      nomeFantasia: input.nomeFantasia?.trim() || undefined,
-      regime: input.regime,
-      anexoSimples:
-        input.regime === "SIMPLES_NACIONAL" ? input.anexoSimples : undefined,
-      uf: input.uf,
-      municipio: input.municipio.trim(),
-      inscricaoEstadual: input.inscricaoEstadual?.trim() || undefined,
-      inscricaoMunicipal: input.inscricaoMunicipal?.trim() || undefined,
-      faturamento12m: input.faturamento12m,
-    };
+    const ie = input.inscricaoEstadual?.trim() || undefined;
+    const im = input.inscricaoMunicipal?.trim() || undefined;
     try {
+      // Persiste no backend (PUT /v1/empresas/{id}) — antes só gravava no
+      // contexto e perdia no reload.
+      const persistida = await empresa_api.atualizar(empresa.id, {
+        razaoSocial: input.razaoSocial.trim(),
+        nomeFantasia: input.nomeFantasia?.trim() || undefined,
+        regime: input.regime,
+        anexoSimples:
+          input.regime === "SIMPLES_NACIONAL" ? input.anexoSimples : undefined,
+        uf: input.uf,
+        municipio: input.municipio.trim(),
+        inscricaoEstadual: ie,
+        inscricaoMunicipal: im,
+        faturamento12m: input.faturamento12m,
+      });
+      // O EmpresaOut não ecoa IE/IM — preserva o que o usuário digitou.
+      const atualizada: Empresa = {
+        ...persistida,
+        inscricaoEstadual: ie,
+        inscricaoMunicipal: im,
+      };
       await salvarEmpresa(atualizada);
       toast.success("Cadastro atualizado", {
         description: "As novas informações já estão valendo nos cálculos.",

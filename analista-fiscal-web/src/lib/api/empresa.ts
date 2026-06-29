@@ -207,6 +207,21 @@ export interface CriarEmpresaInput {
   faturamento12m?: number;
 }
 
+/** Campos editáveis de `PUT /v1/empresas/{id}` (todos opcionais — só envia o que veio). */
+export interface AtualizarEmpresaInput {
+  razaoSocial?: string;
+  nomeFantasia?: string;
+  regime?: RegimeTributario;
+  anexoSimples?: string;
+  cnaePrincipal?: string;
+  municipio?: string;
+  codigoMunicipioIbge?: string;
+  uf?: string;
+  inscricaoEstadual?: string;
+  inscricaoMunicipal?: string;
+  faturamento12m?: number;
+}
+
 export const empresa = {
   /** `GET /v1/empresas` → lista de empresas do tenant (RLS via JWT). */
   listar: async (): Promise<Empresa[]> => {
@@ -238,6 +253,37 @@ export const empresa = {
     });
     const out = await fetchJson("/empresas", empresaOutSchema, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return mapearEmpresa(out);
+  },
+
+  /**
+   * `PUT /v1/empresas/{id}` → atualiza o cadastro (EmpresaUpdateIn → EmpresaOut).
+   *
+   * Body montado em snake_case explícito porque IE/IM viram `ie`/`im` (não é
+   * conversão camel→snake direta). O `EmpresaOut` não ecoa IE/IM — o caller
+   * preserva esses dois a partir do form.
+   */
+  atualizar: async (id: string, input: AtualizarEmpresaInput): Promise<Empresa> => {
+    const body = {
+      razao_social: input.razaoSocial ?? null,
+      nome_fantasia: input.nomeFantasia ?? null,
+      regime_tributario: input.regime ? REGIME_FRONT_TO_BACK[input.regime] : null,
+      anexo_simples: input.anexoSimples ?? null,
+      cnae_principal: input.cnaePrincipal ?? null,
+      municipio: input.municipio ?? null,
+      codigo_municipio_ibge: input.codigoMunicipioIbge ?? null,
+      uf: input.uf ?? null,
+      ie: input.inscricaoEstadual ?? null,
+      im: input.inscricaoMunicipal ?? null,
+      // Dinheiro como string decimal (nunca float no body).
+      faturamento_12m:
+        input.faturamento12m != null ? String(input.faturamento12m) : null,
+    };
+    const out = await fetchJson(`/empresas/${id}`, empresaOutSchema, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
