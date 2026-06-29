@@ -16,7 +16,7 @@ from app.shared.exceptions import EmailEnvioFalhou
 from app.shared.integrations.email.provider import build_email_provider
 from app.shared.integrations.email.types import EmailMessage
 from app.shared.types import JsonObject
-from app.workers.celery_app import celery_app
+from app.workers.celery_app import celery_app, enqueue
 
 log = structlog.get_logger(__name__)
 
@@ -71,3 +71,21 @@ def enviar_email(
 
     log.info("email.task.ok", tags=tags_log, message_id=message_id)
     return {"status": "ok", "message_id": message_id}
+
+
+def enfileirar_email(msg: EmailMessage, *, to: str, tags: list[str]) -> None:
+    """Despacha (fail-soft) um ``EmailMessage`` já renderizado para a task.
+
+    Ponto único usado pelos fluxos (onboarding/fatura/alerta). O ``to`` real é
+    passado aqui — os templates renderizam com ``to`` vazio. ``enqueue`` é no-op
+    sem Celery e NUNCA levanta, então chamar isto não quebra o fluxo que invoca.
+    """
+    enqueue(
+        enviar_email,
+        to=to,
+        assunto=msg.assunto,
+        html=msg.html,
+        texto=msg.texto,
+        remetente=msg.remetente,
+        tags=tags,
+    )

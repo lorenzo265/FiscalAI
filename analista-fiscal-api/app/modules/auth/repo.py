@@ -44,6 +44,18 @@ class UsuarioRepo:
         stmt = select(Usuario.id).where(Usuario.tenant_id == tenant_id, Usuario.email == email)
         return (await self._s.execute(stmt)).scalar_one_or_none() is not None
 
+    async def primeira_do_tenant(self, tenant_id: UUID) -> Usuario | None:
+        """Usuário 'primário' (mais antigo ativo) do tenant — destinatário de
+        notificações (fatura/alerta). Filtra por ``tenant_id`` explícito, então
+        é seguro sob RLS e em sessão superuser (webhook/worker cross-tenant)."""
+        stmt = (
+            select(Usuario)
+            .where(Usuario.tenant_id == tenant_id, Usuario.ativo.is_(True))
+            .order_by(Usuario.created_at)
+            .limit(1)
+        )
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
     async def criar(
         self,
         tenant_id: UUID,

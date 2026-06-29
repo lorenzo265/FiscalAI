@@ -18,7 +18,8 @@ from zoneinfo import ZoneInfo
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings
+from app.config import Settings, get_settings
+from app.modules.auth.repo import UsuarioRepo
 from app.modules.billing.planos import PLANOS_VERSAO, TRIAL_DIAS, plano_para
 from app.modules.billing.provider import (
     BillingProvider,
@@ -28,6 +29,8 @@ from app.modules.billing.provider import (
 from app.modules.billing.repo import AssinaturaRepo, EventoBillingRepo, FaturaRepo
 from app.shared.db.models import Assinatura, EventoBilling, Fatura
 from app.shared.exceptions import AssinaturaNaoEncontrada
+from app.shared.integrations.email.templates import renderizar_fatura
+from app.workers.tasks.email_enviar import enfileirar_email
 
 log = structlog.get_logger(__name__)
 
@@ -267,3 +270,30 @@ class BillingService:
                 pago_em=agora if status == "paga" else None,
             )
         )
+
+        # Recibo por e-mail quando a fatura é paga (fail-soft — NUNCA quebra o
+        # webhook). "falhou" vira inadimplência, tratada à parte. Semântica
+        # AT-LEAST-ONCE: o retorno-cedo acima evita re-envio numa re-entrega já
+        # COMMITADA, mas o enqueue ocorre antes do commit final (em
+        # processar_webhook); se o commit falhar e o Stripe re-entregar, o recibo
+        # pode duplicar. Trade-off consciente p/ notificação: não perder > não duplicar.
+        if status == "paga":
+            try:
+                usuario = await UsuarioRepo(session).primeira_do_tenant(
+                    assinatura.tenant_id
+                )
+                if usuario is not None:
+                    settings = get_settings()
+                    msg = renderizar_fatura(
+                        nome=usuario.nome,
+                        plano=assinatura.plano_codigo,
+                        valor=valor,
+                        vencimento=date(agora.year, agora.month, 1),
+                        link_pagamento=f"{settings.APP_BASE_URL}/configuracoes",
+                    )
+                    enfileirar_email(msg, to=usuario.email, tags=["fatura"])
+            except Exception:  # notificação nunca bloqueia o billing
+                log.warning(
+                    "billing.fatura_email_falhou",
+                    assinatura_id=str(assinatura.id),
+                )

@@ -22,6 +22,8 @@ from app.shared.exceptions import (
     TenantNaoEncontrado,
     TokenInvalido,
 )
+from app.shared.integrations.email.templates import renderizar_onboarding
+from app.workers.tasks.email_enviar import enfileirar_email
 
 log = structlog.get_logger(__name__)
 
@@ -90,6 +92,18 @@ class AuthService:
             tenant_slug=tenant.slug,
             usuario_id=str(usuario.id),
         )
+
+        # E-mail de boas-vindas (fail-soft — NUNCA pode quebrar o cadastro).
+        # Despacho assíncrono via Celery; no-op sem broker, fake sem EMAIL_API_KEY.
+        try:
+            msg = renderizar_onboarding(
+                nome=usuario.nome,
+                link_painel=get_settings().APP_BASE_URL,
+            )
+            enfileirar_email(msg, to=usuario.email, tags=["onboarding"])
+        except Exception:  # notificação nunca bloqueia o cadastro
+            log.warning("auth.onboarding_email_falhou", tenant_id=str(tenant.id))
+
         return tenant, usuario, token, expires_in, raw_refresh
 
     async def login(

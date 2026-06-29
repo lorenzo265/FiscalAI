@@ -148,6 +148,14 @@ class Settings(BaseSettings):
         default="Arkan <nao-responda@arkan.com.br>",
         description="Remetente padrão (precisa de domínio verificado no provedor).",
     )
+    APP_BASE_URL: str = Field(
+        default="http://localhost:3000",
+        description="URL base do frontend (links em e-mails). Sem barra no fim.",
+    )
+    ALERTA_AGENDA_DIAS: int = Field(
+        default=7,
+        description="Janela (dias) p/ alertar por e-mail obrigações a vencer.",
+    )
 
     # JWT — Sprint 1
     JWT_SECRET: str = Field(

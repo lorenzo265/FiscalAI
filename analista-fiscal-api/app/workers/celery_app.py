@@ -220,6 +220,14 @@ def _beat_schedule() -> dict[str, Any]:
             "schedule": crontab(day_of_month=5, hour=4, minute=0),
             "options": {"queue": "default"},
         },
+        # ── Marco 4 PR3 (#14) — alerta por e-mail de obrigações a vencer ───
+        "agenda.alertar_vencimentos": {
+            # Diário 06:45 BR — varre AgendaItem pendentes a vencer na janela
+            # (ALERTA_AGENDA_DIAS) ainda não alertados → e-mail + alertado_em.
+            "task": "agenda.alertar_vencimentos",
+            "schedule": crontab(hour=6, minute=45),
+            "options": {"queue": "default"},
+        },
     }
 
 
