@@ -16,6 +16,7 @@ import { Framed } from "@/components/blueprint/framed";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { ResetDemoButton } from "@/components/configuracoes/reset-demo-button";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import { useCertificadoStatus } from "@/hooks/use-certificado";
 import { emailLogado } from "@/lib/auth";
 import {
   reveal,
@@ -43,7 +44,8 @@ export default function ConfiguracoesPage() {
     setEmail(emailLogado());
   }, []);
 
-  const certificadoOk = !!empresa?.certificadoA1;
+  const { data: certificado } = useCertificadoStatus();
+  const certificadoOk = !!certificado;
   const bancosCount = empresa?.bancosConectados?.length ?? 0;
 
   const cards: CardConfig[] = [
@@ -62,8 +64,8 @@ export default function ConfiguracoesPage() {
       rotulo: "NF-e",
       titulo: "Certificado digital",
       descricao: certificadoOk
-        ? `Arquivo ${empresa!.certificadoA1!.nomeArquivo} carregado.`
-        : "Sem certificado A1 — emissão de NF-e indisponível.",
+        ? "Certificado A1 instalado e cifrado."
+        : "Sem certificado A1 — transmissões oficiais indisponíveis.",
       icone: ShieldCheck,
       pill: certificadoOk
         ? { tom: "ok", texto: "instalado" }

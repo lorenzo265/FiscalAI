@@ -16,6 +16,7 @@ import { fiscal } from "@/lib/api/fiscal";
 import { agenda } from "@/lib/api/agenda";
 import { notas } from "@/lib/api/notas";
 import { manifestacao } from "@/lib/api/manifestacao";
+import { certificado } from "@/lib/api/certificado";
 import { controles } from "@/lib/api/controles";
 import { pessoal } from "@/lib/api/pessoal";
 import { contabil } from "@/lib/api/contabil";
@@ -31,6 +32,7 @@ export const api = {
   agenda,
   notas,
   manifestacao,
+  certificado,
   controles,
   pessoal,
   contabil,

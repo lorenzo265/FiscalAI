@@ -14,61 +14,65 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useEmpresaAtual } from "@/components/layout/empresa-provider";
-import type { Empresa } from "@/lib/schemas/empresa";
+import { useSubirCertificado } from "@/hooks/use-certificado";
+import { ApiError } from "@/lib/http";
 import { cn } from "@/lib/utils";
+
+/** Lê um File e devolve só o conteúdo em base64 (sem o prefixo data:). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const virgula = result.indexOf(",");
+      resolve(virgula >= 0 ? result.slice(virgula + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("falha ao ler o arquivo"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export function SubstituirCertificadoModal({
   open,
   onOpenChange,
-  empresa,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  empresa: Empresa;
 }) {
-  const { salvarEmpresa } = useEmpresaAtual();
+  const subir = useSubirCertificado();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [arrastando, setArrastando] = React.useState(false);
-  const [arquivo, setArquivo] = React.useState<string | null>(null);
+  const [arquivo, setArquivo] = React.useState<File | null>(null);
   const [senha, setSenha] = React.useState("");
-  const [enviando, setEnviando] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
       setArquivo(null);
       setSenha("");
-      setEnviando(false);
     }
   }, [open]);
 
   function handleFile(file: File | null) {
     if (!file) return;
-    setArquivo(file.name);
+    setArquivo(file);
   }
 
   async function confirmar() {
-    if (!arquivo) return;
-    setEnviando(true);
+    if (!arquivo || !senha) return;
     try {
-      const validade = new Date();
-      validade.setFullYear(validade.getFullYear() + 1);
-      await salvarEmpresa({
-        ...empresa,
-        certificadoA1: {
-          nomeArquivo: arquivo,
-          validade: validade.toISOString().slice(0, 10),
-          mock: true,
-        },
-      });
-      toast.success("Certificado substituído", {
-        description: "Já pode emitir NF-e com o novo A1.",
+      const pfxBase64 = await fileToBase64(arquivo);
+      await subir.mutateAsync({ pfxBase64, senha });
+      toast.success("Certificado instalado", {
+        description:
+          "Guardado com segurança (cifrado). A transmissão é liberada quando você ativar cada envio.",
       });
       onOpenChange(false);
-    } catch {
-      toast.error("Não foi possível substituir agora.");
-    } finally {
-      setEnviando(false);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError
+          ? e.mensagem
+          : "Não foi possível enviar o certificado.";
+      toast.error("Falha ao instalar", { description: msg });
     }
   }
 
@@ -84,10 +88,11 @@ export function SubstituirCertificadoModal({
               <ShieldCheck className="size-4 text-[var(--color-green)]" />
             </div>
             <div className="flex-1">
-              <DialogTitle>Substituir certificado A1</DialogTitle>
+              <DialogTitle>Instalar certificado A1</DialogTitle>
               <DialogDescription className="mt-1">
-                Faça upload do novo arquivo .pfx ou .p12 e informe a senha.
-                O anterior é arquivado automaticamente.
+                Envie o arquivo .pfx ou .p12 e informe a senha. Conferimos a
+                validade e o CNPJ, e guardamos tudo cifrado. O anterior é
+                substituído automaticamente.
               </DialogDescription>
             </div>
           </div>
@@ -127,7 +132,7 @@ export function SubstituirCertificadoModal({
             <Upload className="size-4 text-[var(--color-green)]" />
           </div>
           <p className="text-sm font-semibold text-[var(--color-ink)] text-center">
-            {arquivo ? arquivo : "Arraste o certificado ou clique para selecionar"}
+            {arquivo ? arquivo.name : "Arraste o certificado ou clique para selecionar"}
           </p>
           <p className="text-[11px] text-[var(--color-ink-3)]">
             .pfx ou .p12 — certificado A1
@@ -151,15 +156,15 @@ export function SubstituirCertificadoModal({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={enviando}
+            disabled={subir.isPending}
           >
             Cancelar
           </Button>
           <Button
             onClick={() => void confirmar()}
-            disabled={!arquivo || enviando}
+            disabled={!arquivo || !senha || subir.isPending}
           >
-            {enviando ? "Substituindo..." : "Substituir certificado"}
+            {subir.isPending ? "Instalando..." : "Instalar certificado"}
           </Button>
         </DialogFooter>
       </DialogContent>

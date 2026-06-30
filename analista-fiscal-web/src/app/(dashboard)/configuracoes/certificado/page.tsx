@@ -12,16 +12,20 @@ import { Carimbo } from "@/components/blueprint/carimbo";
 import { ConfiguracoesSubnav } from "@/components/configuracoes/configuracoes-subnav";
 import { SubstituirCertificadoModal } from "@/components/configuracoes/substituir-certificado-modal";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import { useCertificadoStatus } from "@/hooks/use-certificado";
+import { formatarCNPJ } from "@/lib/format/cnpj";
 import { formatarDataBR } from "@/lib/format/data";
 
 export default function ConfiguracoesCertificadoPage() {
-  const { empresa, loading } = useEmpresaAtual();
+  const { empresa, loading: loadingEmpresa } = useEmpresaAtual();
+  const { data: certificado, isLoading: loadingCert } = useCertificadoStatus();
   const [modalAberto, setModalAberto] = React.useState(false);
 
-  const certificado = empresa?.certificadoA1;
+  const loading = loadingEmpresa || loadingCert;
+
   const diasParaVencer = certificado
     ? Math.ceil(
-        (new Date(certificado.validade).getTime() - Date.now()) /
+        (new Date(certificado.validadeFim).getTime() - Date.now()) /
           (24 * 60 * 60 * 1000)
       )
     : null;
@@ -31,6 +35,11 @@ export default function ConfiguracoesCertificadoPage() {
     : diasParaVencer != null && diasParaVencer < 30
       ? "warn"
       : "ok";
+
+  // CN do titular costuma vir como "RAZAO SOCIAL:CNPJ" — mostra só a razão.
+  const titular = certificado
+    ? (certificado.cnTitular.split(":")[0] ?? certificado.cnTitular)
+    : "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,8 +55,9 @@ export default function ConfiguracoesCertificadoPage() {
           Certificado digital A1
         </h1>
         <p className="text-sm text-[var(--color-ink-2)] max-w-2xl mt-1">
-          O certificado A1 assina e autoriza a emissão das notas fiscais. Sem
-          ele, a NF-e não é emitida. Mantenha sempre um vigente.
+          O certificado A1 assina as transmissões oficiais (eSocial, EFD-Reinf,
+          manifestação de NF-e). Guardado cifrado, é usado só no momento do
+          envio. Mantenha sempre um vigente.
         </p>
       </header>
 
@@ -63,8 +73,8 @@ export default function ConfiguracoesCertificadoPage() {
               <div>
                 <AlertTitle>Sem certificado A1 instalado</AlertTitle>
                 <AlertDescription>
-                  A emissão de NF-e está indisponível. Instale um certificado
-                  e-CPF ou e-CNPJ para continuar.
+                  As transmissões oficiais ficam indisponíveis. Instale um
+                  certificado e-CNPJ A1 para liberá-las.
                 </AlertDescription>
               </div>
             </div>
@@ -77,9 +87,10 @@ export default function ConfiguracoesCertificadoPage() {
             <FileLock2 className="size-4 text-[var(--color-ink-2)] mt-0.5 shrink-0" />
             <p className="text-sm text-[var(--color-ink-2)] leading-relaxed">
               Aceitamos arquivos <code className="mono text-[var(--color-ink)]">.pfx</code> ou{" "}
-              <code className="mono text-[var(--color-ink)]">.p12</code>. O certificado fica salvo
-              criptografado neste navegador — nada é enviado para servidores
-              externos nesta demonstração.
+              <code className="mono text-[var(--color-ink)]">.p12</code>. O arquivo é validado
+              (validade e CNPJ) e guardado <strong>cifrado em repouso</strong> (AES-256) no
+              servidor — a senha também fica cifrada e só é usada para abrir o certificado no
+              envio.
             </p>
           </Framed>
         </>
@@ -105,8 +116,8 @@ export default function ConfiguracoesCertificadoPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-[var(--color-ink)] truncate mono">
-                    {certificado.nomeArquivo}
+                  <span className="text-sm font-bold text-[var(--color-ink)] truncate">
+                    {titular}
                   </span>
                   <Pill tom={tom}>
                     {tom === "ok" ? "vigente" : "atenção"}
@@ -130,7 +141,7 @@ export default function ConfiguracoesCertificadoPage() {
               <InfoCampo label="Validade">
                 <span className="mono text-sm text-[var(--color-ink)] font-semibold"
                       style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {formatarDataBR(certificado.validade)}
+                  {formatarDataBR(certificado.validadeFim)}
                 </span>
               </InfoCampo>
               <InfoCampo label="Expira em">
@@ -151,11 +162,14 @@ export default function ConfiguracoesCertificadoPage() {
                     : "Vencido"}
                 </span>
               </InfoCampo>
-              <InfoCampo label="Tipo">
-                <span className="mono text-sm text-[var(--color-ink)] font-semibold">
-                  A1 — arquivo
-                </span>
-              </InfoCampo>
+              {certificado.cnpjTitular ? (
+                <InfoCampo label="CNPJ do titular">
+                  <span className="mono text-sm text-[var(--color-ink)] font-semibold"
+                        style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {formatarCNPJ(certificado.cnpjTitular)}
+                  </span>
+                </InfoCampo>
+              ) : null}
             </div>
 
             <div
@@ -164,7 +178,7 @@ export default function ConfiguracoesCertificadoPage() {
             >
               <p className="text-xs text-[var(--color-ink-3)] max-w-md">
                 Expirando em menos de 30 dias? Substitua agora para não
-                interromper a emissão de notas.
+                interromper as transmissões.
               </p>
               <Button onClick={() => setModalAberto(true)}>
                 <RefreshCw className="size-4" />
@@ -175,13 +189,10 @@ export default function ConfiguracoesCertificadoPage() {
         </Framed>
       )}
 
-      {empresa ? (
-        <SubstituirCertificadoModal
-          open={modalAberto}
-          onOpenChange={setModalAberto}
-          empresa={empresa}
-        />
-      ) : null}
+      <SubstituirCertificadoModal
+        open={modalAberto}
+        onOpenChange={setModalAberto}
+      />
     </div>
   );
 }
