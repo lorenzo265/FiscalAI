@@ -15,6 +15,7 @@ from app.modules.reinf.schemas import (
 from app.modules.reinf.service import ReinfService
 from app.modules.reinf.transmissao_reinf_service import TransmissaoReinfService
 from app.shared.competencia import parse_competencia_mensal
+from app.shared.crypto.cert_loader import carregar_cert_a1
 from app.shared.db.deps import SessionDep, TenantDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["efd_reinf"])
@@ -72,12 +73,14 @@ async def listar_eventos_reinf(
 # ── EFD-Reinf transmissão real (Marco 4 PR2 #11) ────────────────────────────
 
 
-def _construir_servico_transmissao() -> TransmissaoReinfService:
+def _construir_servico_transmissao(
+    cert: tuple[bytes, str] | None = None,
+) -> TransmissaoReinfService:
     """Factory — instancia o pipeline com defaults do ambiente.
 
-    Cert A1 não é resolvido aqui ainda: por padrão a flag está OFF e o
-    assinador cai em ``NotImplementedXmldsigSigner``. Pre-piloto pago, o
-    cert virá do storage criptografado (mesma pendência do eSocial).
+    ``cert`` (quando fornecido) vem de ``carregar_cert_a1`` no handler. Sem
+    cert configurado (ou flag OFF), o assinador cai em
+    ``NotImplementedXmldsigSigner`` (fail-soft §8.12).
     """
     from app.config import get_settings
     from app.shared.crypto.xmldsig import construir_assinador
@@ -85,8 +88,8 @@ def _construir_servico_transmissao() -> TransmissaoReinfService:
 
     s = get_settings()
     assinador = construir_assinador(
-        cert_p12_bytes=None,  # Pre-piloto: cert ainda não vai do banco.
-        senha=None,
+        cert_p12_bytes=cert[0] if cert else None,
+        senha=cert[1] if cert else None,
         transmissao_ativa=s.REINF_TRANSMISSAO_ATIVA,
     )
     cliente = ReinfClient(s)
@@ -111,7 +114,8 @@ async def assinar_evento_reinf(
     ctx: TenantDep,
     session: SessionDep,
 ) -> EventoReinfOut:
-    servico = _construir_servico_transmissao()
+    cert = await carregar_cert_a1(session, empresa_id)
+    servico = _construir_servico_transmissao(cert)
     evento = await servico.assinar_evento(session, evento_id)
     return EventoReinfOut.model_validate(evento)
 
@@ -132,7 +136,8 @@ async def transmitir_lote_reinf(
     session: SessionDep,
     cnpj_contribuinte: str,
 ) -> dict[str, str | int | None]:
-    servico = _construir_servico_transmissao()
+    cert = await carregar_cert_a1(session, empresa_id)
+    servico = _construir_servico_transmissao(cert)
     recibo = await servico.transmitir_lote(
         session, empresa_id, cnpj_contribuinte=cnpj_contribuinte
     )
