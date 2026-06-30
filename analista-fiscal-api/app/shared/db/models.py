@@ -8,6 +8,7 @@ from sqlalchemy import (
     CHAR,
     DATE,
     NUMERIC,
+    BigInteger,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -3488,4 +3489,96 @@ class RefreshToken(Base):
         UniqueConstraint("token_hash", name="uq_refresh_token_hash"),
         Index("ix_refresh_token_family", "family_id"),
         Index("ix_refresh_token_tenant", "tenant_id"),
+    )
+
+
+class NfeDestinada(Base):
+    """NF-e emitida contra o CNPJ da empresa, descoberta pelo DistribuiçãoDFe.
+
+    Uma linha por (empresa, chave_nfe). O upsert transiciona o documento de
+    'resumo' (resNFe, antes da Ciência) para 'completo' (nfeProc, após Ciência)
+    sem duplicar (§8.9). Migration 0068.
+
+    Fonte: NT 2014.002 / retDistDFeInt (SEFAZ Ambiente Nacional).
+    """
+
+    __tablename__ = "nfe_destinada"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chave_nfe: Mapped[str] = mapped_column(String(44), nullable=False)
+    nsu: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    emitente_cnpj: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    emitente_nome: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    valor_total: Mapped[Decimal | None] = mapped_column(NUMERIC(14, 2), nullable=True)
+    dh_emissao: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    tipo_documento: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default="resumo"
+    )
+    tem_xml_completo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    xml_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            r"chave_nfe ~ '^\d{44}$'",
+            name="ck_nfe_destinada_chave_formato",
+        ),
+        CheckConstraint(
+            "tipo_documento IN ('resumo','completo')",
+            name="ck_nfe_destinada_tipo_doc",
+        ),
+        Index("ix_nfe_destinada_tenant", "tenant_id"),
+        Index("ix_nfe_destinada_empresa_nsu", "empresa_id", "nsu"),
+        UniqueConstraint(
+            "empresa_id", "chave_nfe", name="uq_nfe_destinada_empresa_chave"
+        ),
+    )
+
+
+class NfeDistribuicaoCursor(Base):
+    """Cursor de NSU por empresa para o serviço DistribuiçãoDFe.
+
+    Uma linha por empresa (PK = empresa_id). O service de sincronização lê
+    ``ult_nsu`` antes de cada chamada e atualiza ambos os campos após cada
+    batch. Quando ``ult_nsu == max_nsu``, não há mais documentos a consumir.
+    Migration 0068.
+    """
+
+    __tablename__ = "nfe_distribuicao_cursor"
+
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("empresa.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    ult_nsu: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
+    max_nsu: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
+    ultima_sync_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_nfe_distribuicao_cursor_tenant", "tenant_id"),
     )

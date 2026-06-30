@@ -3,11 +3,11 @@
 **Última atualização:** 2026-06-29
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação)** consolidado por commit local, gate verde; **NÃO pushado** (freio do PO). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
-**Suite atual:** **2827 testes** em `tests/unit + tests/eval` (gate canônico, +45 golden MD-e); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
-**mypy strict:** ✅ 0 erros (394 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação) + PR2 (DistribuiçãoDFe)** consolidados por **commit local**, gate verde; **NÃO pushado** (freio do PO). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
+**Suite atual:** **2853 testes** em `tests/unit + tests/eval` (gate orquestrador, PR1+PR2; +26 sobre 2827); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
+**mypy strict:** ✅ 0 erros (399 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação ✅ (branch, não pushado)** 🧾
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação + PR2 DistribuiçãoDFe ✅ (branch, não pushado)** 🧾
 
 > **▶ PRÓXIMO AGENTE:** leia **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — contexto completo, freios, ambiente (DB :5434 agora UP), e pendências priorizadas (Reinf cert A1, e-mail at-least-once, módulos órfãos §3.2, manifesto NF-e §3.4). Mapa das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
 
@@ -126,6 +126,80 @@ Novo módulo `app/modules/manifestacao/` — obrigação legal do destinatário 
 - **🔴 corrigido:** a migration `0067` tinha só `CREATE POLICY … USING` (seguindo o gabarito antigo `0013`). Adicionado **`WITH CHECK ({_RLS_USING})` + `GRANT SELECT,INSERT,UPDATE,DELETE … TO fiscal_app`** para alinhar ao **padrão vigente** (billing `0061` / lgpd `0062` / refresh `0064`) — sem `WITH CHECK` um INSERT podia gravar linha com `tenant_id` de outro tenant (§8.1).
 - **🟡 corrigidos:** docstring do `service` dizia "aceita repo por DI" (sempre cria internamente); descrição do `schema` prometia retorno `200` no caso idempotente (o router retorna `201`).
 - **Estado:** PR1 consolidado por **commit local** na branch `feat/manifestacao-mde` — **NÃO pushado, sem merge na main** (freio do PO).
+
+---
+
+## Manifestação do Destinatário NF-e (MD-e) — PR2 Descoberta (DistribuiçãoDFe) · branch `feat/manifestacao-mde` · 2026-06-29
+
+Descobre NF-es emitidas contra o CNPJ da empresa via SEFAZ DistribuiçãoDFe (NFeDistribuicaoDFe), persiste em `nfe_destinada` com upsert idempotente (§8.9) e avança o cursor de NSU por empresa. Transmissão real (RecepcaoEvento) e cert A1 são PR3.
+
+**O que entrou:**
+
+- **Migration `0068`** (`alembic/versions/0068_nfe_destinada_cursor.py`): duas novas tabelas com RLS multi-tenant vigente (USING + WITH CHECK + GRANT fiscal_app — padrão billing 0061 / lgpd 0062 / refresh 0064 / manifestacao 0067):
+  - `nfe_destinada`: UUID PK, tenant_id, empresa_id FK CASCADE, chave_nfe(44) CHECK `^\d{44}$`, nsu BigInteger, emitente_cnpj/nome, valor_total NUMERIC(14,2), dh_emissao TIMESTAMPTZ, tipo_documento CHECK IN ('resumo','completo'), tem_xml_completo BOOLEAN default false, xml_storage_key TEXT, criado_em/atualizado_em TIMESTAMPTZ. Índices: tenant, empresa+nsu, UNIQUE(empresa_id, chave_nfe).
+  - `nfe_distribuicao_cursor`: PK = empresa_id (exatamente 1 cursor por empresa), tenant_id, ult_nsu BigInt default 0, max_nsu BigInt default 0, ultima_sync_em TIMESTAMPTZ nullable. Índice: tenant.
+
+- **Models** `NfeDestinada` e `NfeDistribuicaoCursor` em `app/shared/db/models.py` (SQLAlchemy 2.0 `Mapped[]`, `BigInteger` importado).
+
+- **Integração** `app/shared/integrations/sefaz_mde/` (3 arquivos):
+  - `types.py`: `TipoDocumentoMde = Literal["resumo","completo"]` · dataclass frozen `ResumoNFeDestinada` (chave_nfe, nsu, emitente_cnpj/nome, valor_total `Decimal|None`, dh_emissao aware, tipo_documento, xml_completo) · dataclass frozen `ResultadoDistribuicao` (documentos, ult_nsu, max_nsu).
+  - `provider.py`: `SefazMdeProvider` (`@runtime_checkable` Protocol — baixar_documentos + transmitir_evento) · `_FakeSefazMdeProvider(extra_batches=0)` (determinístico, 3 docs/batch, chave SHA-256, sem rede; `extra_batches>0` simula multi-page para testar `truncado`) · `FocusSefazMdeProvider` (httpx + `@retry` tenacity em `httpx.TransportError`, parser tolerante a aliases camelCase/snake_case, endpoint best-effort [follow-up PR3]) · `SefazMdeErro` · `build_sefaz_mde_provider(settings)` (factory: `FOCUS_NFE_TOKEN` setado → real, senão → Fake). Imports top-level para `httpx`/`tenacity` (sem lazy — ambos são deps core).
+  - `__init__.py`: docstring de package.
+
+- **`app/modules/manifestacao/distribuicao_repo.py`** — `DistribuicaoRepo`:
+  - `get_cursor(empresa_id)` → `NfeDistribuicaoCursor | None`
+  - `create_cursor(tenant_id, empresa_id)` → cursor inicial (ult_nsu=0)
+  - `update_cursor(cursor, *, ult_nsu, max_nsu, ultima_sync_em)` → cursor atualizado
+  - `upsert_destinada(tenant_id, empresa_id, doc, agora)` → `(NfeDestinada, is_new: bool)` (SELECT → INSERT ou UPDATE; promoção resumo→completo nunca retroage)
+  - `listar_destinadas(empresa_id, *, pendentes, limite)` → lista ordenada por NSU desc; `pendentes=True` usa LEFT JOIN com `manifestacao_nfe`
+
+- **`app/modules/manifestacao/distribuicao_service.py`** — `DistribuicaoService.sincronizar(session, tenant_id, empresa_id, cnpj, provider, *, max_paginas=10, _repo=None)`:
+  - Obtém/cria cursor → loop: `baixar_documentos` → upsert cada doc → `update_cursor` → para quando `ult_nsu >= max_nsu` (completo) ou `paginas >= max_paginas` (`truncado=True`) → `session.commit()` → retorna `SincronizacaoResultadoOut`.
+
+- **`app/modules/manifestacao/schemas.py`** — 3 novos schemas:
+  - `NfeDestinadaOut` (`from_attributes=True`)
+  - `SincronizarManifestacaoIn` (extra=forbid, sem campos obrigatórios — reservado para PR3)
+  - `SincronizacaoResultadoOut` (novos, atualizados, ult_nsu, max_nsu, truncado)
+
+- **`app/modules/manifestacao/router.py`** — 2 novos endpoints:
+  - `POST /v1/empresas/{empresa_id}/manifestacao/sincronizar` → resolve CNPJ da empresa via `select(Empresa.cnpj)` → `build_sefaz_mde_provider(settings)` → `DistribuicaoService().sincronizar(...)`.
+  - `GET /v1/empresas/{empresa_id}/manifestacao/destinadas` (`pendentes`, `limite`) → `DistribuicaoRepo(session).listar_destinadas(...)`.
+
+- **`tests/unit/manifestacao/test_distribuicao.py`** — 27 testes (sem rede, sem DB real):
+  - `_FakeSefazMdeProvider` (8): batch size=3, NSU crescente, determinismo, loop termina sem extra_batches, extra_batches>0 prolonga loop, chave 44 dígitos, Decimal, `NotImplementedError` em transmitir_evento.
+  - `DistribuicaoService.sincronizar` (7): cria cursor na 1ª vez, cursor existente não cria novo, upsert idempotente (`is_new=False` → atualizados), cursor avança (ult_nsu/max_nsu no resultado), truncado com max_paginas=1, retorna novos corretos, commit exatamente 1 vez.
+  - `FocusSefazMdeProvider._parse_response` (6): resNFe→resumo, nfeProc→completo, aliases camelCase, doc sem chave ignorado, lista vazia, não-dict levanta `SefazMdeErro`.
+  - Schemas (4): extra=forbid, body vazio OK, `SincronizacaoResultadoOut` campos, `NfeDestinadaOut` from ORM mock.
+  - Protocolo (1): `isinstance(_FakeSefazMdeProvider(), SefazMdeProvider)` = True.
+  - Fixture `_make_focus_provider()`: `object.__new__` sem `__init__` (não abre conexão HTTP).
+
+**Decisões de domínio:**
+- **NSU (Número Sequencial Único):** monotonicamente crescente por CNPJ no Ambiente Nacional. Cursor persiste `ult_nsu` (avança a cada batch) e `max_nsu` (maior NSU disponível no AN); quando `ult_nsu == max_nsu`, não há mais docs. Fonte: retDistDFeInt (NT 2014.002 / Leiaute DistribuiçãoDFe).
+- **resNFe vs. nfeProc:** `resNFe` (resumo) chega antes da Ciência; `nfeProc` (XML completo) chega após o evento 210210. Upsert promove `tipo_documento` de `resumo` para `completo` mas nunca retroage (§8.2 append-only).
+- **Provider real Focus NFe:** `FocusSefazMdeProvider` usa `GET /v2/nfes_recebidas?nsu={nsu}&cnpj={cnpj}` — best-effort [follow-up PR3]. A Focus NFe pode não ter um wrapper REST para `NFeDistribuicaoDFe`; nesse caso exigirá integração SOAP direta com o AN. Confirmar contra a doc oficial antes de produção.
+- **`@retry` no método vs. atributo:** a versão anterior armazenava o decorator em `self._retry_decorator` (bug — nunca aplicado). Corrigido: `@retry(retry_if_exception_type(httpx.TransportError))` é decorator de método em nível de classe com imports top-level.
+
+**Pendências conscientes (PR3):**
+1. **Focus NFe endpoint** — confirmar endpoint + query params exatos na doc oficial antes de ligar em produção.
+2. **Cert A1 + RecepcaoEvento** — `transmitir_evento` levanta `NotImplementedError("PR3")` nos dois providers.
+3. **Write I/O ao object storage** — `xml_storage_key` calculada mas XML do `nfeProc` não é gravado (PR3).
+4. **`retProEvento` / polling de recibo** — resposta do SEFAZ ao RecepcaoEvento é PR3.
+
+**Contagem:** 2827 (base, PR1) → **2853 confirmados** (+26). Gate (orquestrador): `pytest tests/unit tests/eval` = **2853 passed / 3 skip** · `mypy app/` = **0 / 399** · `ruff` limpo · migration `0068` validada **up/down/up no DB :5434** (RLS WITH CHECK + GRANT nas 2 tabelas).
+
+**Revisão + gate (orquestrador — reviewers automáticos `backend-reviewer`/`fiscal-validator` travando no watchdog desta sessão):** corrigi **3 erros mypy** (conversão `int()` sobre `object`/`Any` do JSON Focus → helper `_coerce_int` robusto em `sefaz_mde/provider.py`) + **ruff `UP017`** (`timezone.utc`→`datetime.UTC`). Revisão de princípios OK: RLS `WITH CHECK`+`GRANT` nas 2 tabelas, `Decimal` em `valor_total`, upsert idempotente `(empresa,chave)`, cap de paginação anti-loop (`truncado`), factory sem rede em dev (`FOCUS_NFE_TOKEN` ausente → Fake). `[follow-up §3b.2]` `FocusSefazMdeProvider` cria `httpx.AsyncClient` por request sem `aclose` (mesma dívida eSocial/Reinf — varrer junto na robustez). **Estado:** PR2 consolidado por **commit local** na branch — NÃO pushado, sem merge na main (freio do PO).
+
+**Arquivos criados/modificados:**
+- `alembic/versions/0068_nfe_destinada_cursor.py` (NOVO)
+- `app/shared/db/models.py` (+`NfeDestinada`, `NfeDistribuicaoCursor`, import `BigInteger`)
+- `app/shared/integrations/sefaz_mde/__init__.py` (NOVO)
+- `app/shared/integrations/sefaz_mde/types.py` (NOVO)
+- `app/shared/integrations/sefaz_mde/provider.py` (NOVO)
+- `app/modules/manifestacao/distribuicao_repo.py` (NOVO)
+- `app/modules/manifestacao/distribuicao_service.py` (NOVO)
+- `app/modules/manifestacao/schemas.py` (+3 schemas PR2)
+- `app/modules/manifestacao/router.py` (+2 endpoints PR2)
+- `tests/unit/manifestacao/test_distribuicao.py` (NOVO, 27 testes)
 
 ---
 

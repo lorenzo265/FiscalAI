@@ -1,8 +1,13 @@
-"""Schemas Pydantic v2 — Manifestação do Destinatário NF-e (MD-e)."""
+"""Schemas Pydantic v2 — Manifestação do Destinatário NF-e (MD-e).
+
+PR1: RegistrarManifestacaoIn, ManifestacaoNFeOut, TipoEventoManifestacaoIn.
+PR2: NfeDestinadaOut, SincronizarManifestacaoIn, SincronizacaoResultadoOut.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
@@ -119,3 +124,69 @@ class ManifestacaoNFeOut(BaseModel):
     assinado_em: datetime | None
     transmitido_em: datetime | None
     respondido_em: datetime | None
+
+
+# ── PR2: Descoberta (DistribuiçãoDFe) ────────────────────────────────────────
+
+
+class NfeDestinadaOut(BaseModel):
+    """NF-e emitida contra o CNPJ da empresa, descoberta pelo DistribuiçãoDFe.
+
+    Gerada pelo upsert idempotente do ``DistribuicaoService.sincronizar``.
+    Valor em Decimal (nunca float). Datas aware.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    empresa_id: UUID
+    chave_nfe: str
+    nsu: int
+    emitente_cnpj: str | None
+    emitente_nome: str | None
+    valor_total: Decimal | None
+    dh_emissao: datetime | None
+    tipo_documento: str  # 'resumo' | 'completo'
+    tem_xml_completo: bool
+    xml_storage_key: str | None
+    criado_em: datetime
+    atualizado_em: datetime
+
+
+class SincronizarManifestacaoIn(BaseModel):
+    """Body opcional para o endpoint POST /manifestacao/sincronizar.
+
+    Nenhum campo é obrigatório. ``extra='forbid'`` recusa campos desconhecidos
+    para evitar confusion silenciosa.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Reservado para extensões futuras (PR3: flag para forçar re-sync completo,
+    # override de max_paginas, etc.). Atualmente sem campos obrigatórios.
+
+
+class SincronizacaoResultadoOut(BaseModel):
+    """Resultado de uma sincronização do DistribuiçãoDFe.
+
+    ``truncado=True`` indica que o loop foi interrompido pelo cap ``max_paginas``
+    antes de consumir todos os documentos disponíveis. Uma nova chamada ao endpoint
+    continuará do ``ult_nsu`` persistido no cursor.
+    """
+
+    model_config = ConfigDict(from_attributes=False)
+
+    novos: int
+    """Documentos inseridos pela primeira vez nesta sincronização."""
+
+    atualizados: int
+    """Documentos já existentes que foram atualizados (re-sync idempotente)."""
+
+    ult_nsu: int
+    """Último NSU consumido (persistido no cursor da empresa)."""
+
+    max_nsu: int
+    """Maior NSU disponível no Ambiente Nacional para o CNPJ da empresa."""
+
+    truncado: bool
+    """True quando a sincronização foi interrompida pelo cap de páginas."""
