@@ -607,6 +607,50 @@ class SerproCredencial(Base):
     )
 
 
+class CertificadoA1(Base):
+    """Cofre do certificado A1 (.p12 ICP-Brasil) por empresa — épico cert A1.
+
+    Guarda o .p12 e a senha CIFRADOS em repouso (envelope AES-256-GCM, §8.7):
+    ``pfx_cifrado`` = ``cifrar(base64(pfx_bytes))`` e ``senha_cifrada`` =
+    ``cifrar(senha)`` — ambos TEXT (token do envelope). O material só é
+    decifrado no ato do envio, via o único ponto de entrada
+    ``app.shared.crypto.cert_loader.carregar_cert_a1``.
+
+    Uma linha ATIVA por empresa (unique parcial ``WHERE ativo`` na migration
+    0069); substituir desativa a anterior e insere a nova (histórico preservado).
+    A senha é guardada cifrada (decisão PO 2026-06-30) p/ permitir transmissão
+    automática; nunca aparece em log estruturado (§8.7).
+    """
+
+    __tablename__ = "certificado_a1"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    empresa_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("empresa.id", ondelete="CASCADE"), nullable=False
+    )
+    pfx_cifrado: Mapped[str] = mapped_column(Text, nullable=False)
+    senha_cifrada: Mapped[str] = mapped_column(Text, nullable=False)
+    cn_titular: Mapped[str] = mapped_column(Text, nullable=False)
+    cnpj_titular: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    validade_inicio: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    validade_fim: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    ativo: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_certificado_a1_tenant", "tenant_id"),)
+
+
 class Certidao(Base):
     """CertidÃ£o CND / CRF / CNDT emitida (Sprint 6).
 

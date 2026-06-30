@@ -1279,3 +1279,46 @@ class ManifestacaoErroSEFAZ(ManifestacaoError):
     """
 
     http_status = 502
+
+
+# ── Cofre de certificado A1 (épico cert A1) ──────────────────────────────────
+
+
+class CertificadoA1Error(DomainError):
+    """Base para erros do cofre de certificado A1 (.p12 ICP-Brasil).
+
+    Subtypes mapeiam para HTTP 4xx. Não levante a base diretamente.
+    """
+
+    http_status = 422
+
+
+class CertificadoA1Invalido(CertificadoA1Error):
+    """O .p12 não abre com a senha informada, está corrompido ou sem certificado.
+
+    Causa típica: senha errada ou arquivo que não é um PKCS#12 válido.
+    """
+
+    http_status = 422
+
+
+class CertificadoA1CnpjDivergente(CertificadoA1Error):
+    """O CNPJ do titular do certificado não bate com o CNPJ da empresa.
+
+    Proteção contra subir o cert de outra empresa. Só é levantada quando o
+    CNPJ pôde ser extraído do certificado (SAN OID 2.16.76.1.3.3 ou CN).
+    """
+
+    http_status = 422
+
+
+class CertificadoA1Expirado(CertificadoA1Error):
+    """O certificado já passou da validade (notAfter) — não pode ser usado."""
+
+    http_status = 422
+
+
+class CertificadoA1NaoEncontrado(CertificadoA1Error):
+    """Nenhum certificado A1 ativo para a empresa informada."""
+
+    http_status = 404

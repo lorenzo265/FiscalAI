@@ -489,10 +489,21 @@ async def test_resultado_transmissao_evento_cstat_aceitos() -> None:
 
 @pytest.mark.asyncio
 async def test_cert_loader_retorna_none() -> None:
-    """carregar_cert_a1 retorna None por ora (épico pendente)."""
+    """carregar_cert_a1 retorna None quando a empresa não tem cert ativo/válido.
+
+    Desde o épico cert A1, o helper consulta ``certificado_a1`` — aqui o mock
+    devolve nenhuma linha (``scalar_one_or_none`` → None), então o resultado é
+    None (fail-soft §8.12). O caminho com cert real vai na suíte de integração.
+    """
+    from unittest.mock import MagicMock
+
     from app.shared.crypto.cert_loader import carregar_cert_a1
 
+    # `execute` é async (awaitable); o Result e `scalar_one_or_none` são sync.
+    resultado = MagicMock()
+    resultado.scalar_one_or_none.return_value = None
     session = AsyncMock()
+    session.execute = AsyncMock(return_value=resultado)
     empresa_id = uuid4()
     result = await carregar_cert_a1(session, empresa_id)
     assert result is None

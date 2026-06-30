@@ -25,6 +25,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.billing.router import router as billing_router
 from app.modules.billing.router import webhook_router as billing_webhook_router
 from app.modules.certidoes.router import router as certidoes_router
+from app.modules.certificado.router import router as certificado_router
 from app.modules.conciliacao.router import router as conciliacao_router
 from app.modules.contabil.router import router as contabil_router
 from app.modules.declaracao_anual.router import router as declaracao_anual_router
@@ -238,6 +239,7 @@ app = FastAPI(
         {"name": "lgpd", "description": "Direito do titular (LGPD): exportação/portabilidade dos dados."},
         {"name": "health", "description": "Probes de saúde (liveness/readiness)."},
         {"name": "manifestacao_nfe", "description": "Manifestação do Destinatário NF-e (MD-e) — NT 2014.002."},
+        {"name": "certificado_a1", "description": "Cofre de certificado A1 (.p12 ICP-Brasil) por empresa."},
     ],
     lifespan=lifespan,
 )
@@ -319,6 +321,7 @@ app.include_router(tabelas_admin_alertas_router)
 app.include_router(tabelas_admin_sugestoes_router)
 app.include_router(tabelas_admin_stats_router)
 app.include_router(manifestacao_router)
+app.include_router(certificado_router)
 
 
 @app.exception_handler(DomainError)
