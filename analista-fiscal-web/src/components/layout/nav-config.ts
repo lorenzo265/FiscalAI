@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Calendar,
   Sparkles,
+  Lightbulb,
   Settings,
 } from "lucide-react";
 import type { RegimeTributario } from "@/lib/schemas/empresa";
@@ -24,6 +25,7 @@ export type ModuloId =
   | "relatorios"
   | "compliance"
   | "agenda"
+  | "advisor"
   | "assistente"
   | "configuracoes";
 
@@ -58,6 +60,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   },
   { id: "agenda", label: "Agenda", href: "/agenda", icon: Calendar, group: "ferramentas" },
   {
+    id: "advisor",
+    label: "Consultor",
+    href: "/advisor",
+    icon: Lightbulb,
+    group: "ferramentas",
+  },
+  {
     id: "assistente",
     label: "Assistente",
     href: "/assistente",
@@ -85,6 +94,7 @@ const MODULOS_POR_REGIME: Record<RegimeTributario, ModuloId[]> = {
     "relatorios",
     "compliance",
     "agenda",
+    "advisor",
     "assistente",
     "configuracoes",
   ],
@@ -98,6 +108,7 @@ const MODULOS_POR_REGIME: Record<RegimeTributario, ModuloId[]> = {
     "relatorios",
     "compliance",
     "agenda",
+    "advisor",
     "assistente",
     "configuracoes",
   ],
@@ -111,6 +122,7 @@ const MODULOS_POR_REGIME: Record<RegimeTributario, ModuloId[]> = {
     "relatorios",
     "compliance",
     "agenda",
+    "advisor",
     "assistente",
     "configuracoes",
   ],
