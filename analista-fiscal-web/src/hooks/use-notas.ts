@@ -14,6 +14,10 @@ import {
   salvarNota,
 } from "@/lib/notas/db-service";
 import { useEmpresaAtual } from "@/components/layout/empresa-provider";
+import {
+  manifestacao,
+  type RegistrarManifestoInput,
+} from "@/lib/api/manifestacao";
 import type { Contraparte, NotaFiscal, StatusManifesto } from "@/lib/schemas/nota";
 
 export function useNotas() {
@@ -86,6 +90,49 @@ export function useManifestar() {
       await manifestarNota(chave, manifesto);
     },
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["notas"] });
+    },
+  });
+}
+
+// ── MD-e: descoberta (DistribuiçãoDFe) + manifesto via backend real ──────────
+
+/**
+ * NF-e descobertas na Receita (DistribuiçãoDFe) contra o CNPJ da empresa.
+ * `pendentes` (default true) traz só as que ainda não têm evento de manifesto.
+ */
+export function useDestinadas(pendentes = true) {
+  const { empresa } = useEmpresaAtual();
+  return useQuery({
+    queryKey: ["manifestacao", "destinadas", empresa?.cnpj, pendentes],
+    queryFn: () => manifestacao.listarDestinadas({ pendentes }),
+    enabled: !!empresa,
+  });
+}
+
+/** Dispara a sincronização DistribuiçãoDFe (busca novas NF-e na Receita). */
+export function useSincronizarDestinadas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => manifestacao.sincronizar(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["manifestacao"] });
+    },
+  });
+}
+
+/**
+ * Registra um evento de manifestação do destinatário no backend real (MD-e).
+ * Distinto do `useManifestar` legado (que persiste o status só local/Dexie nas
+ * notas importadas por XML); este fala com o módulo `manifestacao`.
+ */
+export function useRegistrarManifesto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RegistrarManifestoInput) =>
+      manifestacao.registrar(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["manifestacao"] });
       void qc.invalidateQueries({ queryKey: ["notas"] });
     },
   });
