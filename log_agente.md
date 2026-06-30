@@ -1,15 +1,26 @@
 # Log do Agente — Analista Fiscal Backend
 
-**Última atualização:** 2026-06-29
+**Última atualização:** 2026-06-30
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação) + PR2 (DistribuiçãoDFe) + PR3 (transmissão RecepcaoEvento)** consolidados por **commit local**, gate verde; **NÃO pushado** (freio do PO). Falta PR4 (front). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
-**Suite atual:** **2869 testes** em `tests/unit + tests/eval` (gate orquestrador, PR1+PR2+PR3; +42 sobre 2827); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
-**mypy strict:** ✅ 0 erros (401 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/cert-a1-cofre` (sobre `feat/manifestacao-mde`, superset = main+MD-e) — **Cofre de cert A1: PR1 (cofre cifrado + `carregar_cert_a1` real) + PR2 (liga eSocial+Reinf) + PR3 front (tela de certificado)** por **commit local**, gate verde; **NÃO pushado** (freio do PO). [MD-e 4 PRs pushados em `origin/feat/manifestacao-mde`; advisor (front) em `feat/advisor-tela` local.]
+**Suite atual:** **2876 testes** em `tests/unit + tests/eval` (gate orquestrador, cofre PR1; +7 sobre 2869); 3 skipped · front: `npm run build` ✅ (49 rotas) + `tsc --noEmit` ✅
+**mypy strict:** ✅ 0 erros (407 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
 **🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação + PR2 DistribuiçãoDFe + PR3 transmissão ✅ (branch, não pushado)** 🧾
 
 > **▶ PRÓXIMO AGENTE:** leia **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — contexto completo, freios, ambiente (DB :5434 agora UP), e pendências priorizadas (Reinf cert A1, e-mail at-least-once, módulos órfãos §3.2, manifesto NF-e §3.4). Mapa das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
+
+---
+
+## Épico cert A1 — cofre de certificado cifrado · branch `feat/cert-a1-cofre` (2026-06-30)
+
+Decisão do PO: **senha guardada cifrada** (transmissão automática) + **cofre completo** (liga os 3). O cert A1 (.p12 ICP-Brasil) por empresa é o que destrava a assinatura XMLDSig real (eSocial #20, EFD-Reinf §3b.1, MD-e). Resolve as 3 pendências de cert de uma vez. Orquestrador solo; subagente `backend-scout` mapeou o terreno.
+
+- **PR1 — fundação do cofre** (`770b1ea`): migration **0069** `certificado_a1` (RLS completo: ENABLE + POLICY USING+WITH CHECK + GRANT fiscal_app; unique parcial `WHERE ativo` = 1 cert ativo/empresa; CNPJ + validade em TEXT cifrado). Model `CertificadoA1` + 5 exceções (`CertificadoA1Invalido/CnpjDivergente/Expirado/NaoEncontrado`). `inspeciona_p12.py` puro (golden): abre o PKCS#12 via `cryptography` (core), extrai CN, CNPJ (SAN OID 2.16.76.1.3.3 ou sufixo do CN), validade aware e fingerprint SHA-256. Módulo `app/modules/certificado/` (repo/service/schemas/router): upload (.p12 base64 + senha) → valida (abre, validade, CNPJ×empresa) → cifra (.p12 em base64 + senha pelo **envelope AES-256-GCM** §8.7, em colunas TEXT — sem cripto manual como o `SerproCredencial`) → substitui o ativo. GET status (só metadados) + DELETE. **`carregar_cert_a1` deixa de ser stub** (lê cert ativo+válido e decifra) → **liga o MD-e de graça** (o router do MD-e já chamava o helper). 7 testes (inspeção c/ .p12 real: CN/CNPJ-CN/CNPJ-SAN/sem-CNPJ, senha errada, corrompido, round-trip envelope). Migration 0069 up/down/up no DB :5434. **2876 passed/3 skip · mypy 0/407 · ruff verde.**
+- **PR2 — liga eSocial + Reinf** (`9bb706e`): os routers de `pessoal`/`reinf` deixam de passar `cert=None`; carregam `carregar_cert_a1(session, empresa_id)` nos handlers que assinam (assinar + transmitir_lote) e injetam na factory do serviço (param `cert` opcional). Flags `ESOCIAL_/REINF_TRANSMISSAO_ATIVA` seguem False (ativação consciente §8.12). Suíte verde (exit 0) · mypy 0 · ruff verde.
+- **PR3 — front** (`a7953eb`): a tela `/configuracoes/certificado` deixa de ser mock local (que só guardava o nome do arquivo); adapter `certificado.ts` + hook + modal que lê os BYTES do .p12 (FileReader→base64) e faz upload real + tela com status real (CN/validade/CNPJ/dias) + hub lê o status real. tsc ✅ + build ✅ (49 rotas) + verificação Playwright (upload real de um .p12 → POST com pfx_base64+senha → "Certificado instalado", 0 erros console em load limpo).
+- **Pendência:** integração e2e HTTP real não rodada (o container `:8000` é imagem antiga sem o cofre; backend provado por unit+migration). Onboarding (`passo-certificado`) segue local (follow-up). Stub do cert A1 oficialmente **resolvido**.
 
 ---
 
