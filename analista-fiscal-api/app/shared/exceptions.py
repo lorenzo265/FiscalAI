@@ -1256,3 +1256,26 @@ class ManifestacaoAssinaturaIndisponivel(ManifestacaoError):
     """
 
     http_status = 412
+
+
+class ManifestacaoTransmissaoDesativada(ManifestacaoError):
+    """Tentativa de transmitir com flag MANIFESTACAO_TRANSMISSAO_ATIVA=false.
+
+    §8.12 — transmissão é ato consciente. Service para com 412 quando a
+    flag opt-in está desligada (default em dev/CI). Habilite no .env
+    quando o cert A1 + credenciais SEFAZ estiverem prontos para produção.
+
+    Análogo a ``ReinfTransmissaoDesativada`` e ``EsocialTransmissaoDesativada``.
+    """
+
+    http_status = 412
+
+
+class ManifestacaoErroSEFAZ(ManifestacaoError):
+    """SEFAZ/Focus NFe respondeu com 4xx/5xx ou XML inválido após retries.
+
+    O evento foi enviado mas o SEFAZ retornou erro não-recuperável.
+    Persiste o evento como 'rejeitado' com o cStat e xMotivo recebidos.
+    """
+
+    http_status = 502

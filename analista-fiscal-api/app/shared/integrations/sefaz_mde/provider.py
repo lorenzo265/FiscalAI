@@ -1,4 +1,4 @@
-"""Providers para o serviço DistribuiçãoDFe (NFeDistribuicaoDFe) — MD-e PR2.
+"""Providers para o serviço MD-e (DistribuiçãoDFe + RecepcaoEvento).
 
 Expõe:
   * ``SefazMdeProvider`` — Protocol (contrato; zero importações de rede).
@@ -6,19 +6,25 @@ Expõe:
   * ``FocusSefazMdeProvider`` — real, via Focus NFe REST (best-effort [follow-up]).
   * ``build_sefaz_mde_provider`` — factory baseado em settings.
 
-§8.12 — transmissão é ato consciente. ``transmitir_evento`` é NotImplemented
-         neste PR (PR3 cabeará cert A1 + RecepcaoEvento SEFAZ).
-§8.9  — idempotência: o caller (``DistribuicaoService``) faz upsert idempotente;
-         o provider não persiste nada.
+§8.12 — transmissão é ato consciente. ``MANIFESTACAO_TRANSMISSAO_ATIVA=false``
+         mantém o pipeline inerte no service (fail-closed).
+§8.9  — idempotência: o caller (``TransmissaoManifestacaoService``) gera
+         ``idempotency_key`` UUID5 estável; o provider repassa via header.
 
-[follow-up PR3] Confirmar o endpoint Focus NFe para NF-es recebidas por NSU
-  antes de ligar em produção. O Focus NFe pode não ter um wrapper REST para
-  NFeDistribuicaoDFe e exigir integração direta com o SOAP SEFAZ.
+[follow-up PR3] Confirmar o endpoint Focus NFe para RecepcaoEvento de evento
+  MD-e (manifestação do destinatário) antes de ligar em produção. A Focus NFe
+  pode não ter wrapper REST para NFeRecepcaoEvento — exigindo integração SOAP
+  direta com o SEFAZ AN (cOrgao=91, endpoint Nacional).
+
+[follow-up PR3] Confirmar endpoint Focus NFe para NFeDistribuicaoDFe (baixar
+  documentos por NSU) antes de ligar em produção.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import xml.etree.ElementTree as ET  # nosec B405 — parseia resposta SEFAZ confiável
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Protocol, runtime_checkable
@@ -34,7 +40,9 @@ from tenacity import (
 
 from app.config import Settings
 from app.shared.integrations.sefaz_mde.types import (
+    CSTAT_ACEITOS_MDE,
     ResultadoDistribuicao,
+    ResultadoTransmissaoEvento,
     ResumoNFeDestinada,
     TipoDocumentoMde,
 )
@@ -74,11 +82,16 @@ class SefazMdeProvider(Protocol):
         cnpj: str,
         xml_evento: bytes,
         idempotency_key: str,
-    ) -> str:
-        """Envia evento MD-e ao RecepcaoEvento SEFAZ. Retorna protocolo.
+    ) -> ResultadoTransmissaoEvento:
+        """Envia evento MD-e ao RecepcaoEvento SEFAZ (cOrgao=91, AN).
 
-        TODO PR3 — não implementado neste PR. Cabeará cert A1 ICP-Brasil +
-        wiring do webservice NFeRecepcaoEvento (cOrgao=91, Ambiente Nacional).
+        PR3 — cabeado com cert A1 ICP-Brasil via ``carregar_cert_a1``.
+        Retorna ``ResultadoTransmissaoEvento`` com protocolo, cStat e
+        ``aceito = cStat in {135, 136}`` (NT 2014.002 §6.1).
+
+        §8.9 — idempotência: repassar ``idempotency_key`` como header
+        ``X-Idempotency-Key`` garante que retransmissões devolvem o mesmo
+        resultado no Focus NFe / SEFAZ (deduplicação pelo AN).
         """
         ...
 
@@ -94,11 +107,22 @@ class _FakeSefazMdeProvider:
       * N > 0: simula N páginas adicionais (``max_nsu > ult_nsu + batch_size``),
         útil para testar o cap ``max_paginas`` e ``truncado=True``.
 
+    ``rejeitar_evento``:
+      * False (default): ``transmitir_evento`` retorna cStat=135 (aceito).
+      * True: ``transmitir_evento`` retorna cStat=218 (Duplicidade de evento)
+        — útil para testar o caminho de rejeição no service.
+
     Mesma entrada → mesma saída (determinismo §8.4). Sem rede, sem estado.
     """
 
-    def __init__(self, *, extra_batches: int = 0) -> None:
+    def __init__(
+        self,
+        *,
+        extra_batches: int = 0,
+        rejeitar_evento: bool = False,
+    ) -> None:
         self._extra = extra_batches
+        self._rejeitar = rejeitar_evento
 
     async def baixar_documentos(
         self,
@@ -141,9 +165,51 @@ class _FakeSefazMdeProvider:
         cnpj: str,
         xml_evento: bytes,
         idempotency_key: str,
-    ) -> str:
-        raise NotImplementedError(
-            "transmitir_evento: implementar em PR3 (cert A1 + RecepcaoEvento SEFAZ)"
+    ) -> ResultadoTransmissaoEvento:
+        """Simula a transmissão ao RecepcaoEvento SEFAZ (sem rede).
+
+        Modo ``rejeitar_evento=False`` (default): cStat=135 (aceito).
+        Modo ``rejeitar_evento=True``: cStat=218 (Duplicidade — rejeição).
+
+        Recibo fake é XML mínimo do ``retEvento`` para exercitar
+        o armazenamento no storage (test PR3).
+        """
+        if self._rejeitar:
+            xml_recibo = (
+                b"<retEvento><infEvento>"
+                b"<cStat>218</cStat>"
+                b"<xMotivo>Rejeicao: Duplicidade de evento</xMotivo>"
+                b"</infEvento></retEvento>"
+            )
+            return ResultadoTransmissaoEvento(
+                protocolo=None,
+                codigo_status=218,
+                motivo="Rejeicao: Duplicidade de evento",
+                xml_recibo=xml_recibo,
+                aceito=False,
+            )
+
+        # Protocolo determinístico baseado no idempotency_key
+        protocolo = f"NFEMDE{hashlib.sha256(idempotency_key.encode()).hexdigest()[:15].upper()}"
+        xml_recibo = (
+            f"<retEvento><infEvento>"
+            f"<cStat>135</cStat>"
+            f"<xMotivo>Evento registrado e vinculado a NF-e</xMotivo>"
+            f"<nProt>{protocolo}</nProt>"
+            f"</infEvento></retEvento>"
+        ).encode()
+        log.debug(
+            "sefaz_mde.fake.transmitir",
+            cnpj=cnpj[:6] + "...",
+            idempotency_key=idempotency_key,
+            protocolo=protocolo,
+        )
+        return ResultadoTransmissaoEvento(
+            protocolo=protocolo,
+            codigo_status=135,
+            motivo="Evento registrado e vinculado a NF-e",
+            xml_recibo=xml_recibo,
+            aceito=True,
         )
 
     @staticmethod
@@ -234,14 +300,147 @@ class FocusSefazMdeProvider:
             status_code=resp.status_code,
         )
 
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=30),
+        stop=stop_after_attempt(4),
+        retry=retry_if_exception_type(httpx.TransportError),
+        reraise=True,
+    )
     async def transmitir_evento(
         self,
         cnpj: str,
         xml_evento: bytes,
         idempotency_key: str,
-    ) -> str:
-        raise NotImplementedError(
-            "transmitir_evento: implementar em PR3 (cert A1 + RecepcaoEvento SEFAZ)"
+    ) -> ResultadoTransmissaoEvento:
+        """Transmite evento MD-e ao SEFAZ via Focus NFe (best-effort).
+
+        [follow-up PR3] Endpoint e formato da Focus NFe para RecepcaoEvento
+        de manifestação de destinatário precisam ser confirmados na
+        documentação oficial antes de ir para produção. A Focus NFe pode
+        não ter wrapper REST para NFeRecepcaoEvento e exigir integração SOAP
+        direta com o SEFAZ AN (cOrgao=91, Ambiente Nacional).
+
+        Implementação atual envia o XML assinado como corpo da requisição
+        (Content-Type: application/xml) para o endpoint best-effort
+        ``/v2/manifestacoes``. O parser do retorno é tolerante a JSON e XML.
+
+        Retry: apenas ``httpx.TransportError`` (erros de transporte).
+        4xx: levanta ``SefazMdeErro`` sem retry (rejeição de negócio).
+        """
+        # [follow-up PR3] Confirmar endpoint Focus NFe para transmissão de
+        # evento MD-e. Pode exigir outro caminho ou formato de request.
+        url = f"{self._base}/v2/manifestacoes"
+        headers = {
+            "Content-Type": "application/xml",
+            "X-Idempotency-Key": idempotency_key,
+        }
+        try:
+            resp = await self._http.post(url, content=xml_evento, headers=headers)
+        except httpx.TransportError:
+            raise  # tenacity captura e decide se retenta
+
+        if resp.status_code not in (200, 201):
+            raise SefazMdeErro(
+                f"Focus NFe RecepcaoEvento retornou {resp.status_code}: "
+                f"{resp.text[:300]}",
+                status_code=resp.status_code,
+            )
+
+        return self._parse_ret_evento(resp.content)
+
+    def _parse_ret_evento(self, content: bytes) -> ResultadoTransmissaoEvento:
+        """Parser tolerante do retEvento (JSON ou XML).
+
+        Extrai ``cStat``, ``xMotivo`` e ``nProt`` do retorno do SEFAZ/Focus.
+        Aceita resposta JSON (Focus wrapper) ou XML nativo (retEvento).
+        """
+        # Tenta JSON primeiro (Focus NFe pode wrappear em JSON)
+        try:
+            data = json.loads(content.decode("utf-8", errors="replace"))
+            if isinstance(data, dict):
+                c_stat_raw = _get_first(
+                    data, "cStat", "codigo_status", "status", "c_stat"
+                )
+                x_motivo_raw = _get_first(
+                    data, "xMotivo", "motivo", "mensagem", "x_motivo"
+                )
+                n_prot_raw = _get_first(
+                    data, "nProt", "protocolo", "n_prot", "numero_protocolo"
+                )
+                c_stat = _coerce_int(c_stat_raw, 0) if c_stat_raw is not None else None
+                x_motivo = str(x_motivo_raw) if x_motivo_raw else None
+                n_prot = str(n_prot_raw) if n_prot_raw else None
+                aceito = c_stat in CSTAT_ACEITOS_MDE if c_stat is not None else False
+                log.info(
+                    "sefaz_mde.focus.ret_evento_json",
+                    c_stat=c_stat,
+                    aceito=aceito,
+                )
+                return ResultadoTransmissaoEvento(
+                    protocolo=n_prot,
+                    codigo_status=c_stat,
+                    motivo=x_motivo,
+                    xml_recibo=content,
+                    aceito=aceito,
+                )
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+        # Tenta parse XML (retEvento SEFAZ)
+        try:
+            root = ET.fromstring(content)  # nosec B314 — resposta do SEFAZ confiável
+            # Namespace tolerante: procura com e sem namespace.
+            # Nota: não usar `or` com ET.Element — elementos vazios são falsy
+            # em Python 3.8+; usar `is not None` explicitamente.
+            _nfe_ns = "{http://www.portalfiscal.inf.br/nfe}"
+            inf = root.find(f".//{_nfe_ns}infEvento")
+            if inf is None:
+                inf = root.find(".//infEvento")
+            if inf is not None:
+                # cStat
+                _c_el = inf.find(f"{_nfe_ns}cStat")
+                if _c_el is None:
+                    _c_el = inf.find("cStat")
+                # xMotivo
+                _m_el = inf.find(f"{_nfe_ns}xMotivo")
+                if _m_el is None:
+                    _m_el = inf.find("xMotivo")
+                # nProt
+                _p_el = inf.find(f"{_nfe_ns}nProt")
+                if _p_el is None:
+                    _p_el = inf.find("nProt")
+
+                c_stat_text = _c_el.text if _c_el is not None else None
+                c_stat = _coerce_int(c_stat_text, 0) if c_stat_text else None
+                x_motivo = _m_el.text if _m_el is not None else None
+                n_prot = _p_el.text if _p_el is not None else None
+                aceito = c_stat in CSTAT_ACEITOS_MDE if c_stat is not None else False
+                log.info(
+                    "sefaz_mde.focus.ret_evento_xml",
+                    c_stat=c_stat,
+                    aceito=aceito,
+                )
+                return ResultadoTransmissaoEvento(
+                    protocolo=n_prot,
+                    codigo_status=c_stat,
+                    motivo=x_motivo,
+                    xml_recibo=content,
+                    aceito=aceito,
+                )
+        except ET.ParseError:
+            pass
+
+        # Fallback: conteúdo não reconhecido
+        log.warning(
+            "sefaz_mde.focus.ret_evento_nao_reconhecido",
+            bytes_recebidos=len(content),
+        )
+        return ResultadoTransmissaoEvento(
+            protocolo=None,
+            codigo_status=None,
+            motivo="Resposta do SEFAZ não reconhecida (JSON/XML inválido)",
+            xml_recibo=content,
+            aceito=False,
         )
 
     def _parse_response(

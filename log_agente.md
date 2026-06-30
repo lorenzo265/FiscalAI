@@ -3,11 +3,11 @@
 **Última atualização:** 2026-06-29
 **Agente:** claude-opus-4-8 (orquestrador, solo)
 **Skill ativa:** `fiscalai-backend`
-**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação) + PR2 (DistribuiçãoDFe)** consolidados por **commit local**, gate verde; **NÃO pushado** (freio do PO). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
-**Suite atual:** **2853 testes** em `tests/unit + tests/eval` (gate orquestrador, PR1+PR2; +26 sobre 2827); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
-**mypy strict:** ✅ 0 erros (399 arquivos) · **ruff `check .` ✅ VERDE**
+**Branch:** `feat/manifestacao-mde` (sobre `main`@`601d332`) — **MD-e PR1 (fundação) + PR2 (DistribuiçãoDFe) + PR3 (transmissão RecepcaoEvento)** consolidados por **commit local**, gate verde; **NÃO pushado** (freio do PO). Falta PR4 (front). [M1–M4 + e-mail nos fluxos já em `origin/main` (`3c7d65d`→handoff `601d332`).]
+**Suite atual:** **2869 testes** em `tests/unit + tests/eval` (gate orquestrador, PR1+PR2+PR3; +42 sobre 2827); 3 skipped (symlink storage OS + 2× eval_live) · integração **36 passed** · front: `npm run build` ✅ + `tsc --noEmit` ✅
+**mypy strict:** ✅ 0 erros (401 arquivos) · **ruff `check .` ✅ VERDE**
 **bandit:** ✅ 0 issues (nosec: falsos positivos anotados)
-**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação + PR2 DistribuiçãoDFe ✅ (branch, não pushado)** 🧾
+**🎉 ROADMAP COMPLETO — Sprints 0–22 (Fases 1-4)** + **Hardening Auditoria (2026-06-04)** ✅ + **Validação Fiscal (2026-06-05)** ✅ + **Correção Auditoria Fiscal (2026-06-21)** 🔧 + **Produção M1 (fundação) + M2 (billing) + M3 (LGPD/segurança)** 🚀 + **M4 remover mocks — PR 1 storage + PR 2 Reinf→SERPRO + PR 3 e-mail + PR 4 Dockerfile front ✅** + **e-mail nos fluxos + fix registro Celery ✅ (PUSHADO origin/main@`3c7d65d`)** 📦 + **Manifesto NF-e (MD-e) PR1 fundação + PR2 DistribuiçãoDFe + PR3 transmissão ✅ (branch, não pushado)** 🧾
 
 > **▶ PRÓXIMO AGENTE:** leia **`docs/PROMPT-PROXIMO-AGENTE-POS-M4.md`** — contexto completo, freios, ambiente (DB :5434 agora UP), e pendências priorizadas (Reinf cert A1, e-mail at-least-once, módulos órfãos §3.2, manifesto NF-e §3.4). Mapa das pontas soltas: `docs/auditoria-pontas-soltas-be-fe.md`.
 
@@ -200,6 +200,60 @@ Descobre NF-es emitidas contra o CNPJ da empresa via SEFAZ DistribuiçãoDFe (NF
 - `app/modules/manifestacao/schemas.py` (+3 schemas PR2)
 - `app/modules/manifestacao/router.py` (+2 endpoints PR2)
 - `tests/unit/manifestacao/test_distribuicao.py` (NOVO, 27 testes)
+
+---
+
+## Manifestação do Destinatário NF-e (MD-e) — PR3 Transmissão RecepcaoEvento · branch `feat/manifestacao-mde` · 2026-06-29
+
+Pipeline completo de transmissão do evento MD-e ao webservice SEFAZ RecepcaoEvento (cOrgao=91, Ambiente Nacional). Espelha 1:1 o padrão `TransmissaoReinfService` (M4 PR2). **Inerte por design**: cert A1 retorna None (helper único `carregar_cert_a1` — épico pendente), flag `MANIFESTACAO_TRANSMISSAO_ATIVA=false` por default (fail-closed §8.12).
+
+**O que entrou:**
+
+- **`app/shared/crypto/cert_loader.py`** (NOVO): helper único `async def carregar_cert_a1(session, empresa_id) -> tuple[bytes, str] | None`. Retorna `None` por ora com log `cert.indisponivel` em debug. Docstring explica o TODO completo (tabela cifrada + AES-256 decifra). **Ponto único de entrada do cert A1** — eSocial/Reinf têm comentário `# TODO: migrar para carregar_cert_a1` mas comportamento preservado (sem regressão).
+
+- **`app/shared/integrations/sefaz_mde/types.py`** (MODIFICADO): adicionado `CSTAT_ACEITOS_MDE: frozenset[int] = frozenset({135, 136})` + dataclass `ResultadoTransmissaoEvento(protocolo, codigo_status, motivo, xml_recibo, aceito)`. Critério de aceite NT 2014.002 §6.1: cStat 135 (vinculado) e 136 (NF-e não encontrada no AN) = aceitos; demais = rejeitados.
+
+- **`app/shared/integrations/sefaz_mde/provider.py`** (MODIFICADO): Protocol `SefazMdeProvider.transmitir_evento` atualizado para retornar `ResultadoTransmissaoEvento`. `_FakeSefazMdeProvider`: novo param `rejeitar_evento: bool = False`; implementa `transmitir_evento` (cStat 135 aceito / 218 rejeição, protocolo determinístico via SHA-256 do idempotency_key, recibo XML fake). `FocusSefazMdeProvider`: implementa `transmitir_evento` com `@retry(TransportError)` + idempotência via `X-Idempotency-Key`, POST best-effort a `/v2/manifestacoes`, parser tolerante `_parse_ret_evento` (JSON + XML, `is not None` explícito para ET.Element). Adicionados imports `json`, `ET`. **[follow-up]** endpoint Focus NFe a confirmar na doc oficial antes de produção.
+
+- **`app/shared/exceptions.py`** (MODIFICADO): adicionado `ManifestacaoTransmissaoDesativada` (http_status=412) e `ManifestacaoErroSEFAZ` (502) no bloco MD-e.
+
+- **`app/config.py`** (MODIFICADO): adicionado `MANIFESTACAO_TRANSMISSAO_ATIVA: bool = False` (§8.12, mesmo padrão de `ESOCIAL_TRANSMISSAO_ATIVA`/`REINF_TRANSMISSAO_ATIVA`).
+
+- **`app/modules/manifestacao/transmissao_manifestacao_service.py`** (NOVO): `TransmissaoManifestacaoService.transmitir(session, tenant_id, empresa_id, manifestacao_id, *, signer, provider, storage, transmissao_ativa, tp_amb="1")`. Fluxo: fail-closed §8.12 → carrega manifestação → idempotência (aceito/transmitido → no-op) → re-gera XML via `gerar_xml_evento` (usa `criado_em` como `dh_evento`, determinístico) → assina (fail-soft: `XmldsigSigningError` → `ManifestacaoAssinaturaIndisponivel` 412, status fica 'preparado') → grava XML assinado no storage → transmite via provider → grava recibo → atualiza status/protocolo/cStat/motivo/timestamps → commit único. `_idempotency_key` = UUID5 sobre `(empresa_id|chave_nfe|tipo_evento|sequencial)` com namespace MD-e distinto. DI-first: signer/provider/storage injetados (router usa factories, testes usam fakes). `ALGORITMO_VERSAO = "mde.transmissao.v1"`.
+
+- **`app/modules/manifestacao/router.py`** (MODIFICADO): adicionado `POST /{empresa_id}/manifestacao/{manifestacao_id}/transmitir` — resolve cert via `carregar_cert_a1` (None hoje) → `construir_assinador` → `build_sefaz_mde_provider` → `StorageDep` → `TransmissaoManifestacaoService().transmitir(...)`. `tp_amb` derivado de `settings.FOCUS_NFE_SANDBOX` (reutiliza config existente; [follow-up] separar `MANIFESTACAO_SANDBOX` quando necessário). Adicionados imports: `TransmissaoManifestacaoService`, `carregar_cert_a1`, `construir_assinador`, `StorageDep`.
+
+- **`tests/unit/manifestacao/test_distribuicao.py`** (MODIFICADO): substituído `test_fake_transmitir_evento_not_implemented` (que testava o placeholder PR2) por 2 novos testes: `test_fake_transmitir_evento_retorna_aceito` (cStat 135) e `test_fake_transmitir_evento_rejeicao` (cStat 218, `rejeitar_evento=True`).
+
+- **`tests/unit/manifestacao/test_transmissao.py`** (NOVO): 15 testes — happy path aceito (cStat 135), rejeitado (cStat 218), fail-closed (flag off → 412), fail-soft sem cert (XmldsigSigningError → 412, status 'preparado'), idempotência aceito (no-op), idempotência transmitido (no-op), XML na key correta, recibo na key correta, storage_key definida após transmissão, usa key pré-existente, respondido_em/transmitido_em preenchidos, tipo 210240 com justificativa, protocolo determinístico do Fake, cStat aceitos frozenset, cert_loader retorna None.
+
+**Decisões de domínio (com fonte):**
+- **Critério de aceite cStat {135, 136}**: NT 2014.002 §6.1 — 135 = registrado e vinculado à NF-e; 136 = registrado mas NF-e não encontrada no AN (comum em evento Ciência antes da NF-e ser autorizada). Ambos = evento válido registrado no SEFAZ.
+- **Re-gera XML no transmitir**: `criado_em` como `dh_evento` → determinístico entre retentativas. `dhEvento` não afeta deduplicação no SEFAZ (deduplicação é pelo Id = tipo+chave+seq).
+- **Commit único** no final: storage writes acontecem antes do commit. Se DB falha, storage tem dados órfãos (keys determinísticas → retry sobrescreve idempotentemente). Aceito por simplicidade; a alternativa (commit antes do envio + commit depois) seria 2-phase e complexa.
+- **`tp_amb`** derivado de `FOCUS_NFE_SANDBOX` no router (reutiliza config existente do Focus NFe).
+
+**Pendências conscientes PR3 ([follow-up]):**
+1. **Endpoint Focus NFe para RecepcaoEvento** — confirmar `/v2/manifestacoes` + formato de request/response na doc oficial antes de produção. Focus pode não ter wrapper REST para NFeRecepcaoEvento (SOAP direto no SEFAZ AN).
+2. **Cert A1** — `carregar_cert_a1` retorna None. Pipeline inerte até épico "gestão de cert A1 por empresa" ser entregue.
+3. **eSocial/Reinf** — deixado comentário `# TODO: migrar para carregar_cert_a1` nos routers (sem mudar comportamento, sem regressão).
+4. **`httpx.AsyncClient` sem `aclose`** no `FocusSefazMdeProvider` — dívida pré-existente (espelha eSocial/Reinf); varrer junto num cleanup de robustez.
+
+**Contagem:** 2853 (base PR2) → **2869 confirmados** (+16). Gate (orquestrador): `pytest tests/unit tests/eval` = **2869 passed / 3 skip** · `mypy app/` = **0 / 401** · `ruff` limpo (corrigi 2 `UP012` `.encode("utf-8")`→`.encode()` no fake signer do teste). Sem migration nova.
+**Revisão de princípios (orquestrador — reviewers automáticos travando):** §8.12 fail-closed (flag off → 412) ✅, idempotência aceito/transmitido no-op ✅, storage do XML+recibo ✅, critério cStat ∈ {135,136} ✅, cert por `carregar_cert_a1` (None) → fail-soft ✅, DI de signer/provider/storage ✅, eSocial/Reinf inalterados (só comentário TODO) ✅. **Estado:** PR3 consolidado por **commit local** na branch — NÃO pushado (freio do PO).
+**Migration:** nenhuma — `ManifestacaoNFe` já tem todos os campos necessários (`xml_recibo_storage_key`, `protocolo`, `codigo_status_sefaz`, `motivo_sefaz`, `transmitido_em`, `respondido_em`) da migration 0067.
+
+**Arquivos criados/modificados (PR3):**
+- `app/shared/crypto/cert_loader.py` (NOVO)
+- `app/shared/integrations/sefaz_mde/types.py` (+`CSTAT_ACEITOS_MDE`, +`ResultadoTransmissaoEvento`)
+- `app/shared/integrations/sefaz_mde/provider.py` (Protocol + impls `transmitir_evento`, +`_parse_ret_evento`, +`rejeitar_evento`, +imports `json`/`ET`)
+- `app/shared/integrations/sefaz_mde/__init__.py` (docstring atualizada)
+- `app/shared/exceptions.py` (+`ManifestacaoTransmissaoDesativada`, +`ManifestacaoErroSEFAZ`)
+- `app/config.py` (+`MANIFESTACAO_TRANSMISSAO_ATIVA`)
+- `app/modules/manifestacao/transmissao_manifestacao_service.py` (NOVO)
+- `app/modules/manifestacao/router.py` (+1 endpoint transmitir, +imports)
+- `tests/unit/manifestacao/test_distribuicao.py` (substituído NotImplementedError test +2 testes PR3)
+- `tests/unit/manifestacao/test_transmissao.py` (NOVO, 15 testes)
 
 ---
 

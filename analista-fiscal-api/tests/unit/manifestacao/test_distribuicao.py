@@ -117,11 +117,27 @@ async def test_fake_valor_total_decimal() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fake_transmitir_evento_not_implemented() -> None:
-    """transmitir_evento levanta NotImplementedError (PR3)."""
+async def test_fake_transmitir_evento_retorna_aceito() -> None:
+    """transmitir_evento (PR3) retorna ResultadoTransmissaoEvento com aceito=True (cStat 135)."""
+    from app.shared.integrations.sefaz_mde.types import ResultadoTransmissaoEvento
+
     provider = _FakeSefazMdeProvider()
-    with pytest.raises(NotImplementedError, match="PR3"):
-        await provider.transmitir_evento(_CNPJ, b"<xml/>", "key-1")
+    resultado = await provider.transmitir_evento(_CNPJ, b"<xml/>", "key-1")
+    assert isinstance(resultado, ResultadoTransmissaoEvento)
+    assert resultado.aceito is True
+    assert resultado.codigo_status == 135
+
+
+@pytest.mark.asyncio
+async def test_fake_transmitir_evento_rejeicao() -> None:
+    """transmitir_evento com rejeitar_evento=True retorna aceito=False (cStat 218)."""
+    from app.shared.integrations.sefaz_mde.types import ResultadoTransmissaoEvento
+
+    provider = _FakeSefazMdeProvider(rejeitar_evento=True)
+    resultado = await provider.transmitir_evento(_CNPJ, b"<xml/>", "key-2")
+    assert isinstance(resultado, ResultadoTransmissaoEvento)
+    assert resultado.aceito is False
+    assert resultado.codigo_status == 218
 
 
 # ── DistribuicaoService.sincronizar ──────────────────────────────────────────

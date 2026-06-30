@@ -58,3 +58,43 @@ class ResultadoDistribuicao:
     documentos: list[ResumoNFeDestinada] = field(default_factory=list)
     ult_nsu: int = 0  # último NSU retornado nesta consulta
     max_nsu: int = 0  # maior NSU disponível no AN para o CNPJ
+
+
+# ── PR3: Transmissão de evento (RecepcaoEvento) ──────────────────────────────
+
+# cStat aceitos para manifestação do destinatário (NT 2014.002 §6.1 / MOC NF-e):
+#   135 — Evento registrado e vinculado a NF-e
+#   136 — Evento registrado, mas NF-e não encontrada no AN (comum em Ciência
+#          antes de a NF-e estar autorizada no AN)
+CSTAT_ACEITOS_MDE: frozenset[int] = frozenset({135, 136})
+
+
+@dataclass(frozen=True, slots=True)
+class ResultadoTransmissaoEvento:
+    """Resultado da transmissão de um evento MD-e ao SEFAZ via RecepcaoEvento.
+
+    Retornado por ``SefazMdeProvider.transmitir_evento``.
+
+    Critério de aceite (NT 2014.002 §6.1 / MOC NF-e v7.0):
+      cStat 135 — Evento registrado e vinculado a NF-e
+      cStat 136 — Evento registrado, mas NF-e não encontrada no AN
+
+    Outros cStat = rejeição (4xx SEFAZ — ex.: 218 Duplicidade, 225 schema,
+    etc.). O caller decide como tratar; o service atualiza ``status`` para
+    'aceito' ou 'rejeitado' baseado em ``aceito``.
+    """
+
+    protocolo: str | None
+    """nProt do retEvento — identificador único do protocolo SEFAZ."""
+
+    codigo_status: int | None
+    """cStat do retEvento (135/136 = aceito; outros = rejeição)."""
+
+    motivo: str | None
+    """xMotivo do retEvento (descrição legível do status)."""
+
+    xml_recibo: bytes | None
+    """XML completo do retEvento para armazenamento (audit trail §8.2)."""
+
+    aceito: bool
+    """True quando codigo_status ∈ {135, 136}."""

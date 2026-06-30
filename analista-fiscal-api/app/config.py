@@ -455,6 +455,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    # MD-e PR3 — Transmissão de evento ao SEFAZ (RecepcaoEvento).
+    # Mesmo padrão do eSocial/Reinf: opt-in explícito, default False.
+    # Habilite em produção quando cert A1 ICP-Brasil estiver disponível via
+    # ``carregar_cert_a1`` (épico "gestão de cert A1 por empresa").
+    MANIFESTACAO_TRANSMISSAO_ATIVA: bool = Field(
+        default=False,
+        description=(
+            "§8.12 — Transmissão é ato consciente. Flag opt-in: False = "
+            "evento fica em status='assinado' sem enviar ao SEFAZ (pronto "
+            "para admin baixar e transmitir manualmente). True = pipeline "
+            "MD-e transmite automaticamente ao RecepcaoEvento SEFAZ após "
+            "assinatura. Análogo a ESOCIAL_TRANSMISSAO_ATIVA / "
+            "REINF_TRANSMISSAO_ATIVA. Default False até cert A1 + credenciais "
+            "SEFAZ estarem prontos em produção."
+        ),
+    )
+
     # Sprint 19.5 PR2 — Painel admin de tabelas tributárias
     ADMIN_WHATSAPP_PHONE: str | None = Field(
         default=None,

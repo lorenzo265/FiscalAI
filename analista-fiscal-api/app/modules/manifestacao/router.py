@@ -2,10 +2,11 @@
 
 PR1: POST registrar + GET listar.
 PR2: POST sincronizar (DistribuiçãoDFe) + GET destinadas.
-Transmissão ao SEFAZ: TODO PR3.
+PR3: POST transmitir (RecepcaoEvento SEFAZ) — pipeline assinar+enviar.
 
-§8.12 — o endpoint POST registra e opcionalmente assina (fail-soft);
-        status 'preparado' = assinatura pendente, 'assinado' = pronto para PR3.
+§8.12 — transmissão é ato consciente; flag MANIFESTACAO_TRANSMISSAO_ATIVA
+        default False (inerte em dev/CI). Cert A1 via carregar_cert_a1
+        (retorna None por ora — épico "gestão de cert A1 por empresa").
 """
 
 from __future__ import annotations
@@ -27,10 +28,16 @@ from app.modules.manifestacao.schemas import (
     TipoEventoManifestacaoIn,
 )
 from app.modules.manifestacao.service import ManifestacaoService
+from app.modules.manifestacao.transmissao_manifestacao_service import (
+    TransmissaoManifestacaoService,
+)
+from app.shared.crypto.cert_loader import carregar_cert_a1
+from app.shared.crypto.xmldsig import construir_assinador
 from app.shared.db.deps import SessionDep, TenantDep
 from app.shared.db.models import Empresa
 from app.shared.exceptions import EmpresaNaoEncontrada
 from app.shared.integrations.sefaz_mde.provider import build_sefaz_mde_provider
+from app.shared.storage.deps import StorageDep
 
 router = APIRouter(prefix="/v1/empresas", tags=["manifestacao_nfe"])
 
@@ -176,3 +183,63 @@ async def listar_destinadas(
         limite=limite,
     )
     return [NfeDestinadaOut.model_validate(r) for r in rows]
+
+
+# ── PR3: Transmissão de Evento ao SEFAZ (RecepcaoEvento) ─────────────────────
+
+
+@router.post(
+    "/{empresa_id}/manifestacao/{manifestacao_id}/transmitir",
+    response_model=ManifestacaoNFeOut,
+    status_code=200,
+    summary="Transmite evento MD-e ao SEFAZ (RecepcaoEvento)",
+    description=(
+        "Pipeline completo: (re)assina o XML com cert A1 ICP-Brasil → grava no "
+        "object storage → POST ao RecepcaoEvento SEFAZ (cOrgao=91, Ambiente "
+        "Nacional) via Focus NFe [best-effort, follow-up] → grava recibo → "
+        "atualiza status ('aceito' cStat∈{135,136} / 'rejeitado'). "
+        "**Inerte em dev/CI**: ``MANIFESTACAO_TRANSMISSAO_ATIVA=false`` (§8.12). "
+        "**Cert A1**: ``carregar_cert_a1`` retorna None por ora (épico "
+        "'gestão de cert A1 por empresa' → ver ``app/shared/crypto/cert_loader.py``). "
+        "Idempotente: manifestação já 'aceita'/'transmitida' → devolve como está."
+    ),
+)
+async def transmitir_manifestacao(
+    empresa_id: UUID,
+    manifestacao_id: UUID,
+    ctx: TenantDep,
+    session: SessionDep,
+    request: Request,
+    storage: StorageDep,
+) -> ManifestacaoNFeOut:
+    settings = request.app.state.settings
+
+    # TODO: migrar para carregar_cert_a1 quando "gestão de cert A1" for entregue.
+    # Por ora, cert=None → NotImplementedXmldsigSigner → transmissão inerte
+    # (fail-soft §8.12): sem cert, XmldsigSigningError → ManifestacaoAssinaturaIndisponivel.
+    # O flag MANIFESTACAO_TRANSMISSAO_ATIVA já é fail-closed (412) se False,
+    # então o cert só é avaliado quando a flag está True.
+    cert = await carregar_cert_a1(session, empresa_id)
+
+    assinador = construir_assinador(
+        cert_p12_bytes=cert[0] if cert else None,
+        senha=cert[1] if cert else None,
+        transmissao_ativa=settings.MANIFESTACAO_TRANSMISSAO_ATIVA,
+    )
+    provider = build_sefaz_mde_provider(settings)
+
+    manifestacao = await TransmissaoManifestacaoService().transmitir(
+        session,
+        ctx.tenant_id,
+        empresa_id,
+        manifestacao_id,
+        signer=assinador,
+        provider=provider,
+        storage=storage,
+        transmissao_ativa=settings.MANIFESTACAO_TRANSMISSAO_ATIVA,
+        # tp_amb: "2" em sandbox/homologação, "1" em produção.
+        # Reutiliza FOCUS_NFE_SANDBOX (settings existente) enquanto não há
+        # MANIFESTACAO_SANDBOX dedicado. [follow-up] separar quando necessário.
+        tp_amb="2" if settings.FOCUS_NFE_SANDBOX else "1",
+    )
+    return ManifestacaoNFeOut.model_validate(manifestacao)
